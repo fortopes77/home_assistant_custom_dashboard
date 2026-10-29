@@ -30,6 +30,9 @@
   --danger: #c43d3d;
   --battery: #3c8f7c;
   --shadow: 0 1px 2px rgb(60 45 20 / 0.05), 0 4px 16px rgb(60 45 20 / 0.06);
+  --tint-glow: 55%;            /* time-of-day tint behind Today: the top glow and the bottom wash */
+  --tint-wash: 34%;
+  --tint-hero: 30%;
   --radius: 20px;
   --radius-sm: 12px;
   --gap: 14px;
@@ -58,6 +61,9 @@
     --warning: #f0a94a;
     --battery: #63c2ab;
     --shadow: none;
+    --tint-glow: 34%;
+    --tint-wash: 24%;
+    --tint-hero: 22%;
     color-scheme: dark;
   }
 }
@@ -77,6 +83,9 @@
   --warning: #f0a94a;
   --battery: #63c2ab;
   --shadow: none;
+  --tint-glow: 34%;
+  --tint-wash: 24%;
+  --tint-hero: 22%;
   color-scheme: dark;
 }
 
@@ -91,6 +100,26 @@ body {
   overflow-x: hidden;
 }
 a { color: var(--primary); }
+
+/* Time of day and weather tint, Today only (js/tint.js sets the two colours).
+   Registered so the colours drift smoothly when the sun or the weather changes. */
+@property --tint-a { syntax: "<color>"; inherits: true; initial-value: #8cc4ea; }
+@property --tint-b { syntax: "<color>"; inherits: true; initial-value: #f2c97e; }
+:root { transition: --tint-a 6s ease, --tint-b 6s ease; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background:
+    radial-gradient(120% 70% at 85% -10%, color-mix(in srgb, var(--tint-a) var(--tint-glow), transparent), transparent 70%),
+    radial-gradient(100% 60% at 0% 110%, color-mix(in srgb, var(--tint-b) var(--tint-wash), transparent), transparent 70%);
+}
+:root.tint-on[data-view="today"] body::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { :root { transition: none; } }
 h1, h2, h3, p { margin: 0; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -330,6 +359,15 @@ small { font-size: 0.8em; }
     radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
     var(--surface);
 }
+/* With the tint on, the hero's glow takes the time-of-day colour instead of plain amber. */
+.tint-on .hero {
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tint-a) var(--tint-hero), transparent), transparent 65%),
+    radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--tint-b) calc(var(--tint-hero) / 2), transparent), transparent 70%),
+    var(--surface);
+}
+/* Let the tint reach the top bar too. */
+.tint-on[data-view="today"] .topbar { background: color-mix(in srgb, var(--bg) 45%, transparent); }
 .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .hero-greet { font-weight: 600; color: var(--muted); }
 .hero-time {
@@ -6675,6 +6713,80 @@ class Sky {
   }
 }
 
+// ---- tint.js ----
+// A quiet wash of colour behind Today that follows the sun and the weather.
+// Much calmer than the live sky: two soft glows whose colours drift through the day.
+// The CSS mixes them at low strength over the page colour, so light and dark both stay readable.
+
+// Colours by sun elevation (degrees): [elevation, [top glow, bottom glow]]. Morning and evening differ.
+const TINT_RISING = [
+  [-12, ['#4a5aa8', '#2c3570']],  // night: indigo
+  [-4, ['#8a6fc4', '#3f4a94']],   // first light: lavender
+  [2, ['#f08a7e', '#9a7fd0']],    // sunrise: rose and lilac
+  [10, ['#f5b469', '#e79a8a']],   // early morning: soft gold
+  [30, ['#8cc4ea', '#f2c97e']],   // morning: clear blue, warm low light
+  [55, ['#7bb6e6', '#a9d4ee']],   // midday: blue
+];
+const TINT_SETTING = [
+  [-12, ['#4a5aa8', '#2c3570']],
+  [-4, ['#7a5cb8', '#3c4590']],   // dusk: violet
+  [2, ['#e7728a', '#8a6cc8']],    // sunset: rose and violet
+  [10, ['#f39a52', '#e6788c']],   // golden hour: amber
+  [30, ['#f2bf6e', '#8cc4ea']],   // afternoon: warm gold
+  [55, ['#7bb6e6', '#a9d4ee']],
+];
+
+// How the weather pulls the colours: towards a shade, by how much.
+const TINT_WEATHER = {
+  partlycloudy: ['#a3acb8', 0.25],
+  cloudy: ['#98a2ae', 0.6],
+  fog: ['#b7bdc4', 0.65],
+  rainy: ['#5f86a6', 0.7],
+  pouring: ['#4f7090', 0.8],
+  lightning: ['#5a5f86', 0.6],
+  'lightning-rainy': ['#4d5580', 0.7],
+  snowy: ['#c9d7e6', 0.6],
+  'snowy-rainy': ['#9fb4c8', 0.6],
+  hail: ['#8fa0b4', 0.6],
+  windy: ['#9fb8c4', 0.2],
+  'windy-variant': ['#98a6b2', 0.4],
+  exceptional: ['#a08a8a', 0.4],
+};
+
+const tintRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const tintHex = (rgb) => '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+const tintMix = (a, b, t) => {
+  const x = tintRgb(a);
+  const y = tintRgb(b);
+  return tintHex(x.map((v, i) => v + (y[i] - v) * t));
+};
+
+function tintSample(table, elevation) {
+  if (elevation <= table[0][0]) return table[0][1];
+  for (let i = 1; i < table.length; i++) {
+    const [e1, c1] = table[i];
+    if (elevation <= e1) {
+      const [e0, c0] = table[i - 1];
+      const t = (elevation - e0) / (e1 - e0);
+      return c0.map((c, j) => tintMix(c, c1[j], t));
+    }
+  }
+  return table[table.length - 1][1];
+}
+
+/** elevation (deg), rising (bool), condition (HA weather state) -> { a, b } hex colours. */
+function todayTint({ elevation = 30, rising = true, condition = '' } = {}) {
+  let [a, b] = tintSample(rising ? TINT_RISING : TINT_SETTING, elevation);
+  const fx = TINT_WEATHER[condition];
+  if (fx) {
+    // Under cloud at night the shade is darker, so it doesn't glow grey in the dark.
+    const shade = elevation < -4 ? tintMix(fx[0], '#2c3570', 0.5) : fx[0];
+    a = tintMix(a, shade, fx[1]);
+    b = tintMix(b, shade, fx[1]);
+  }
+  return { a, b };
+}
+
 // ---- wall.js ----
 // Wall mode for an always-on tablet: a clock screen after a spell without touches, software
 // dimming (more at night), keeping the screen awake, and full screen.
@@ -7598,7 +7710,7 @@ class Voice {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '29 Oct 2026, 14:31 (e82bd4f)';
+const DASH_BUILD = '29 Oct 2026, 15:31 (246c046)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -7630,6 +7742,7 @@ const DEFAULT_PREFS = {
   peopleMap: true,       // the Places page and the map on Today
   showHidden: false,     // hidden and diagnostic entities
   showUnavailable: false,
+  tint: true,            // a quiet time-of-day and weather colour behind Today
   sky: false,            // live sky background
   skyAnimate: true,
   weatherEntity: '',     // weather for the sky and Today; empty = the first one
@@ -7791,6 +7904,7 @@ function tickClock() {
   const big = $('.hero-time');
   if (big) big.textContent = fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, '');
   applyTheme();
+  if (!store.states.has('sun.sun')) updateTint();
 }
 
 function applyTheme() {
@@ -7858,7 +7972,27 @@ function setupWall() {
 let sky = null;
 let skyPreview = ''; // a look picked in Settings to try; not saved
 
+// The same inputs drive the quiet tint behind Today; it is skipped while the live sky is on.
+function updateTint() {
+  const root = document.documentElement;
+  const on = store.prefs.tint && !store.prefs.sky;
+  root.classList.toggle('tint-on', on);
+  if (!on) return;
+  const sun = store.states.get('sun.sun');
+  const a = sun?.attributes || {};
+  const fromClock = clockSun();
+  const w = weatherEntity();
+  const t = todayTint({
+    elevation: Number.isFinite(a.elevation) ? a.elevation : fromClock.elevation,
+    rising: typeof a.rising === 'boolean' ? a.rising : fromClock.rising,
+    condition: w?.state || '',
+  });
+  root.style.setProperty('--tint-a', t.a);
+  root.style.setProperty('--tint-b', t.b);
+}
+
 function updateSky({ instant = false } = {}) {
+  updateTint();
   if (!sky) return;
   const sun = store.states.get('sun.sun');
   const a = sun?.attributes || {};
@@ -7878,6 +8012,7 @@ function updateSky({ instant = false } = {}) {
 function applySky() {
   const on = store.prefs.sky;
   document.documentElement.classList.toggle('sky-on', on);
+  updateTint();
   if (!on) {
     sky?.destroy();
     sky = null;
@@ -8960,6 +9095,7 @@ const VIEWS = {
       <section class="card" id="look">
         <h2 class="card-title">${icon('sun')}Look</h2>
         ${choose('theme', 'Theme', [['auto', 'Same as this device'], ['sun', 'Dark after sunset'], ['light', 'Light'], ['dark', 'Dark']])}
+        ${check('tint', 'Time and weather tint on Today', 'A soft wash of colour that follows the sun and the weather')}
         ${check('sky', 'Live sky background', 'Follows the sun and the weather: sunrise, clouds, rain, storms, stars')}
         ${p.sky ? `${check('skyAnimate', 'Animate rain, snow and clouds', 'Turn off on an older tablet to save power')}
           <div class="row"><span><b>Preview a sky</b><small class="muted">Only for looking; it goes back to live when you reload.</small></span></div>
@@ -9631,7 +9767,7 @@ document.addEventListener('change', (e) => {
     writePrefs();
     applyTheme();
     if (['wall', 'idleMinutes', 'dim', 'dimNight', 'keepAwake'].includes(key)) { wallMode?.update(); renderFullscreenButton(); }
-    if (['sky', 'skyAnimate', 'weatherEntity'].includes(key)) applySky();
+    if (['tint', 'sky', 'skyAnimate', 'weatherEntity'].includes(key)) applySky();
     if (key === 'calView') loadEvents(true);
     if (t.dataset.pref !== 'feedIn' && t.dataset.pref !== 'buyRate') render();
     return;
