@@ -760,6 +760,7 @@ small { font-size: 0.8em; }
 /* ---------- Home: plan, rooms, devices ---------- */
 
 .v-home { display: grid; gap: var(--gap); }
+.home-plan { display: grid; gap: var(--gap); min-width: 0; }
 .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .room { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 16px; background: var(--surface-2); }
 .room.lit { background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
@@ -950,7 +951,7 @@ small { font-size: 0.8em; }
 
 
   .v-home { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
-  .v-home .plan-card { grid-row: span 2; position: sticky; top: 72px; }
+  .v-home .home-plan { grid-row: span 2; }
   .v-home .rooms { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) .rooms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -1160,6 +1161,96 @@ small { font-size: 0.8em; }
 .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
 .chip .icon { width: 18px; height: 18px; }
 .chip:disabled { opacity: 0.45; cursor: default; }
+
+/* ---------- floor plan: cameras round the house ---------- */
+
+.plan-card { position: relative; }
+.plan-card:has(.plan-camera) { padding-bottom: 20px; }
+.plan-camera {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: clamp(10px, 0.6cqi + 6px, 12.5px);
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.plan-camera i {
+  display: grid;
+  place-items: center;
+  width: clamp(24px, 3.4cqi + 10px, 34px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--primary) 55%, transparent), 0 2px 6px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s, background 0.2s;
+}
+.plan-camera .icon { width: 58%; height: 58%; }
+.plan-camera span {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface), 0 0 7px var(--surface);
+  pointer-events: none;
+}
+.plan-camera:focus { outline: none; }
+.plan-camera:focus-visible i { box-shadow: 0 0 0 3px var(--primary); }
+@media (hover: hover) { .plan-camera:hover i { transform: scale(1.1); } }
+/* Someone at a camera: the marker turns solid and pulses. */
+.plan-camera.alert i { background: var(--primary); color: var(--primary-text); }
+.plan-camera.alert i::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  animation: pulse 1.6s infinite;
+  pointer-events: none;
+}
+
+.plan-cam-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.plan-cam-btn .icon { width: 20px; height: 20px; }
+
+/* Moving cameras: rooms step back, markers can be dragged. */
+.cam-editing .plan > svg, .cam-editing .plan-label { opacity: 0.6; }
+.cam-editing .plan { cursor: crosshair; }
+.cam-editing .plan-camera { touch-action: none; cursor: grab; }
+.cam-editing .plan-camera i { box-shadow: 0 0 0 2px var(--primary), 0 2px 8px rgb(0 0 0 / 0.3); }
+.cam-editing .plan-camera.picked i { background: var(--primary); color: var(--primary-text); transform: scale(1.18); }
+.cam-editing .plan-camera.dragging { z-index: 4; cursor: grabbing; }
+.cam-editing .plan-camera.dragging i { transform: scale(1.25); }
+.cam-tray { display: grid; gap: 10px; padding: 22px 14px 8px; }
+.cam-tray .hint { margin: 0; }
+.cam-tray .chips { margin: 0; }
+.cam-tray .chip { cursor: pointer; }
+.cam-tray .chip.off-plan { opacity: 0.6; border-style: dashed; }
+.cam-tray-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.cam-tray-acts .icon { width: 18px; height: 18px; }
 
 .pmap { position: relative; height: 260px; isolation: isolate; }
 .pmap-canvas { position: absolute; inset: 0; }
@@ -2690,16 +2781,139 @@ function roomLabelPoint(room) {
   return best;
 }
 
-/** The part of the floor that is shown: the whole picture, or just the rooms with a little margin. */
-function planBox(floor) {
+/**
+ * The part of the floor that is shown: the whole picture, or just the rooms with a little margin.
+ * With `outside`, a wider margin leaves room for camera markers around the house.
+ */
+function planBox(floor, outside = false) {
   const all = floor.rooms.flatMap((r) => r.points);
-  if (floor.box) return floor.box;
-  if (!all.length || (floor.style === 'picture' && floor.img && !floor.crop)) return { x: 0, y: 0, w: floor.w, h: floor.h };
-  const b = bbox(all);
-  const m = Math.max(8, Math.round(Math.max(b.w, b.h) * 0.025));
+  let b;
+  if (floor.box) b = floor.box;
+  else if (!all.length || (floor.style === 'picture' && floor.img && !floor.crop)) b = { x: 0, y: 0, w: floor.w, h: floor.h };
+  else {
+    const r = bbox(all);
+    const m = Math.max(8, Math.round(Math.max(r.w, r.h) * 0.025));
+    const x = Math.max(0, r.x - m);
+    const y = Math.max(0, r.y - m);
+    b = { x, y, w: Math.min(floor.w, r.x + r.w + m) - x, h: Math.min(floor.h, r.y + r.h + m) - y };
+  }
+  if (!outside) return b;
+  const m = Math.round(Math.max(b.w, b.h) * 0.06);
   const x = Math.max(0, b.x - m);
   const y = Math.max(0, b.y - m);
   return { x, y, w: Math.min(floor.w, b.x + b.w + m) - x, h: Math.min(floor.h, b.y + b.h + m) - y };
+}
+
+// ---------- cameras around the house ----------
+
+// Words in a camera's name that point at a room even when the names differ.
+const CAM_HINTS = [
+  [['driveway', 'drive', 'carport', 'car', 'garagedoor'], ['garage', 'carport']],
+  [['frontdoor', 'front', 'doorbell', 'door', 'porch', 'entry'], ['porch', 'entry', 'frontdoor']],
+  [['deck', 'patio', 'backyard', 'back', 'yard', 'garden', 'pool', 'alfresco'], ['alfresco', 'deck', 'patio', 'outdoor']],
+];
+
+/** The room a camera most likely watches, from its area first and then the words in its name. */
+function cameraRoom(floor, name, areaRoom) {
+  const rooms = floor.rooms.filter((r) => !r.fixed);
+  if (areaRoom && rooms.some((r) => r.id === areaRoom)) return areaRoom;
+  const words = String(name).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const keys = new Set([...words, ...words.slice(1).map((w, i) => words[i] + w), words.join('')].map(normName));
+  const names = (r) => [normName(r.name), ...aliasesOf(r)];
+  const hit = (want) => rooms.find((r) => names(r).some((n) => want.has(n)));
+  let room = hit(keys);
+  for (const [from, to] of CAM_HINTS) {
+    if (room) break;
+    if (from.some((w) => keys.has(w))) room = hit(new Set(to));
+  }
+  return room?.id || null;
+}
+
+/**
+ * Suggested spots for cameras nobody has placed yet: just outside the house on the side nearest
+ * the room each one watches, and cameras with no room spread evenly around the rest of the outside.
+ * @param {object} floor
+ * @param {Array<{id, room}>} cams  room is a room id or null
+ * @param {Array<[number, number]>} taken  spots already used by placed cameras
+ * @returns {Map<string, [number, number]>}
+ */
+function suggestCamSpots(floor, cams, taken = []) {
+  const out = new Map();
+  const all = floor.rooms.flatMap((r) => r.points);
+  if (!all.length) return out;
+  const house = bbox(all);
+  const box = planBox(floor, true);
+  const size = Math.max(house.w, house.h);
+  const off = size * 0.035;
+  const gap = size * 0.11;
+  // The ring the markers sit on, clamped to what is shown.
+  const L = Math.max(box.x + off * 0.6, house.x - off);
+  const R = Math.min(box.x + box.w - off * 0.6, house.x + house.w + off);
+  const T = Math.max(box.y + off * 0.6, house.y - off);
+  const B = Math.min(box.y + box.h - off * 0.6, house.y + house.h + off);
+  const used = taken.map((p) => [...p]);
+  const free = (p) => used.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= gap);
+  const round = (p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+  // Walk round the ring: t in [0, perimeter) to a point.
+  const sides = [R - L, B - T, R - L, B - T];
+  const per = sides.reduce((a, b) => a + b, 0);
+  const ringAt = (t) => {
+    t = ((t % per) + per) % per;
+    if (t < sides[0]) return [L + t, T];
+    t -= sides[0];
+    if (t < sides[1]) return [R, T + t];
+    t -= sides[1];
+    if (t < sides[2]) return [R - t, B];
+    return [L, B - (t - sides[2])];
+  };
+  const ringOf = ([px, py]) => {
+    const d = [py - T, R - px, B - py, px - L].map(Math.abs);
+    const side = d.indexOf(Math.min(...d));
+    const cx = Math.min(R, Math.max(L, px));
+    const cy = Math.min(B, Math.max(T, py));
+    return [cx - L, sides[0] + (cy - T), sides[0] + sides[1] + (R - cx), sides[0] + sides[1] + sides[2] + (B - cy)][side];
+  };
+  const place = (id, t0) => {
+    for (let i = 0; i < 40; i++) {
+      const step = Math.ceil(i / 2) * gap * 0.5 * (i % 2 ? 1 : -1);
+      const p = ringAt(t0 + step);
+      if (free(p)) { used.push(p); out.set(id, round(p)); return; }
+    }
+    const p = ringAt(t0);
+    used.push(p);
+    out.set(id, round(p));
+  };
+  const byId = new Map(floor.rooms.map((r) => [r.id, r]));
+  const rest = [];
+  for (const c of cams) {
+    const room = c.room && byId.get(c.room);
+    if (room) place(c.id, ringOf(roomLabelPoint(room)));
+    else rest.push(c);
+  }
+  for (const c of rest) {
+    // The point on the ring furthest from every camera already there.
+    let best = 0;
+    let bestD = -1;
+    for (let t = 0; t < per; t += per / 96) {
+      const p = ringAt(t);
+      const d = used.length ? Math.min(...used.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1]))) : 0;
+      if (d > bestD + 0.01) { bestD = d; best = t; }
+    }
+    place(c.id, best);
+  }
+  return out;
+}
+
+/** A point on the drawn plan (fractions of its width and height) back in the floor's own pixels. */
+function planPointAt(floor, { rotated = false, outside = false } = {}, fx, fy) {
+  const { x, y, w, h } = planBox(floor, outside);
+  rotated = rotated && planCanRotate(floor);
+  const W = rotated ? h : w;
+  const H = rotated ? w : h;
+  const X = Math.min(1, Math.max(0, fx)) * W;
+  const Y = Math.min(1, Math.max(0, fy)) * H;
+  const p = rotated ? [Y + x, y + h - X] : [X + x, Y + y];
+  return p.map((n) => Math.round(n * 10) / 10);
 }
 
 /** Phones turn a wide plan on its side; a plan that is already tall stays as it is. */
@@ -2751,6 +2965,15 @@ function cleanLayout(raw) {
     if (f.box && [f.box.x, f.box.y, f.box.w, f.box.h].every((v) => planNum(v) != null) && f.box.w > 0 && f.box.h > 0) {
       floor.box = { x: planNum(f.box.x), y: planNum(f.box.y), w: planNum(f.box.w), h: planNum(f.box.h) };
     }
+    if (f.cams && typeof f.cams === 'object') {
+      const cams = {};
+      for (const [cid, at] of Object.entries(f.cams).slice(0, 60)) {
+        if (!/^camera\.[a-z0-9_]{1,80}$/.test(cid)) continue;
+        if (at === false) cams[cid] = false;
+        else if (planPt(at)) cams[cid] = planPt(at);
+      }
+      if (Object.keys(cams).length) floor.cams = cams;
+    }
     if (Array.isArray(f.furniture)) {
       floor.furniture = f.furniture.slice(0, 200).map((it) => {
         const rect = Array.isArray(it?.rect) && it.rect.length === 4 ? it.rect.map(planNum) : null;
@@ -2771,10 +2994,12 @@ function cleanLayout(raw) {
  * Portrait phones get a wide plan turned a quarter clockwise so it fills the screen.
  * @param {object} floor
  * @param {(room) => object} info  { areaId, glow: {color, strength}, temp, lightsOn, motion, open, cameras, label, name }
- * @param {object} opts            rotated, image (data URL of the floor's picture)
+ * @param {object} opts            rotated, image (data URL of the floor's picture),
+ *                                 cams: [{ id, at: [x, y], name, alert, picked }] markers round the house,
+ *                                 outside: leave room round the house for camera markers
  */
-function planHtml(floor, info, { rotated = false, image = '' } = {}) {
-  const { x, y, w, h } = planBox(floor);
+function planHtml(floor, info, { rotated = false, image = '', cams = [], outside = cams.length > 0 } = {}) {
+  const { x, y, w, h } = planBox(floor, outside);
   rotated = rotated && planCanRotate(floor);
   const W = rotated ? h : w;
   const H = rotated ? w : h;
@@ -2869,6 +3094,14 @@ function planHtml(floor, info, { rotated = false, image = '' } = {}) {
       <g class="plan-wall-side" aria-hidden="true" transform="translate(1.6 2.6)">${walls.join('')}</g>
       <g class="plan-wall-top" aria-hidden="true">${walls.join('')}</g>`;
 
+  const markers = cams.map((c) => {
+    const [cx, cy] = at(c.at);
+    return `<button type="button" class="plan-camera${c.alert ? ' alert' : ''}${c.picked ? ' picked' : ''}" data-open-entity="${esc(c.id)}" data-plan-cam="${esc(c.id)}"
+      style="left:${pct(cx, W)};top:${pct(cy, H)}" aria-label="${esc(`${c.name} camera${c.alert ? ', someone there' : ''}`)}">
+      <i>${icon('camera')}</i><span>${esc(c.name)}</span>
+    </button>`;
+  }).join('');
+
   // Wall thickness follows the plan's size, so a big plan's walls look as thick as a small one's.
   const scale = Math.max(w, h) / 1000;
   return `<div class="plan${rotated ? ' rotated' : ''}${picture ? ' picture' : ' drawn'}${picture && floor.invert !== false ? ' invert-dark' : ''}" data-floor="${esc(fid)}"
@@ -2895,6 +3128,7 @@ function planHtml(floor, info, { rotated = false, image = '' } = {}) {
       ${art}
     </svg>
     ${labels.join('')}
+    ${markers}
   </div>`;
 }
 
@@ -3684,6 +3918,27 @@ async function saveLayoutNow() {
   planStore.onChange();
 }
 
+/**
+ * Put camera markers on a floor: { camera id: [x, y] in the floor's pixels, false to take it off
+ * the plan, or null to hand it back to its suggested spot }. Saved like the rest of the plan.
+ */
+function setPlanCams(floorId, spots) {
+  const floors = planStore.layout?.floors || [];
+  const floor = floors.find((f) => f.id === floorId);
+  for (const [id, at] of Object.entries(spots)) {
+    for (const f of floors) if (f.cams) delete f.cams[id];
+    if (floor && at != null) floor.cams = { ...(floor.cams || {}), [id]: at };
+  }
+  for (const f of floors) if (f.cams && !Object.keys(f.cams).length) delete f.cams;
+  savePlanSoon();
+}
+
+/** Every camera back to its suggested spot. */
+function resetPlanCams() {
+  for (const f of planStore.layout?.floors || []) delete f.cams;
+  savePlanSoon();
+}
+
 /** Store a floor's picture; the layout then points at it by its revision. */
 async function savePlanImage(floor, data) {
   const rev = Math.random().toString(36).slice(2, 10);
@@ -3775,6 +4030,7 @@ function planSettingsHtml() {
         <label class="check"><input type="checkbox" id="plan-invert" ${floor.invert !== false ? 'checked' : ''} ${image && floor.style === 'picture' ? '' : 'disabled'}><span>Darken the picture in dark mode</span></label>
         <label class="check"><input type="checkbox" id="plan-labels" ${floor.labels !== false ? 'checked' : ''}><span>Show room names on the plan</span></label>
       </div>
+      <p class="muted panel-text">Cameras sit round the outside of the house on Home; tap one to watch it. <a href="#/home?cams=edit">Move cameras on the plan</a></p>
       <div class="form-actions">
         <button type="button" class="btn" data-plan-act="upload">${icon('upload')}${image ? 'Replace picture' : floor.img ? 'Upload the picture again' : 'Add a picture'}</button>
         ${floor.img ? '<button type="button" class="btn" data-plan-act="remove-picture">Remove picture</button>' : ''}
@@ -7712,7 +7968,7 @@ class Voice {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '29 Oct 2026, 20:50 (d60e002)';
+const DASH_BUILD = '29 Oct 2026, 21:07 (72fcd5e)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -7790,6 +8046,8 @@ const ui = {
   sheet: null,             // { kind: 'device'|'room'|'person'|'notes'|'camera'|'day', id, back }
   calMonth: null,          // first day of the month shown in the month calendar
   homeQuery: '',           // "Find a device" on Home
+  camEdit: false,          // moving camera markers on the Home floor plan
+  camPick: '',             // camera picked to place with a tap
   pending: new Map(),      // entity_id -> expected state after a tap
   seenOn: new Set(),
   openStory: '',
@@ -8039,7 +8297,7 @@ function applySky() {
 
 function render() {
   const r = parseRoute();
-  if (r.view !== ui.view) closeSheet();
+  if (r.view !== ui.view) { closeSheet(); ui.camEdit = false; ui.camPick = ''; }
   ui.view = r.view;
   ui.params = r.params;
   document.documentElement.dataset.view = ui.view;
@@ -8844,7 +9102,7 @@ function climateScenesHtml() {
 }
 
 function extrasHtml() {
-  const cams = [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
+  const cams = listedCameras();
   return `${cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : ''}${climateScenesHtml()}`;
 }
 
@@ -8860,12 +9118,102 @@ function searchResultsHtml() {
 
 function camerasHtml(ids) {
   if (!ids.length) return '';
-  return `<ul class="cams">${ids.map((id) => {
-    const s = store.states.get(id);
-    return `<li><button type="button" class="cam" data-open-entity="${esc(id)}">
-      <img data-cam="${esc(id)}" alt="" decoding="async"><span class="cam-name">${esc(nameOf(s).replace(/\s*fluent$/i, '').replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase()))}</span>
-    </button></li>`;
-  }).join('')}</ul>`;
+  return `<ul class="cams">${ids.map((id) => `<li><button type="button" class="cam" data-open-entity="${esc(id)}">
+      <img data-cam="${esc(id)}" alt="" decoding="async"><span class="cam-name">${esc(camName(store.states.get(id)))}</span>
+    </button></li>`).join('')}</ul>`;
+}
+
+/** "DRIVEWAY Fluent" reads as "Driveway". */
+function camName(s) {
+  return nameOf(s).replace(/\s*fluent$/i, '').replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase());
+}
+
+function listedCameras() {
+  return [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
+}
+
+/** Cameras whose own motion or person sensor is on right now. */
+function camAlerts() {
+  const devs = new Set();
+  for (const s of store.states.values()) {
+    if (domainOf(s.entity_id) !== 'binary_sensor' || s.state !== 'on') continue;
+    if (!MOTION_CLASSES.has(s.attributes?.device_class) && !/_(person|motion|visitor)$/.test(s.entity_id)) continue;
+    const d = store.entityInfo.get(s.entity_id)?.deviceId;
+    if (d) devs.add(d);
+  }
+  return devs;
+}
+
+// ---------- cameras on the floor plan ----------
+
+function homeFloor() {
+  const floors = planStore.layout?.floors || [];
+  return { floors, floor: floors.find((f) => f.id === planStore.floor) || floors[0] || null };
+}
+
+const planRotated = () => matchMedia('(orientation: portrait) and (max-width: 699.98px)').matches;
+
+/**
+ * Camera markers for one floor: cameras put somewhere stay there; the rest get a suggested spot
+ * round the outside of the first floor, near the room they watch.
+ */
+function planCams(floor, floors, cams) {
+  const placed = new Map();
+  for (const f of floors) for (const [id, at] of Object.entries(f.cams || {})) placed.set(id, { floor: f.id, at });
+  const mine = cams.filter((id) => placed.get(id)?.floor === floor.id && placed.get(id).at);
+  const loose = floor === floors[0] ? cams.filter((id) => !placed.has(id)) : [];
+  const map = planMapping();
+  const roomOfArea = new Map();
+  for (const r of floor.rooms) {
+    const a = map.get(r.id);
+    if (a && !roomOfArea.has(a)) roomOfArea.set(a, r.id);
+  }
+  const spots = suggestCamSpots(floor,
+    loose.map((id) => ({ id, room: cameraRoom(floor, camName(store.states.get(id)), roomOfArea.get(areaOf(id))) })),
+    mine.map((id) => placed.get(id).at));
+  const alerts = camAlerts();
+  return [...mine.map((id) => [id, placed.get(id).at]), ...loose.map((id) => [id, spots.get(id)])]
+    .filter(([, at]) => at)
+    .map(([id, at]) => ({
+      id, at, name: camName(store.states.get(id)),
+      alert: alerts.has(store.entityInfo.get(id)?.deviceId), picked: ui.camEdit && ui.camPick === id,
+    }));
+}
+
+function camTrayHtml(cams, markers) {
+  const on = new Set(markers.map((m) => m.id));
+  const picked = ui.camPick && store.states.get(ui.camPick);
+  return `<div class="cam-tray">
+    <p class="hint">${picked ? `Tap the plan where <b>${esc(camName(picked))}</b> is.` : 'Drag a camera to where it is, or tap one and then tap the plan.'}</p>
+    <div class="chips">${cams.map((id) => `<button type="button" class="chip${ui.camPick === id ? ' on' : ''}${on.has(id) ? '' : ' off-plan'}" data-cam-pick="${esc(id)}">${icon('camera')}${esc(camName(store.states.get(id)))}</button>`).join('')}</div>
+    <div class="cam-tray-acts">
+      ${picked && on.has(ui.camPick) ? `<button type="button" class="btn" data-cam-edit="hide">Take off the plan</button>` : ''}
+      <button type="button" class="btn" data-cam-edit="reset">${icon('undo')}Suggested spots</button>
+      <button type="button" class="btn primary" data-cam-edit="done">${icon('check')}Done</button>
+    </div>
+  </div>`;
+}
+
+/** Put a camera where it was dropped or tapped (fractions across the drawn plan). */
+function placeCam(id, fx, fy) {
+  const { floors, floor } = homeFloor();
+  if (!floor) return;
+  const at = planPointAt(floor, { rotated: planRotated(), outside: true }, fx, fy);
+  // Pin every suggested spot on this floor too, so moving one camera never shifts the others.
+  const spots = Object.fromEntries(planCams(floor, floors, listedCameras()).map((m) => [m.id, m.at]));
+  spots[id] = at;
+  setPlanCams(floor.id, spots);
+  ui.camPick = '';
+  render();
+}
+
+function camEditAct(act) {
+  const { floor } = homeFloor();
+  if (act === 'start') { ui.camEdit = true; ui.camPick = ''; }
+  else if (act === 'done') { ui.camEdit = false; ui.camPick = ''; }
+  else if (act === 'reset') { resetPlanCams(); ui.camPick = ''; toast('Cameras are back at their suggested spots.'); }
+  else if (act === 'hide' && floor && ui.camPick) { setPlanCams(floor.id, { [ui.camPick]: false }); ui.camPick = ''; }
+  render();
 }
 
 // ============================================================
@@ -8974,21 +9322,29 @@ const VIEWS = {
   home() {
     if (!ready()) return notReady();
     const rooms = roomList();
-    const floors = planStore.layout?.floors || [];
-    const floor = floors.find((f) => f.id === planStore.floor) || floors[0];
+    const { floors, floor } = homeFloor();
+    const cams = listedCameras();
+    if (ui.params.cams === 'edit' && floor && cams.length && !ui.camEdit) {
+      ui.camEdit = true;
+      history.replaceState(null, '', '#/home');
+    }
+    if (!floor || !cams.length) ui.camEdit = false;
     let plan = '';
     if (floor) {
       const map = planMapping();
       const infos = new Map(floor.rooms.map((r) => [r.id, roomInfo(r.name, map.get(r.id))]));
-      plan = `<section class="card plan-card">
+      const markers = cams.length ? planCams(floor, floors, cams) : [];
+      plan = `<section class="card plan-card${ui.camEdit ? ' cam-editing' : ''}">
         ${floors.length > 1 ? `<div class="chips">${floors.map((f) => `<button type="button" class="chip${f === floor ? ' on' : ''}" data-floor="${esc(f.id)}">${esc(f.name)}</button>`).join('')}</div>` : ''}
-        ${planHtml(floor, (r) => infos.get(r.id), { rotated: matchMedia('(orientation: portrait) and (max-width: 699.98px)').matches, image: planStore.images.get(floor.id) || '' })}
+        ${cams.length && !ui.camEdit ? `<button type="button" class="plan-cam-btn" data-cam-edit="start" aria-label="Move cameras on the plan" title="Move cameras">${icon('camera')}</button>` : ''}
+        ${planHtml(floor, (r) => infos.get(r.id), { rotated: planRotated(), image: planStore.images.get(floor.id) || '', cams: markers, outside: cams.length > 0 })}
+        ${ui.camEdit ? camTrayHtml(cams, markers) : ''}
       </section>`;
     }
-    const cams = [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
     const count = [...store.states.keys()].filter(listed).length;
+    const camCard = cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : '';
     return `<div class="v-home">
-      ${plan}
+      ${plan ? `<div class="home-plan">${plan}${camCard}</div>` : camCard}
       <section class="card rooms-card">
         <h2 class="card-title">${icon('area')}Rooms</h2>
         <label class="search">${icon('search')}<input type="text" id="home-q" placeholder="Find a device" autocomplete="off" value="${esc(ui.homeQuery)}" aria-label="Find a device"></label>
@@ -8999,7 +9355,6 @@ const VIEWS = {
           : `Showing all ${count} devices. <a href="#/settings?section=devices">Show only exposed devices</a>`}</p>
       </section>
       ${climateScenesHtml()}
-      ${cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : ''}
     </div>`;
   },
 
@@ -9647,6 +10002,23 @@ document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
   if (handleSettingsClick(t) || handleCalendarClick(t)) return;
+  const ce = t.closest('[data-cam-edit]');
+  if (ce) { camEditAct(ce.dataset.camEdit); return; }
+  const cp = t.closest('[data-cam-pick]');
+  if (cp) { ui.camPick = ui.camPick === cp.dataset.camPick ? '' : cp.dataset.camPick; render(); return; }
+  const editPlan = ui.camEdit && t.closest('.cam-editing .plan');
+  if (editPlan) {
+    // Moving cameras: a tap picks a camera, then a tap on the plan puts it there.
+    const m = t.closest('[data-plan-cam]');
+    if (m) ui.camPick = ui.camPick === m.dataset.planCam ? '' : m.dataset.planCam;
+    else if (ui.camPick) {
+      const r = editPlan.getBoundingClientRect();
+      placeCam(ui.camPick, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+      return;
+    }
+    render();
+    return;
+  }
   const sheetEl = t.closest('#sheet');
   if (t === $('#sheet')) { closeSheet(); return; } // the backdrop
   if (t.closest('[data-close]')) { closeSheet(); return; }
@@ -9726,6 +10098,43 @@ document.addEventListener('keydown', (e) => {
 });
 
 $('#sheet').addEventListener('close', () => { stopCamera(); ui.sheet = null; });
+
+// Dragging a camera marker while moving cameras (finger or mouse).
+document.addEventListener('pointerdown', (e) => {
+  const m = e.target.closest?.('.cam-editing [data-plan-cam]');
+  if (!m || e.button > 0) return;
+  const plan = m.closest('.plan');
+  const rect = plan.getBoundingClientRect();
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  const frac = (ev) => [Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width)), Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height))];
+  let moved = false;
+  try { m.setPointerCapture(e.pointerId); } catch { /* already gone */ }
+  ui.dragging = true;
+  const move = (ev) => {
+    if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+    moved = true;
+    m.classList.add('dragging');
+    const [fx, fy] = frac(ev);
+    m.style.left = `${(fx * 100).toFixed(2)}%`;
+    m.style.top = `${(fy * 100).toFixed(2)}%`;
+  };
+  const up = (ev) => {
+    m.removeEventListener('pointermove', move);
+    m.removeEventListener('pointerup', up);
+    m.removeEventListener('pointercancel', up);
+    ui.dragging = false;
+    if (!moved) return; // a tap: the click that follows picks the camera
+    ui.suppressClick = true;
+    setTimeout(() => { ui.suppressClick = false; }, 400);
+    if (ev.type === 'pointercancel') { render(); return; }
+    const [fx, fy] = frac(ev);
+    placeCam(m.dataset.planCam, fx, fy);
+  };
+  m.addEventListener('pointermove', move);
+  m.addEventListener('pointerup', up);
+  m.addEventListener('pointercancel', up);
+});
 
 // Sliders: show the number while dragging, send it on release.
 document.addEventListener('input', (e) => {
