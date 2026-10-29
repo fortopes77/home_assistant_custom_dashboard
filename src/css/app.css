@@ -753,6 +753,7 @@ small { font-size: 0.8em; }
 /* ---------- Home: plan, rooms, devices ---------- */
 
 .v-home { display: grid; gap: var(--gap); }
+.home-plan { display: grid; gap: var(--gap); min-width: 0; }
 .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .room { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 16px; background: var(--surface-2); }
 .room.lit { background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
@@ -943,7 +944,7 @@ small { font-size: 0.8em; }
 
 
   .v-home { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
-  .v-home .plan-card { grid-row: span 2; position: sticky; top: 72px; }
+  .v-home .home-plan { grid-row: span 2; }
   .v-home .rooms { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) .rooms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }

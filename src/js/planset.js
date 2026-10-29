@@ -171,6 +171,27 @@ async function saveLayoutNow() {
   planStore.onChange();
 }
 
+/**
+ * Put camera markers on a floor: { camera id: [x, y] in the floor's pixels, false to take it off
+ * the plan, or null to hand it back to its suggested spot }. Saved like the rest of the plan.
+ */
+export function setPlanCams(floorId, spots) {
+  const floors = planStore.layout?.floors || [];
+  const floor = floors.find((f) => f.id === floorId);
+  for (const [id, at] of Object.entries(spots)) {
+    for (const f of floors) if (f.cams) delete f.cams[id];
+    if (floor && at != null) floor.cams = { ...(floor.cams || {}), [id]: at };
+  }
+  for (const f of floors) if (f.cams && !Object.keys(f.cams).length) delete f.cams;
+  savePlanSoon();
+}
+
+/** Every camera back to its suggested spot. */
+export function resetPlanCams() {
+  for (const f of planStore.layout?.floors || []) delete f.cams;
+  savePlanSoon();
+}
+
 /** Store a floor's picture; the layout then points at it by its revision. */
 async function savePlanImage(floor, data) {
   const rev = Math.random().toString(36).slice(2, 10);
@@ -262,6 +283,7 @@ export function planSettingsHtml() {
         <label class="check"><input type="checkbox" id="plan-invert" ${floor.invert !== false ? 'checked' : ''} ${image && floor.style === 'picture' ? '' : 'disabled'}><span>Darken the picture in dark mode</span></label>
         <label class="check"><input type="checkbox" id="plan-labels" ${floor.labels !== false ? 'checked' : ''}><span>Show room names on the plan</span></label>
       </div>
+      <p class="muted panel-text">Cameras sit round the outside of the house on Home; tap one to watch it. <a href="#/home?cams=edit">Move cameras on the plan</a></p>
       <div class="form-actions">
         <button type="button" class="btn" data-plan-act="upload">${icon('upload')}${image ? 'Replace picture' : floor.img ? 'Upload the picture again' : 'Add a picture'}</button>
         ${floor.img ? '<button type="button" class="btn" data-plan-act="remove-picture">Remove picture</button>' : ''}
