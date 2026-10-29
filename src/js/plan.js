@@ -44,7 +44,7 @@ const ROOM_WORDS = [
   ...[2, 3, 4, 5, 6].map((n) => [`bed${n}`, `bedroom${n}`]),
 ];
 
-function aliasesOf(room) {
+export function aliasesOf(room) {
   const own = (room.aliases || []).map(normName);
   const n = normName(room.name);
   const words = ROOM_WORDS.find((group) => group.includes(n)) || [];
@@ -168,16 +168,139 @@ export function roomLabelPoint(room) {
   return best;
 }
 
-/** The part of the floor that is shown: the whole picture, or just the rooms with a little margin. */
-export function planBox(floor) {
+/**
+ * The part of the floor that is shown: the whole picture, or just the rooms with a little margin.
+ * With `outside`, a wider margin leaves room for camera markers around the house.
+ */
+export function planBox(floor, outside = false) {
   const all = floor.rooms.flatMap((r) => r.points);
-  if (floor.box) return floor.box;
-  if (!all.length || (floor.style === 'picture' && floor.img && !floor.crop)) return { x: 0, y: 0, w: floor.w, h: floor.h };
-  const b = bbox(all);
-  const m = Math.max(8, Math.round(Math.max(b.w, b.h) * 0.025));
+  let b;
+  if (floor.box) b = floor.box;
+  else if (!all.length || (floor.style === 'picture' && floor.img && !floor.crop)) b = { x: 0, y: 0, w: floor.w, h: floor.h };
+  else {
+    const r = bbox(all);
+    const m = Math.max(8, Math.round(Math.max(r.w, r.h) * 0.025));
+    const x = Math.max(0, r.x - m);
+    const y = Math.max(0, r.y - m);
+    b = { x, y, w: Math.min(floor.w, r.x + r.w + m) - x, h: Math.min(floor.h, r.y + r.h + m) - y };
+  }
+  if (!outside) return b;
+  const m = Math.round(Math.max(b.w, b.h) * 0.06);
   const x = Math.max(0, b.x - m);
   const y = Math.max(0, b.y - m);
   return { x, y, w: Math.min(floor.w, b.x + b.w + m) - x, h: Math.min(floor.h, b.y + b.h + m) - y };
+}
+
+// ---------- cameras around the house ----------
+
+// Words in a camera's name that point at a room even when the names differ.
+const CAM_HINTS = [
+  [['driveway', 'drive', 'carport', 'car', 'garagedoor'], ['garage', 'carport']],
+  [['frontdoor', 'front', 'doorbell', 'door', 'porch', 'entry'], ['porch', 'entry', 'frontdoor']],
+  [['deck', 'patio', 'backyard', 'back', 'yard', 'garden', 'pool', 'alfresco'], ['alfresco', 'deck', 'patio', 'outdoor']],
+];
+
+/** The room a camera most likely watches, from its area first and then the words in its name. */
+export function cameraRoom(floor, name, areaRoom) {
+  const rooms = floor.rooms.filter((r) => !r.fixed);
+  if (areaRoom && rooms.some((r) => r.id === areaRoom)) return areaRoom;
+  const words = String(name).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const keys = new Set([...words, ...words.slice(1).map((w, i) => words[i] + w), words.join('')].map(normName));
+  const names = (r) => [normName(r.name), ...aliasesOf(r)];
+  const hit = (want) => rooms.find((r) => names(r).some((n) => want.has(n)));
+  let room = hit(keys);
+  for (const [from, to] of CAM_HINTS) {
+    if (room) break;
+    if (from.some((w) => keys.has(w))) room = hit(new Set(to));
+  }
+  return room?.id || null;
+}
+
+/**
+ * Suggested spots for cameras nobody has placed yet: just outside the house on the side nearest
+ * the room each one watches, and cameras with no room spread evenly around the rest of the outside.
+ * @param {object} floor
+ * @param {Array<{id, room}>} cams  room is a room id or null
+ * @param {Array<[number, number]>} taken  spots already used by placed cameras
+ * @returns {Map<string, [number, number]>}
+ */
+export function suggestCamSpots(floor, cams, taken = []) {
+  const out = new Map();
+  const all = floor.rooms.flatMap((r) => r.points);
+  if (!all.length) return out;
+  const house = bbox(all);
+  const box = planBox(floor, true);
+  const size = Math.max(house.w, house.h);
+  const off = size * 0.035;
+  const gap = size * 0.11;
+  // The ring the markers sit on, clamped to what is shown.
+  const L = Math.max(box.x + off * 0.6, house.x - off);
+  const R = Math.min(box.x + box.w - off * 0.6, house.x + house.w + off);
+  const T = Math.max(box.y + off * 0.6, house.y - off);
+  const B = Math.min(box.y + box.h - off * 0.6, house.y + house.h + off);
+  const used = taken.map((p) => [...p]);
+  const free = (p) => used.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= gap);
+  const round = (p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+  // Walk round the ring: t in [0, perimeter) to a point.
+  const sides = [R - L, B - T, R - L, B - T];
+  const per = sides.reduce((a, b) => a + b, 0);
+  const ringAt = (t) => {
+    t = ((t % per) + per) % per;
+    if (t < sides[0]) return [L + t, T];
+    t -= sides[0];
+    if (t < sides[1]) return [R, T + t];
+    t -= sides[1];
+    if (t < sides[2]) return [R - t, B];
+    return [L, B - (t - sides[2])];
+  };
+  const ringOf = ([px, py]) => {
+    const d = [py - T, R - px, B - py, px - L].map(Math.abs);
+    const side = d.indexOf(Math.min(...d));
+    const cx = Math.min(R, Math.max(L, px));
+    const cy = Math.min(B, Math.max(T, py));
+    return [cx - L, sides[0] + (cy - T), sides[0] + sides[1] + (R - cx), sides[0] + sides[1] + sides[2] + (B - cy)][side];
+  };
+  const place = (id, t0) => {
+    for (let i = 0; i < 40; i++) {
+      const step = Math.ceil(i / 2) * gap * 0.5 * (i % 2 ? 1 : -1);
+      const p = ringAt(t0 + step);
+      if (free(p)) { used.push(p); out.set(id, round(p)); return; }
+    }
+    const p = ringAt(t0);
+    used.push(p);
+    out.set(id, round(p));
+  };
+  const byId = new Map(floor.rooms.map((r) => [r.id, r]));
+  const rest = [];
+  for (const c of cams) {
+    const room = c.room && byId.get(c.room);
+    if (room) place(c.id, ringOf(roomLabelPoint(room)));
+    else rest.push(c);
+  }
+  for (const c of rest) {
+    // The point on the ring furthest from every camera already there.
+    let best = 0;
+    let bestD = -1;
+    for (let t = 0; t < per; t += per / 96) {
+      const p = ringAt(t);
+      const d = used.length ? Math.min(...used.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1]))) : 0;
+      if (d > bestD + 0.01) { bestD = d; best = t; }
+    }
+    place(c.id, best);
+  }
+  return out;
+}
+
+/** A point on the drawn plan (fractions of its width and height) back in the floor's own pixels. */
+export function planPointAt(floor, { rotated = false, outside = false } = {}, fx, fy) {
+  const { x, y, w, h } = planBox(floor, outside);
+  rotated = rotated && planCanRotate(floor);
+  const W = rotated ? h : w;
+  const H = rotated ? w : h;
+  const X = Math.min(1, Math.max(0, fx)) * W;
+  const Y = Math.min(1, Math.max(0, fy)) * H;
+  const p = rotated ? [Y + x, y + h - X] : [X + x, Y + y];
+  return p.map((n) => Math.round(n * 10) / 10);
 }
 
 /** Phones turn a wide plan on its side; a plan that is already tall stays as it is. */
@@ -229,6 +352,15 @@ export function cleanLayout(raw) {
     if (f.box && [f.box.x, f.box.y, f.box.w, f.box.h].every((v) => planNum(v) != null) && f.box.w > 0 && f.box.h > 0) {
       floor.box = { x: planNum(f.box.x), y: planNum(f.box.y), w: planNum(f.box.w), h: planNum(f.box.h) };
     }
+    if (f.cams && typeof f.cams === 'object') {
+      const cams = {};
+      for (const [cid, at] of Object.entries(f.cams).slice(0, 60)) {
+        if (!/^camera\.[a-z0-9_]{1,80}$/.test(cid)) continue;
+        if (at === false) cams[cid] = false;
+        else if (planPt(at)) cams[cid] = planPt(at);
+      }
+      if (Object.keys(cams).length) floor.cams = cams;
+    }
     if (Array.isArray(f.furniture)) {
       floor.furniture = f.furniture.slice(0, 200).map((it) => {
         const rect = Array.isArray(it?.rect) && it.rect.length === 4 ? it.rect.map(planNum) : null;
@@ -249,10 +381,12 @@ export function cleanLayout(raw) {
  * Portrait phones get a wide plan turned a quarter clockwise so it fills the screen.
  * @param {object} floor
  * @param {(room) => object} info  { areaId, glow: {color, strength}, temp, lightsOn, motion, open, cameras, label, name }
- * @param {object} opts            rotated, image (data URL of the floor's picture)
+ * @param {object} opts            rotated, image (data URL of the floor's picture),
+ *                                 cams: [{ id, at: [x, y], name, alert, picked }] markers round the house,
+ *                                 outside: leave room round the house for camera markers
  */
-export function planHtml(floor, info, { rotated = false, image = '' } = {}) {
-  const { x, y, w, h } = planBox(floor);
+export function planHtml(floor, info, { rotated = false, image = '', cams = [], outside = cams.length > 0 } = {}) {
+  const { x, y, w, h } = planBox(floor, outside);
   rotated = rotated && planCanRotate(floor);
   const W = rotated ? h : w;
   const H = rotated ? w : h;
@@ -347,6 +481,14 @@ export function planHtml(floor, info, { rotated = false, image = '' } = {}) {
       <g class="plan-wall-side" aria-hidden="true" transform="translate(1.6 2.6)">${walls.join('')}</g>
       <g class="plan-wall-top" aria-hidden="true">${walls.join('')}</g>`;
 
+  const markers = cams.map((c) => {
+    const [cx, cy] = at(c.at);
+    return `<button type="button" class="plan-camera${c.alert ? ' alert' : ''}${c.picked ? ' picked' : ''}" data-open-entity="${esc(c.id)}" data-plan-cam="${esc(c.id)}"
+      style="left:${pct(cx, W)};top:${pct(cy, H)}" aria-label="${esc(`${c.name} camera${c.alert ? ', someone there' : ''}`)}">
+      <i>${icon('camera')}</i><span>${esc(c.name)}</span>
+    </button>`;
+  }).join('');
+
   // Wall thickness follows the plan's size, so a big plan's walls look as thick as a small one's.
   const scale = Math.max(w, h) / 1000;
   return `<div class="plan${rotated ? ' rotated' : ''}${picture ? ' picture' : ' drawn'}${picture && floor.invert !== false ? ' invert-dark' : ''}" data-floor="${esc(fid)}"
@@ -373,6 +515,7 @@ export function planHtml(floor, info, { rotated = false, image = '' } = {}) {
       ${art}
     </svg>
     ${labels.join('')}
+    ${markers}
   </div>`;
 }
 

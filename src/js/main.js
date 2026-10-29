@@ -10,8 +10,8 @@ import {
   domainOf, nameOf, isUnavailable, formatState, relativeTime, compareDomains, isCoverDoor, iconFor, domainLabel,
 } from './entities.js';
 import { esc, deviceTile, deviceControls, readingHtml, historyHtml } from './controls.js';
-import { planRooms, matchRooms, planHtml, lightGlowColor } from './plan.js';
-import { planStore, loadFloorPlan, planSettingsHtml, wirePlanSettings } from './planset.js';
+import { planRooms, matchRooms, planHtml, lightGlowColor, cameraRoom, suggestCamSpots, planPointAt } from './plan.js';
+import { planStore, loadFloorPlan, planSettingsHtml, wirePlanSettings, setPlanCams, resetPlanCams } from './planset.js';
 import { Sky, SKY_PREVIEWS, clockSun } from './sky.js';
 import { todayTint } from './tint.js';
 import { Wall, IDLE_CHOICES, DIM_CHOICES } from './wall.js';
@@ -115,6 +115,8 @@ const ui = {
   sheet: null,             // { kind: 'device'|'room'|'person'|'notes'|'camera'|'day', id, back }
   calMonth: null,          // first day of the month shown in the month calendar
   homeQuery: '',           // "Find a device" on Home
+  camEdit: false,          // moving camera markers on the Home floor plan
+  camPick: '',             // camera picked to place with a tap
   pending: new Map(),      // entity_id -> expected state after a tap
   seenOn: new Set(),
   openStory: '',
@@ -364,7 +366,7 @@ function applySky() {
 
 function render() {
   const r = parseRoute();
-  if (r.view !== ui.view) closeSheet();
+  if (r.view !== ui.view) { closeSheet(); ui.camEdit = false; ui.camPick = ''; }
   ui.view = r.view;
   ui.params = r.params;
   document.documentElement.dataset.view = ui.view;
@@ -1169,7 +1171,7 @@ function climateScenesHtml() {
 }
 
 function extrasHtml() {
-  const cams = [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
+  const cams = listedCameras();
   return `${cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : ''}${climateScenesHtml()}`;
 }
 
@@ -1185,12 +1187,102 @@ function searchResultsHtml() {
 
 function camerasHtml(ids) {
   if (!ids.length) return '';
-  return `<ul class="cams">${ids.map((id) => {
-    const s = store.states.get(id);
-    return `<li><button type="button" class="cam" data-open-entity="${esc(id)}">
-      <img data-cam="${esc(id)}" alt="" decoding="async"><span class="cam-name">${esc(nameOf(s).replace(/\s*fluent$/i, '').replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase()))}</span>
-    </button></li>`;
-  }).join('')}</ul>`;
+  return `<ul class="cams">${ids.map((id) => `<li><button type="button" class="cam" data-open-entity="${esc(id)}">
+      <img data-cam="${esc(id)}" alt="" decoding="async"><span class="cam-name">${esc(camName(store.states.get(id)))}</span>
+    </button></li>`).join('')}</ul>`;
+}
+
+/** "DRIVEWAY Fluent" reads as "Driveway". */
+function camName(s) {
+  return nameOf(s).replace(/\s*fluent$/i, '').replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase());
+}
+
+function listedCameras() {
+  return [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
+}
+
+/** Cameras whose own motion or person sensor is on right now. */
+function camAlerts() {
+  const devs = new Set();
+  for (const s of store.states.values()) {
+    if (domainOf(s.entity_id) !== 'binary_sensor' || s.state !== 'on') continue;
+    if (!MOTION_CLASSES.has(s.attributes?.device_class) && !/_(person|motion|visitor)$/.test(s.entity_id)) continue;
+    const d = store.entityInfo.get(s.entity_id)?.deviceId;
+    if (d) devs.add(d);
+  }
+  return devs;
+}
+
+// ---------- cameras on the floor plan ----------
+
+function homeFloor() {
+  const floors = planStore.layout?.floors || [];
+  return { floors, floor: floors.find((f) => f.id === planStore.floor) || floors[0] || null };
+}
+
+const planRotated = () => matchMedia('(orientation: portrait) and (max-width: 699.98px)').matches;
+
+/**
+ * Camera markers for one floor: cameras put somewhere stay there; the rest get a suggested spot
+ * round the outside of the first floor, near the room they watch.
+ */
+function planCams(floor, floors, cams) {
+  const placed = new Map();
+  for (const f of floors) for (const [id, at] of Object.entries(f.cams || {})) placed.set(id, { floor: f.id, at });
+  const mine = cams.filter((id) => placed.get(id)?.floor === floor.id && placed.get(id).at);
+  const loose = floor === floors[0] ? cams.filter((id) => !placed.has(id)) : [];
+  const map = planMapping();
+  const roomOfArea = new Map();
+  for (const r of floor.rooms) {
+    const a = map.get(r.id);
+    if (a && !roomOfArea.has(a)) roomOfArea.set(a, r.id);
+  }
+  const spots = suggestCamSpots(floor,
+    loose.map((id) => ({ id, room: cameraRoom(floor, camName(store.states.get(id)), roomOfArea.get(areaOf(id))) })),
+    mine.map((id) => placed.get(id).at));
+  const alerts = camAlerts();
+  return [...mine.map((id) => [id, placed.get(id).at]), ...loose.map((id) => [id, spots.get(id)])]
+    .filter(([, at]) => at)
+    .map(([id, at]) => ({
+      id, at, name: camName(store.states.get(id)),
+      alert: alerts.has(store.entityInfo.get(id)?.deviceId), picked: ui.camEdit && ui.camPick === id,
+    }));
+}
+
+function camTrayHtml(cams, markers) {
+  const on = new Set(markers.map((m) => m.id));
+  const picked = ui.camPick && store.states.get(ui.camPick);
+  return `<div class="cam-tray">
+    <p class="hint">${picked ? `Tap the plan where <b>${esc(camName(picked))}</b> is.` : 'Drag a camera to where it is, or tap one and then tap the plan.'}</p>
+    <div class="chips">${cams.map((id) => `<button type="button" class="chip${ui.camPick === id ? ' on' : ''}${on.has(id) ? '' : ' off-plan'}" data-cam-pick="${esc(id)}">${icon('camera')}${esc(camName(store.states.get(id)))}</button>`).join('')}</div>
+    <div class="cam-tray-acts">
+      ${picked && on.has(ui.camPick) ? `<button type="button" class="btn" data-cam-edit="hide">Take off the plan</button>` : ''}
+      <button type="button" class="btn" data-cam-edit="reset">${icon('undo')}Suggested spots</button>
+      <button type="button" class="btn primary" data-cam-edit="done">${icon('check')}Done</button>
+    </div>
+  </div>`;
+}
+
+/** Put a camera where it was dropped or tapped (fractions across the drawn plan). */
+function placeCam(id, fx, fy) {
+  const { floors, floor } = homeFloor();
+  if (!floor) return;
+  const at = planPointAt(floor, { rotated: planRotated(), outside: true }, fx, fy);
+  // Pin every suggested spot on this floor too, so moving one camera never shifts the others.
+  const spots = Object.fromEntries(planCams(floor, floors, listedCameras()).map((m) => [m.id, m.at]));
+  spots[id] = at;
+  setPlanCams(floor.id, spots);
+  ui.camPick = '';
+  render();
+}
+
+function camEditAct(act) {
+  const { floor } = homeFloor();
+  if (act === 'start') { ui.camEdit = true; ui.camPick = ''; }
+  else if (act === 'done') { ui.camEdit = false; ui.camPick = ''; }
+  else if (act === 'reset') { resetPlanCams(); ui.camPick = ''; toast('Cameras are back at their suggested spots.'); }
+  else if (act === 'hide' && floor && ui.camPick) { setPlanCams(floor.id, { [ui.camPick]: false }); ui.camPick = ''; }
+  render();
 }
 
 // ============================================================
@@ -1299,21 +1391,29 @@ const VIEWS = {
   home() {
     if (!ready()) return notReady();
     const rooms = roomList();
-    const floors = planStore.layout?.floors || [];
-    const floor = floors.find((f) => f.id === planStore.floor) || floors[0];
+    const { floors, floor } = homeFloor();
+    const cams = listedCameras();
+    if (ui.params.cams === 'edit' && floor && cams.length && !ui.camEdit) {
+      ui.camEdit = true;
+      history.replaceState(null, '', '#/home');
+    }
+    if (!floor || !cams.length) ui.camEdit = false;
     let plan = '';
     if (floor) {
       const map = planMapping();
       const infos = new Map(floor.rooms.map((r) => [r.id, roomInfo(r.name, map.get(r.id))]));
-      plan = `<section class="card plan-card">
+      const markers = cams.length ? planCams(floor, floors, cams) : [];
+      plan = `<section class="card plan-card${ui.camEdit ? ' cam-editing' : ''}">
         ${floors.length > 1 ? `<div class="chips">${floors.map((f) => `<button type="button" class="chip${f === floor ? ' on' : ''}" data-floor="${esc(f.id)}">${esc(f.name)}</button>`).join('')}</div>` : ''}
-        ${planHtml(floor, (r) => infos.get(r.id), { rotated: matchMedia('(orientation: portrait) and (max-width: 699.98px)').matches, image: planStore.images.get(floor.id) || '' })}
+        ${cams.length && !ui.camEdit ? `<button type="button" class="plan-cam-btn" data-cam-edit="start" aria-label="Move cameras on the plan" title="Move cameras">${icon('camera')}</button>` : ''}
+        ${planHtml(floor, (r) => infos.get(r.id), { rotated: planRotated(), image: planStore.images.get(floor.id) || '', cams: markers, outside: cams.length > 0 })}
+        ${ui.camEdit ? camTrayHtml(cams, markers) : ''}
       </section>`;
     }
-    const cams = [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
     const count = [...store.states.keys()].filter(listed).length;
+    const camCard = cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : '';
     return `<div class="v-home">
-      ${plan}
+      ${plan ? `<div class="home-plan">${plan}${camCard}</div>` : camCard}
       <section class="card rooms-card">
         <h2 class="card-title">${icon('area')}Rooms</h2>
         <label class="search">${icon('search')}<input type="text" id="home-q" placeholder="Find a device" autocomplete="off" value="${esc(ui.homeQuery)}" aria-label="Find a device"></label>
@@ -1324,7 +1424,6 @@ const VIEWS = {
           : `Showing all ${count} devices. <a href="#/settings?section=devices">Show only exposed devices</a>`}</p>
       </section>
       ${climateScenesHtml()}
-      ${cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : ''}
     </div>`;
   },
 
@@ -1972,6 +2071,23 @@ document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
   if (handleSettingsClick(t) || handleCalendarClick(t)) return;
+  const ce = t.closest('[data-cam-edit]');
+  if (ce) { camEditAct(ce.dataset.camEdit); return; }
+  const cp = t.closest('[data-cam-pick]');
+  if (cp) { ui.camPick = ui.camPick === cp.dataset.camPick ? '' : cp.dataset.camPick; render(); return; }
+  const editPlan = ui.camEdit && t.closest('.cam-editing .plan');
+  if (editPlan) {
+    // Moving cameras: a tap picks a camera, then a tap on the plan puts it there.
+    const m = t.closest('[data-plan-cam]');
+    if (m) ui.camPick = ui.camPick === m.dataset.planCam ? '' : m.dataset.planCam;
+    else if (ui.camPick) {
+      const r = editPlan.getBoundingClientRect();
+      placeCam(ui.camPick, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+      return;
+    }
+    render();
+    return;
+  }
   const sheetEl = t.closest('#sheet');
   if (t === $('#sheet')) { closeSheet(); return; } // the backdrop
   if (t.closest('[data-close]')) { closeSheet(); return; }
@@ -2051,6 +2167,43 @@ document.addEventListener('keydown', (e) => {
 });
 
 $('#sheet').addEventListener('close', () => { stopCamera(); ui.sheet = null; });
+
+// Dragging a camera marker while moving cameras (finger or mouse).
+document.addEventListener('pointerdown', (e) => {
+  const m = e.target.closest?.('.cam-editing [data-plan-cam]');
+  if (!m || e.button > 0) return;
+  const plan = m.closest('.plan');
+  const rect = plan.getBoundingClientRect();
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  const frac = (ev) => [Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width)), Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height))];
+  let moved = false;
+  try { m.setPointerCapture(e.pointerId); } catch { /* already gone */ }
+  ui.dragging = true;
+  const move = (ev) => {
+    if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+    moved = true;
+    m.classList.add('dragging');
+    const [fx, fy] = frac(ev);
+    m.style.left = `${(fx * 100).toFixed(2)}%`;
+    m.style.top = `${(fy * 100).toFixed(2)}%`;
+  };
+  const up = (ev) => {
+    m.removeEventListener('pointermove', move);
+    m.removeEventListener('pointerup', up);
+    m.removeEventListener('pointercancel', up);
+    ui.dragging = false;
+    if (!moved) return; // a tap: the click that follows picks the camera
+    ui.suppressClick = true;
+    setTimeout(() => { ui.suppressClick = false; }, 400);
+    if (ev.type === 'pointercancel') { render(); return; }
+    const [fx, fy] = frac(ev);
+    placeCam(m.dataset.planCam, fx, fy);
+  };
+  m.addEventListener('pointermove', move);
+  m.addEventListener('pointerup', up);
+  m.addEventListener('pointercancel', up);
+});
 
 // Sliders: show the number while dragging, send it on release.
 document.addEventListener('input', (e) => {
