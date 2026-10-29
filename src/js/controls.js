@@ -16,6 +16,8 @@ export function shortName(s, room = '') {
   const n = nameOf(s);
   if (!room) return n;
   const cut = n.replace(new RegExp(`^${room.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'i'), '');
+  // "Living room blind 1" listed under "Living" keeps its name rather than becoming "Room blind 1"
+  if (/^room\b/i.test(cut)) return n;
   return cut && cut !== n ? cut.charAt(0).toUpperCase() + cut.slice(1) : n;
 }
 
