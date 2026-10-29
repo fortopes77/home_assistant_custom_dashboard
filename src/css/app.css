@@ -23,6 +23,9 @@
   --danger: #c43d3d;
   --battery: #3c8f7c;
   --shadow: 0 1px 2px rgb(60 45 20 / 0.05), 0 4px 16px rgb(60 45 20 / 0.06);
+  --tint-glow: 55%;            /* time-of-day tint behind Today: the top glow and the bottom wash */
+  --tint-wash: 34%;
+  --tint-hero: 30%;
   --radius: 20px;
   --radius-sm: 12px;
   --gap: 14px;
@@ -51,6 +54,9 @@
     --warning: #f0a94a;
     --battery: #63c2ab;
     --shadow: none;
+    --tint-glow: 34%;
+    --tint-wash: 24%;
+    --tint-hero: 22%;
     color-scheme: dark;
   }
 }
@@ -70,6 +76,9 @@
   --warning: #f0a94a;
   --battery: #63c2ab;
   --shadow: none;
+  --tint-glow: 34%;
+  --tint-wash: 24%;
+  --tint-hero: 22%;
   color-scheme: dark;
 }
 
@@ -84,6 +93,26 @@ body {
   overflow-x: hidden;
 }
 a { color: var(--primary); }
+
+/* Time of day and weather tint, Today only (js/tint.js sets the two colours).
+   Registered so the colours drift smoothly when the sun or the weather changes. */
+@property --tint-a { syntax: "<color>"; inherits: true; initial-value: #8cc4ea; }
+@property --tint-b { syntax: "<color>"; inherits: true; initial-value: #f2c97e; }
+:root { transition: --tint-a 6s ease, --tint-b 6s ease; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background:
+    radial-gradient(120% 70% at 85% -10%, color-mix(in srgb, var(--tint-a) var(--tint-glow), transparent), transparent 70%),
+    radial-gradient(100% 60% at 0% 110%, color-mix(in srgb, var(--tint-b) var(--tint-wash), transparent), transparent 70%);
+}
+:root.tint-on[data-view="today"] body::before { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { :root { transition: none; } }
 h1, h2, h3, p { margin: 0; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -323,6 +352,15 @@ small { font-size: 0.8em; }
     radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
     var(--surface);
 }
+/* With the tint on, the hero's glow takes the time-of-day colour instead of plain amber. */
+.tint-on .hero {
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tint-a) var(--tint-hero), transparent), transparent 65%),
+    radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--tint-b) calc(var(--tint-hero) / 2), transparent), transparent 70%),
+    var(--surface);
+}
+/* Let the tint reach the top bar too. */
+.tint-on[data-view="today"] .topbar { background: color-mix(in srgb, var(--bg) 45%, transparent); }
 .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .hero-greet { font-weight: 600; color: var(--muted); }
 .hero-time {

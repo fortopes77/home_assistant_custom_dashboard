@@ -13,6 +13,7 @@ import { esc, deviceTile, deviceControls, readingHtml, historyHtml } from './con
 import { planRooms, matchRooms, planHtml, lightGlowColor } from './plan.js';
 import { planStore, loadFloorPlan, planSettingsHtml, wirePlanSettings } from './planset.js';
 import { Sky, SKY_PREVIEWS, clockSun } from './sky.js';
+import { todayTint } from './tint.js';
 import { Wall, IDLE_CHOICES, DIM_CHOICES } from './wall.js';
 import { setupInstall, installInfo, promptInstall, onInstallChange } from './install.js';
 import { CameraPlayer, cameraStillUrl, streamLabel } from './camera.js';
@@ -68,6 +69,7 @@ const DEFAULT_PREFS = {
   peopleMap: true,       // the Places page and the map on Today
   showHidden: false,     // hidden and diagnostic entities
   showUnavailable: false,
+  tint: true,            // a quiet time-of-day and weather colour behind Today
   sky: false,            // live sky background
   skyAnimate: true,
   weatherEntity: '',     // weather for the sky and Today; empty = the first one
@@ -229,6 +231,7 @@ function tickClock() {
   const big = $('.hero-time');
   if (big) big.textContent = fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, '');
   applyTheme();
+  if (!store.states.has('sun.sun')) updateTint();
 }
 
 function applyTheme() {
@@ -296,7 +299,27 @@ function setupWall() {
 let sky = null;
 let skyPreview = ''; // a look picked in Settings to try; not saved
 
+// The same inputs drive the quiet tint behind Today; it is skipped while the live sky is on.
+function updateTint() {
+  const root = document.documentElement;
+  const on = store.prefs.tint && !store.prefs.sky;
+  root.classList.toggle('tint-on', on);
+  if (!on) return;
+  const sun = store.states.get('sun.sun');
+  const a = sun?.attributes || {};
+  const fromClock = clockSun();
+  const w = weatherEntity();
+  const t = todayTint({
+    elevation: Number.isFinite(a.elevation) ? a.elevation : fromClock.elevation,
+    rising: typeof a.rising === 'boolean' ? a.rising : fromClock.rising,
+    condition: w?.state || '',
+  });
+  root.style.setProperty('--tint-a', t.a);
+  root.style.setProperty('--tint-b', t.b);
+}
+
 function updateSky({ instant = false } = {}) {
+  updateTint();
   if (!sky) return;
   const sun = store.states.get('sun.sun');
   const a = sun?.attributes || {};
@@ -316,6 +339,7 @@ function updateSky({ instant = false } = {}) {
 function applySky() {
   const on = store.prefs.sky;
   document.documentElement.classList.toggle('sky-on', on);
+  updateTint();
   if (!on) {
     sky?.destroy();
     sky = null;
@@ -1398,6 +1422,7 @@ const VIEWS = {
       <section class="card" id="look">
         <h2 class="card-title">${icon('sun')}Look</h2>
         ${choose('theme', 'Theme', [['auto', 'Same as this device'], ['sun', 'Dark after sunset'], ['light', 'Light'], ['dark', 'Dark']])}
+        ${check('tint', 'Time and weather tint on Today', 'A soft wash of colour that follows the sun and the weather')}
         ${check('sky', 'Live sky background', 'Follows the sun and the weather: sunrise, clouds, rain, storms, stars')}
         ${p.sky ? `${check('skyAnimate', 'Animate rain, snow and clouds', 'Turn off on an older tablet to save power')}
           <div class="row"><span><b>Preview a sky</b><small class="muted">Only for looking; it goes back to live when you reload.</small></span></div>
@@ -2069,7 +2094,7 @@ document.addEventListener('change', (e) => {
     writePrefs();
     applyTheme();
     if (['wall', 'idleMinutes', 'dim', 'dimNight', 'keepAwake'].includes(key)) { wallMode?.update(); renderFullscreenButton(); }
-    if (['sky', 'skyAnimate', 'weatherEntity'].includes(key)) applySky();
+    if (['tint', 'sky', 'skyAnimate', 'weatherEntity'].includes(key)) applySky();
     if (key === 'calView') loadEvents(true);
     if (t.dataset.pref !== 'feedIn' && t.dataset.pref !== 'buyRate') render();
     return;

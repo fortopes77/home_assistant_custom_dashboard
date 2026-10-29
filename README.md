@@ -126,6 +126,10 @@ Turn on **Settings → Wall mode** on the tablet, or add `?wall` to the address.
 - **Keep the screen on** stops the tablet sleeping. Browsers allow this only on `https` addresses.
 - The first touch only wakes the screen. A full screen button appears in the top bar.
 
+## Time and weather tint
+
+Today has a soft wash of colour behind it that follows the sun (`sun.sun`) and the weather: gold in the morning, blue at midday, rose at sunset, indigo at night, and greyer or bluer when it's cloudy or raining. The colours drift slowly as things change, and the other pages stay plain. Turn it off under **Settings → Look → Time and weather tint on Today**. It steps aside while the live sky is on.
+
 ## Live sky background
 
 **Settings → Look → Live sky background** draws a sky that follows the real sun (`sun.sun`) and weather: sunrise and sunset glows, stars at night, drifting clouds, rain, snow, storms and fog. The cards turn to frosted glass over it. **Preview a sky** shows each look. On an older tablet, turn off the animation to save power.
@@ -179,5 +183,5 @@ If a download fails, a notice appears in Home Assistant.
 | `src/js/people.js` | People, zones and the Leaflet map |
 | `src/js/calendar.js`, `brief.js`, `notify.js`, `news.js` | Calendar, day summary, notifications and news |
 | `src/js/camera.js`, `voice.js` | Camera player and Assist |
-| `src/js/sky.js`, `wall.js`, `install.js` | Live sky, wall mode, and installing as an app |
+| `src/js/sky.js`, `tint.js`, `wall.js`, `install.js` | Live sky, the Today tint, wall mode, and installing as an app |
 | `homeassistant/` | Example automations and the GitHub update package |

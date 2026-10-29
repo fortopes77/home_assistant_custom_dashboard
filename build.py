@@ -15,7 +15,7 @@ OUT = ROOT.parent / "dist" / "index.html"
 # Dependency order: each module only imports from modules listed before it.
 MODULES = ["icons.js", "entities.js", "controls.js", "auth.js", "ha.js", "plan.js", "planedit.js", "planset.js",
            "camera.js", "people.js", "energy.js", "calendar.js", "brief.js", "notify.js", "home.js", "news.js",
-           "sky.js", "wall.js", "install.js", "voice.js", "main.js"]
+           "sky.js", "tint.js", "wall.js", "install.js", "voice.js", "main.js"]
 STYLES = ["app.css", "_plan.css", "_map.css", "_cam.css", "_settings.css", "_wall.css"]
 
 
