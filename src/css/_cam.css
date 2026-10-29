@@ -1,0 +1,40 @@
+.cam-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  max-height: 70dvh;
+  background: #000;
+  overflow: hidden;
+}
+.cam-stage > img, .cam-stage > video {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.cam-poster { opacity: 0; transition: opacity 0.3s; }
+.cam-stage.has-pic .cam-poster { opacity: 1; }
+.cam-media { opacity: 0; transition: opacity 0.25s; }
+.cam-stage[data-phase="playing"] .cam-media { opacity: 1; }
+.cam-stage[data-phase="playing"] .cam-poster { visibility: hidden; }
+.cam-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  color: #fff;
+  font-size: 0.9rem;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+  background: radial-gradient(rgb(0 0 0 / 0.35), transparent 75%);
+}
+.cam-status .spinner { border-color: rgb(255 255 255 / 0.35); border-top-color: #fff; }
+.cam-status .btn { display: none; gap: 6px; background: rgb(255 255 255 / 0.92); color: #16191d; border: 0; text-shadow: none; }
+.cam-status .btn .icon { width: 18px; height: 18px; }
+.cam-stage[data-phase="playing"] .cam-status { display: none; }
+.cam-stage[data-phase="failed"] .spinner { display: none; }

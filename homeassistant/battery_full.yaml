@@ -1,0 +1,26 @@
+# Example: tell a phone when the home battery is full. Paste into Settings → Automations → ⋮ → Edit in YAML,
+# or keep it in a package. Change the sensor and notify service to yours. The id lets the dashboard's
+# Energy page show an on/off switch for it.
+id: dashboard_battery_full
+alias: Home battery fully charged
+mode: single
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.battery_state_of_charge   # your battery level sensor (%)
+    above: 99.9
+conditions:
+  # At most once every 6 hours, so a battery hovering at 100% doesn't keep notifying.
+  - condition: template
+    value_template: >-
+      {{ this.attributes.last_triggered is none
+         or now() - this.attributes.last_triggered > timedelta(hours=6) }}
+actions:
+  - action: notify.mobile_app_your_phone        # your phone
+    data:
+      title: Battery full 🔋
+      message: The home battery is fully charged. Extra solar is going to the grid.
+  - action: persistent_notification.create
+    data:
+      notification_id: battery_full
+      title: Battery full 🔋
+      message: The home battery reached 100% at {{ now().strftime('%-I:%M %p') }}.

@@ -1,0 +1,34 @@
+# Example: when someone arrives at a supermarket and the shopping list isn't empty, send them the list.
+# A supermarket is any zone with the mdi:cart icon (Settings → Areas, labels & zones → Zones).
+# Change the people, the list and each person's notify service to yours.
+id: dashboard_shopping_nearby
+alias: Shopping list reminder at the shops
+mode: queued
+triggers:
+  - trigger: state
+    entity_id: [person.one, person.two]
+    to: null   # changes of place only, not of attributes
+conditions:
+  - condition: template
+    value_template: >-
+      {{ states.zone | selectattr('name', 'eq', trigger.to_state.state)
+         | selectattr('attributes.icon', 'eq', 'mdi:cart') | list | count > 0 }}
+  - condition: numeric_state
+    entity_id: todo.shopping_list
+    above: 0
+actions:
+  - action: todo.get_items
+    target:
+      entity_id: todo.shopping_list
+    data:
+      status: needs_action
+    response_variable: list
+  - variables:
+      phone: "{{ {'person.one': 'mobile_app_phone_one', 'person.two': 'mobile_app_phone_two'}[trigger.entity_id] }}"
+      items: "{{ list['todo.shopping_list']['items'] | map(attribute='summary') | list }}"
+  - action: "notify.{{ phone }}"
+    data:
+      title: "🛒 {{ items | count }} on the shopping list"
+      message: "You're at {{ trigger.to_state.state }}: {{ items | join(', ') }}"
+      data:
+        tag: shopping-list

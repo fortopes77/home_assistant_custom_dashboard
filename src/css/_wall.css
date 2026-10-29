@@ -1,0 +1,89 @@
+/* Live sky background, the wall clock screen, dimming and the full screen button. */
+
+.sky { display: none; }
+.sky-on .sky {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100vw;
+  height: 100lvh;
+  pointer-events: none;
+}
+.sky-on body { background: #0b1430; }
+
+/* Cards turn to frosted glass over the sky; text sitting straight on it gets a halo. */
+.sky-on {
+  --on-sky: #ffffff;
+  --sky-halo: 0 1px 2px rgb(0 0 0 / 0.35), 0 0 14px rgb(0 0 0 / 0.3);
+  --glass: color-mix(in srgb, var(--surface) 84%, transparent);
+  --glass-border: color-mix(in srgb, var(--border) 60%, transparent);
+}
+.sky-on[data-sky="light"] {
+  --on-sky: #0d1726;
+  --sky-halo: 0 0 12px rgb(255 255 255 / 0.55);
+}
+.sky-on :is(.topbar h1, .topbar-clock) { color: var(--on-sky); text-shadow: var(--sky-halo); }
+.sky-on .card {
+  background: var(--glass);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+.sky-on .topbar { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sky-on .nav {
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+/* ---------- wall mode: clock screen and dimming ---------- */
+
+.idle {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #000;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 0.35), 0 0 24px rgb(0 0 0 / 0.3);
+  cursor: pointer;
+  touch-action: none;
+  animation: idle-in 0.8s ease-out;
+}
+.sky-on .idle { background: rgb(5 10 25 / 0.25); }
+.idle[hidden] { display: none; }
+/* Only the sky and the clock while idle, not the cards. */
+.is-idle .shell { visibility: hidden; }
+.idle-inner { transform: var(--shift, none); transition: transform 2s ease-in-out; }
+.idle-time {
+  display: block;
+  font-size: clamp(4.5rem, 17vw, 12rem);
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.idle-date { margin: 12px 0 0; font-size: clamp(1.2rem, 4vw, 2rem); font-weight: 500; }
+.idle-weather { margin: 6px 0 0; font-size: clamp(1.1rem, 3.4vw, 1.7rem); opacity: 0.92; }
+.idle-weather:empty, .idle-summary:empty { display: none; }
+.idle-summary { margin: 18px 0 0; font-size: 1rem; opacity: 0.8; }
+.idle-hint { margin: 28px 0 0; font-size: 0.85rem; opacity: 0.55; }
+@keyframes idle-in { from { opacity: 0; } }
+
+.dimmer {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 2.5s ease;
+}
+:root:not(.is-idle) .dimmer { transition-duration: 0.15s; }
+.fullscreen-btn[hidden] { display: none; }

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f1ec" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Home</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath fill=%22%23d9822b%22 d=%22M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+  <div class="shell">
+    <nav class="nav" id="nav" aria-label="Main"></nav>
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="title">Today</h1>
+          <span class="topbar-clock" id="clock"></span>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" class="icon-btn fullscreen-btn" id="fullscreen" aria-label="Full screen" hidden></button>
+          <button type="button" class="icon-btn bell" id="bell" aria-label="Notifications" hidden></button>
+          <a class="status" id="status" href="#/settings" data-status="connecting" aria-label="Connection">
+            <span class="status-dot"></span><span class="status-text">Connecting…</span>
+          </a>
+        </div>
+      </header>
+      <main class="view" id="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div class="idle" id="idle" hidden>
+    <div class="idle-inner">
+      <time class="idle-time" id="idle-time"></time>
+      <p class="idle-date" id="idle-date"></p>
+      <p class="idle-weather" id="idle-weather"></p>
+      <p class="idle-summary" id="idle-summary"></p>
+      <p class="idle-hint">Touch to wake</p>
+    </div>
+  </div>
+  <div class="dimmer" id="dimmer" aria-hidden="true"></div>
+
+  <dialog class="sheet" id="sheet" aria-labelledby="sheet-title"></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <noscript>This dashboard needs JavaScript turned on.</noscript>
+</body>
+</html>

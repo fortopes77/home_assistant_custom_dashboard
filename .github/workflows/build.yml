@@ -1,0 +1,50 @@
+# On every push to main: build the one-file dashboard from src/ and commit it as index.html (and
+# version.json) at the top of the repository, where people download it. Then, if the repository has
+# an HA_WEBHOOK_URL secret, tell that Home Assistant to download the new build
+# (see homeassistant/dashboard_update.yaml).
+name: Build dashboard
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: [index.html, version.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        env:
+          DASH_COMMIT: ${{ github.sha }}
+        run: |
+          python3 build.py
+          cp dist/index.html dist/version.json .
+      - name: Commit the build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html version.json
+          if git diff --cached --quiet; then echo "Nothing changed"; else
+            git commit -q -m "Build dashboard from ${GITHUB_SHA::7}"
+            git pull -q --rebase origin main
+            git push -q origin HEAD:main
+          fi
+          echo "BUILD_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Tell Home Assistant
+        env:
+          HA_WEBHOOK_URL: ${{ secrets.HA_WEBHOOK_URL }}
+        run: |
+          if [ -z "$HA_WEBHOOK_URL" ]; then echo "No HA_WEBHOOK_URL secret; skipping"; exit 0; fi
+          curl -fsS -X POST -H "Content-Type: application/json" -d "{\"sha\": \"$BUILD_SHA\"}" "$HA_WEBHOOK_URL"

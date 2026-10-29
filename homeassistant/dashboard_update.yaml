@@ -1,0 +1,34 @@
+# Keeps /config/www/dashboard/ in step with the GitHub repository.
+# GitHub calls the webhook below after each build; Home Assistant then downloads the new file.
+# Put this file in /config/packages/, copy update_dashboard.sh to /config/scripts/, and restart once.
+# Replace OWNER/REPO with the repository and WEBHOOK_ID with a long random id (it works like a password:
+# store the full URL as the HA_WEBHOOK_URL secret in GitHub, and nowhere public).
+
+shell_command:
+  # Templates rule out "&&" in the command itself, so the steps live in a small script.
+  update_dashboard: "sh /config/scripts/update_dashboard.sh OWNER/REPO {{ sha }}"
+
+automation:
+  - id: dashboard_update_from_github
+    alias: Update dashboard from GitHub
+    description: GitHub calls this after each build on main. Open dashboards reload themselves within 5 minutes.
+    mode: queued
+    triggers:
+      - trigger: webhook
+        webhook_id: WEBHOOK_ID
+        allowed_methods: [POST]
+        local_only: false
+    conditions:
+      - "{{ trigger.json.sha is defined and trigger.json.sha | regex_match('^[0-9a-f]{40}$') }}"
+    actions:
+      - action: shell_command.update_dashboard
+        data:
+          sha: "{{ trigger.json.sha }}"
+        response_variable: result
+      - if: "{{ result.returncode != 0 }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              notification_id: dashboard_update
+              title: Dashboard update failed
+              message: "Couldn't download build {{ trigger.json.sha[:7] }} from GitHub: {{ result.stderr }}"

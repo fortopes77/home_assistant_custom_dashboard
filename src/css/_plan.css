@@ -1,0 +1,170 @@
+.plan-card { padding: 6px 0 4px; }
+.plan {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  aspect-ratio: var(--ar);
+  container-type: inline-size;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.plan > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+/* Plan colours: a soft paper model by day, the deep navy architectural look in dark. */
+.plan-card {
+  --plan-floor: #f4f6fa;
+  --plan-floor-out: rgb(244 246 250 / 0.45);
+  --plan-wall-top: #ffffff;
+  --plan-wall-side: #aab4c3;
+  --plan-cast: rgb(25 35 60 / 0.45);
+  --plan-furn: #e1e6ee;
+  --plan-soft: #d3dae6;
+  --plan-bench: #c8d0dc;
+  --plan-dark: #5d6878;
+  --plan-glass: rgb(140 180 225 / 0.35);
+  --plan-car: #c2cad7;
+  --plan-pillow: #f7f9fc;
+  --wall: 5.5px;
+}
+:root[data-theme="dark"] .plan-card {
+  --plan-floor: #222a38;
+  --plan-floor-out: rgb(34 42 56 / 0.5);
+  --plan-wall-top: #59657a;
+  --plan-wall-side: #0b0f16;
+  --plan-cast: rgb(0 0 0 / 0.75);
+  --plan-furn: #2e3848;
+  --plan-soft: #374356;
+  --plan-bench: #2a3342;
+  --plan-dark: #10151d;
+  --plan-glass: rgb(110 160 225 / 0.16);
+  --plan-car: #3a4558;
+  --plan-pillow: #48546a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .plan-card {
+    --plan-floor: #222a38;
+    --plan-floor-out: rgb(34 42 56 / 0.5);
+    --plan-wall-top: #59657a;
+    --plan-wall-side: #0b0f16;
+    --plan-cast: rgb(0 0 0 / 0.75);
+    --plan-furn: #2e3848;
+    --plan-soft: #374356;
+    --plan-bench: #2a3342;
+    --plan-dark: #10151d;
+    --plan-glass: rgb(110 160 225 / 0.16);
+    --plan-car: #3a4558;
+    --plan-pillow: #48546a;
+  }
+}
+
+.plan-shape {
+  fill: var(--plan-floor);
+  cursor: pointer;
+  transition: fill 0.25s;
+}
+.plan-fixed { fill: var(--plan-floor); }
+.plan-room.outdoor .plan-shape { fill: var(--plan-floor-out); }
+.plan-room.lit .plan-shape { fill: color-mix(in srgb, var(--accent) 12%, var(--plan-floor)); }
+.plan-room.unlinked .plan-shape { fill: color-mix(in srgb, var(--plan-floor) 92%, var(--plan-wall-side)); }
+.plan-room:active .plan-shape { fill: color-mix(in srgb, var(--primary) 22%, var(--plan-floor)); }
+.plan-room:focus { outline: none; }
+.plan-room:focus-visible .plan-shape { stroke: var(--primary); stroke-width: 3px; vector-effect: non-scaling-stroke; }
+@media (hover: hover) {
+  .plan-room:hover .plan-shape { fill: color-mix(in srgb, var(--primary) 9%, var(--plan-floor)); }
+  .plan-room.lit:hover .plan-shape { fill: color-mix(in srgb, var(--accent) 20%, var(--plan-floor)); }
+}
+
+.plan-furniture, .plan-glows, .plan-porches, [class^="plan-wall"] { pointer-events: none; }
+.plan-furn { fill: var(--plan-furn); }
+.plan-furn.soft { fill: var(--plan-soft); }
+.plan-furn.bench { fill: var(--plan-bench); }
+.plan-furn.dark { fill: var(--plan-dark); }
+.plan-furn.pillow { fill: var(--plan-pillow); }
+.plan-furn.car { fill: var(--plan-car); }
+.plan-furn.glass { fill: var(--plan-glass); stroke: var(--plan-bench); stroke-width: 1; }
+
+.plan-wall-cast polygon, .plan-wall-side polygon, .plan-wall-top polygon {
+  fill: none;
+  stroke-width: var(--wall);
+  stroke-linejoin: miter;
+  stroke-linecap: square;
+}
+.plan-wall-cast polygon { stroke: var(--plan-cast); stroke-width: calc(var(--wall) + 2px); }
+.plan-wall-side polygon { stroke: var(--plan-wall-side); }
+.plan-wall-top polygon { stroke: var(--plan-wall-top); }
+.plan-porches polygon {
+  fill: none;
+  stroke: var(--plan-wall-side);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.plan-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  text-align: center;
+  pointer-events: none;
+  font-size: clamp(11px, 0.9cqi + 6px, 15px);
+  line-height: 1.15;
+  color: var(--text);
+}
+.plan-label strong { position: relative; font-weight: 600; }
+.plan-label.compact { font-size: clamp(10px, 0.7cqi + 5px, 13px); }
+.plan-label.compact .plan-meta { display: none; }
+.plan-label.unlinked { opacity: 0.55; }
+/* Keep names readable over a bright glow, light or dark theme. */
+.plan-label.lit { text-shadow: 0 0 2px var(--surface), 0 0 8px var(--surface); }
+.plan-label.lit .plan-meta { color: var(--text); }
+.plan-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.88em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.plan-meta span { display: inline-flex; align-items: center; gap: 1px; }
+.plan-meta .icon { width: 1.15em; height: 1.15em; }
+.plan-lights { color: color-mix(in srgb, var(--accent) 75%, var(--text)); font-weight: 600; }
+.plan-open { color: var(--warning); }
+.plan-motion {
+  position: absolute;
+  top: 0.1em;
+  left: -0.75em;
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+  animation: pulse 1.6s infinite;
+}
+
+/* ---------- floor plan: uploaded pictures ---------- */
+
+.plan.picture > svg { overflow: hidden; border-radius: 10px; }
+.plan.picture .plan-img { pointer-events: none; }
+.plan.picture .plan-shape { fill: transparent; stroke: transparent; stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.plan.picture .plan-room.unlinked .plan-shape { fill: transparent; }
+.plan.picture .plan-room.lit .plan-shape { fill: color-mix(in srgb, var(--accent) 10%, transparent); }
+.plan.picture .plan-room:active .plan-shape { fill: color-mix(in srgb, var(--primary) 22%, transparent); }
+.plan.picture .plan-room:focus-visible .plan-shape { stroke: var(--primary); }
+@media (hover: hover) {
+  .plan.picture .plan-room:hover .plan-shape { fill: color-mix(in srgb, var(--primary) 10%, transparent); stroke: color-mix(in srgb, var(--primary) 55%, transparent); }
+}
+.plan.picture .plan-glow { mix-blend-mode: multiply; }
+/* Names sit on a soft halo so they read over the lines of the picture. */
+.plan.picture .plan-label strong, .plan.picture .plan-meta { text-shadow: 0 0 3px var(--surface), 0 0 3px var(--surface), 0 0 8px var(--surface); }
+:root[data-theme="dark"] .plan.invert-dark .plan-img { filter: url(#plan-invert); }
+:root[data-theme="dark"] .plan.invert-dark .plan-glow { mix-blend-mode: screen; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .plan.invert-dark .plan-img { filter: url(#plan-invert); }
+  :root:not([data-theme="light"]) .plan.invert-dark .plan-glow { mix-blend-mode: screen; }
+}
+
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip .icon { width: 18px; height: 18px; }
+.chip:disabled { opacity: 0.45; cursor: default; }
