@@ -1,9 +1,10 @@
 # Example: a phone reminder before each family calendar event, sent to whoever it's for.
 # Paste into Settings → Automations → ⋮ → Edit in YAML. Change the calendars and notify services to yours.
+# The names (alex, sam) and notify services are examples: change them to your household's.
 # Timed events remind 30 minutes before; all-day events remind at 7:00 that morning.
 # Everything is on one Local Calendar (calendar.family). "Who" comes from the "Who: …" line the dashboard
-# writes in the event's notes: Who: Azelia, Who: Andrew, or no line (or Who: Azelia & Andrew) for both.
-# With separate calendars per person instead, add their triggers with id: azelia / id: andrew.
+# writes in the event's notes: Who: Alex, Who: Sam, or no line (or Who: Alex & Sam) for both.
+# With separate calendars per person instead, add their triggers with id: alex / id: sam.
 id: dashboard_calendar_reminders
 alias: Calendar reminders
 mode: queued
@@ -27,13 +28,13 @@ actions:
         {% if ev.all_day %}Today{% else %}At {{ as_timestamp(ev.start) | timestamp_custom('%-I:%M %p') }}{% endif %}
         {%- if ev.location %} · {{ ev.location }}{% endif %}
   - choose:
-      - conditions: "{{ who == 'azelia' }}"
+      - conditions: "{{ who == 'alex' }}"
         sequence:
-          - action: notify.mobile_app_azelia_s_phone
+          - action: notify.mobile_app_alex_phone
             data: { title: "📅 {{ ev.summary }}", message: "{{ message }}" }
-      - conditions: "{{ who == 'andrew' }}"
+      - conditions: "{{ who == 'sam' }}"
         sequence:
-          - action: notify.mobile_app_sm_s938b
+          - action: notify.mobile_app_sam_phone
             data: { title: "📅 {{ ev.summary }}", message: "{{ message }}" }
     default:
       - action: script.notify_family

@@ -58,7 +58,7 @@ export const calCan = (s, f) => !!((s?.attributes?.supported_features || 0) & f)
 /** A key that finds the same event again after a reload. */
 export const calEvKey = (ev) => [ev.cal, ev.uid || ev.title, ev.recurrenceId || +ev.start].join('|');
 
-// "Who: Azelia & Andrew" on its own line in the description, for calendars shared by everyone.
+// "Who: Alex & Sam" on its own line in the description, for calendars shared by everyone.
 const WHO_LINE = /^\s*who\s*:\s*(.+?)\s*$/im;
 export function calWhoTag(description) {
   const m = (description || '').match(WHO_LINE);
