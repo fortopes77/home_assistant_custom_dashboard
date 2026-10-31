@@ -555,9 +555,14 @@ function calWhoSettingsHtml() {
   </div>`;
 }
 
-/** The household for "Who": the people shown on Places (not the wall tablet), first names. */
+/**
+ * The household for "Who": every person in Home Assistant except wall tablets, first names. Not the
+ * Places list, so hiding someone from this screen's map (or their phone being off) doesn't drop them.
+ */
 function household() {
-  return shownPeople().map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
+  return peopleOf(store.states)
+    .filter((p) => domainOf(p.id) === 'person' && !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name))
+    .map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
 }
 
 /** Calendars Home Assistant can add events to (Local Calendar, Google, CalDAV). */
