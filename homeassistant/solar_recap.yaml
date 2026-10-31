@@ -1,0 +1,24 @@
+# Example: an 8 pm summary of the day's solar, sent through the notify_family script with Gemini wording.
+# The id lets the dashboard's Energy page show an on/off switch for it. Change the sensors to yours.
+id: dashboard_solar_recap
+alias: Evening solar recap
+mode: single
+triggers:
+  - trigger: time
+    at: "20:00:00"
+actions:
+  - variables:
+      made: "{{ states('sensor.solar_daily_pv_generation') | float(0) | round(1) }}"
+      used: "{{ states('sensor.solar_home_consumption_today') | float(0) | round(1) }}"
+      sold: "{{ states('sensor.solar_grid_export_today') | float(0) | round(1) }}"
+      bought: "{{ states('sensor.solar_grid_import_today') | float(0) | round(1) }}"
+      soc: "{{ states('sensor.solar_battery_state_of_charge') | int(0) }}"
+  - action: script.notify_family
+    data:
+      title: "☀️ Today's solar"
+      message: >-
+        Solar made {{ made }} kWh, the house used {{ used }} kWh, {{ sold }} kWh was sold to the grid
+        and {{ bought }} kWh bought. Battery is at {{ soc }}% going into the night.
+      friendly: true
+      data:
+        tag: solar-recap
