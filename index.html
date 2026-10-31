@@ -5653,7 +5653,7 @@ const calCan = (s, f) => !!((s?.attributes?.supported_features || 0) & f);
 /** A key that finds the same event again after a reload. */
 const calEvKey = (ev) => [ev.cal, ev.uid || ev.title, ev.recurrenceId || +ev.start].join('|');
 
-// "Who: Azelia & Andrew" on its own line in the description, for calendars shared by everyone.
+// "Who: Alex & Sam" on its own line in the description, for calendars shared by everyone.
 const WHO_LINE = /^\s*who\s*:\s*(.+?)\s*$/im;
 function calWhoTag(description) {
   const m = (description || '').match(WHO_LINE);
@@ -8105,7 +8105,7 @@ class Voice {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '31 Oct 2026, 12:57 (0ec572c)';
+const DASH_BUILD = '31 Oct 2026, 13:04 (03e6708)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8636,7 +8636,7 @@ const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Who each calendar is for: { [person id]: calendar, both: calendar }. A calendar named after someone
- * ("Azelia", "Andrew's calendar") is theirs; one called Family, Both, Shared or Everyone is for both.
+ * ("Alex", "Sam's calendar") is theirs; one called Family, Both, Shared or Everyone is for both.
  * Settings can pick them by hand. A missing one is '' and the event is tagged "Who: …" instead.
  */
 function calTargets() {
@@ -8913,7 +8913,7 @@ function briefInputs() {
     weather: weatherEntity(),
     unit: tempUnit().replace(/^°.*/, '°'),
     forecast: fc,
-    // "Dentist (Andrew)", so the summary can say whose it is.
+    // "Dentist (Sam)", so the summary can say whose it is.
     events: (() => { const vw = calView(); return day.events.map((ev) => { const w = vw.info(ev); return w ? { ...ev, title: `${ev.title} (${w.label})` } : ev; }); })(),
     calNames: Object.fromEntries(calendarsOf(store.states).map((s) => [s.entity_id, nameOf(s)])),
     people: shownPeople().map((p) => ({ name: p.name, place: personPlace(p) })),
