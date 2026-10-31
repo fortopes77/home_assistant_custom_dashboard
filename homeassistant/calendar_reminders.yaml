@@ -1,17 +1,14 @@
 # Example: a phone reminder before each family calendar event, sent to whoever it's for.
 # Paste into Settings → Automations → ⋮ → Edit in YAML. Change the calendars and notify services to yours.
 # Timed events remind 30 minutes before; all-day events remind at 7:00 that morning.
-# "Who" comes from the calendar (Azelia's, Andrew's, Family = both), or from a "Who: …" line in the
-# event's notes when one calendar is shared, which is what the dashboard writes in that case.
+# Everything is on one Local Calendar (calendar.family). "Who" comes from the "Who: …" line the dashboard
+# writes in the event's notes: Who: Azelia, Who: Andrew, or no line (or Who: Azelia & Andrew) for both.
+# With separate calendars per person instead, add their triggers with id: azelia / id: andrew.
 id: dashboard_calendar_reminders
 alias: Calendar reminders
 mode: queued
 triggers:
-  - { trigger: calendar, event: start, offset: "-0:30:00", entity_id: calendar.azelia, id: azelia }
-  - { trigger: calendar, event: start, offset: "-0:30:00", entity_id: calendar.andrew, id: andrew }
   - { trigger: calendar, event: start, offset: "-0:30:00", entity_id: calendar.family, id: both }
-  - { trigger: calendar, event: start, offset: "7:00:00", entity_id: calendar.azelia, id: azelia }
-  - { trigger: calendar, event: start, offset: "7:00:00", entity_id: calendar.andrew, id: andrew }
   - { trigger: calendar, event: start, offset: "7:00:00", entity_id: calendar.family, id: both }
 conditions:
   # The -30 min triggers are for timed events and the +7 h ones for all-day events.

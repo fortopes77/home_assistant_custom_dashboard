@@ -95,8 +95,8 @@ The Battery level and Geocoded location sensors in the app add the battery and a
 Add, change and delete events right on Today, and say **who** each one is for: one of you, or both. Each person has a colour, every event shows a name tag, and **Everyone / Azelia / Andrew** at the top of the calendar shows just one person's things (plus shared ones) on that screen.
 
 - **+** on the calendar, or **Add an event** on a day, makes a new one. Tap any event to change or delete it (delete asks for a second tap). For a repeating event, choose **Only this one** or **This one and later ones**.
-- Events go in calendars Home Assistant can write to: **Local Calendar** or **Google Calendar**. A calendar named after someone (`Azelia`, `Andrew`) is theirs, and one called `Family` is for both. Change this under **Settings → Today**.
-- With only one shared calendar, the event's notes get a line like `Who: Andrew` instead, and the dashboard reads it back.
+- Set up: in Home Assistant, **Settings → Devices & services → Add integration → Local Calendar**, named `Family`. Everything goes on that one calendar. Tapping a name in **Who** adds a line like `Who: Andrew` to the event's notes (none means both), and the dashboard reads it back for the colour and tag.
+- Prefer a calendar each? One named after someone (`Azelia`, `Andrew`) is theirs, and `Family` is for both. Pick them under **Settings → Today**. Google Calendar works too.
 - Calendars that can only be read (like an iCal feed) still show, and open read-only.
 - Reminders: [`homeassistant/calendar_reminders.yaml`](homeassistant/calendar_reminders.yaml) sends one 30 minutes before (7:00 for all-day events) to whoever it's for, or to the whole family.
 

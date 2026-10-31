@@ -539,7 +539,7 @@ function calWhoSettingsHtml() {
   if (!people.length) return '';
   if (!cals.length) {
     return `<p class="muted cal-who-note">To add events here, with who each one is for, add a <b>Local Calendar</b> in Home Assistant
-      (Settings → Devices &amp; services → Add integration). Make one called after each of you and one called Family for both.</p>`;
+      (Settings → Devices &amp; services → Add integration) called Family. Each event says who it's for in its notes.</p>`;
   }
   const targets = calTargets();
   const picks = store.prefs.calWho || {};
