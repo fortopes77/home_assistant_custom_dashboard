@@ -48,7 +48,7 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 
 - **Hero:** a greeting, a big clock, the date and the weather now (tap it for the forecast). Below that is a short **summary of the day**: the weather, what's on and where everyone is. If Home Assistant has an AI integration (Anthropic, OpenAI or Google Gemini) with an **AI Task**, the AI writes the summary; otherwise a plain one is shown. To pick who writes it, or turn it off, use **Settings → Today**.
 - **Right now** lists open doors, someone at a camera, appliances running and lights left on, with quick actions.
-- **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings.
+- **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings. It's also a **family calendar** you can add to, see [Family calendar](#family-calendar).
 - **Shopping list:** your Home Assistant to-do list. Tap an item to tick it off, type to add one, and use **Clear ticked** to tidy up.
 - **Notifications:** Home Assistant's own notices, which you can dismiss, and what your automations sent to phones (`notify.*`). The **bell** in the top bar counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
 - **News:** Feedreader feeds work, but Home Assistant only keeps the latest story from each, so the dashboard collects stories as they arrive and shares them between screens. For a full list straight away, add a sensor from the HACS **feedparser** integration:
@@ -89,6 +89,16 @@ The map library (Leaflet) comes from cdn.jsdelivr.net and the map pictures from 
 - In Home Assistant, under **Settings → People**, that phone picked under **Track device** for its person.
 
 The Battery level and Geocoded location sensors in the app add the battery and address.
+
+## Family calendar
+
+Add, change and delete events right on Today, and say **who** each one is for: one of you, or both. Each person has a colour, every event shows a name tag, and **Everyone / Azelia / Andrew** at the top of the calendar shows just one person's things (plus shared ones) on that screen.
+
+- **+** on the calendar, or **Add an event** on a day, makes a new one. Tap any event to change or delete it (delete asks for a second tap). For a repeating event, choose **Only this one** or **This one and later ones**.
+- Set up: in Home Assistant, **Settings → Devices & services → Add integration → Local Calendar**, named `Family`. Everything goes on that one calendar. Tapping a name in **Who** adds a line like `Who: Andrew` to the event's notes (none means both), and the dashboard reads it back for the colour and tag.
+- Prefer a calendar each? One named after someone (`Azelia`, `Andrew`) is theirs, and `Family` is for both. Pick them under **Settings → Today**. Google Calendar works too.
+- Calendars that can only be read (like an iCal feed) still show, and open read-only.
+- Reminders: [`homeassistant/calendar_reminders.yaml`](homeassistant/calendar_reminders.yaml) sends one 30 minutes before (7:00 for all-day events) to whoever it's for, or to the whole family.
 
 ## Shopping reminders at the shops
 

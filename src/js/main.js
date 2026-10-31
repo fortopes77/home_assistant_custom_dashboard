@@ -26,7 +26,8 @@ import {
 } from './energy.js';
 import {
   calendarsOf, calParse, calOnDay, calStartOfDay, calAddDays, calDayKey, calTimeLabel, CAL_COLORS,
-  calGridStart, calMonthHtml, calDaySheetHtml,
+  calGridStart, calMonthHtml, calDaySheetHtml, calCan, CAL_CREATE, CAL_DELETE, CAL_UPDATE, calEvKey, calWhoTag,
+  calNotes, CAL_REPEATS, calTimeValue, calEventFromForm, calDayLabel,
 } from './calendar.js';
 import { weatherWord, greetingFor, dayPart, briefFacts, briefLocal, briefAgents, briefPrompt } from './brief.js';
 import { noteFromCall, noteMerge, noteText, noteItems, Ding } from './notify.js';
@@ -64,6 +65,8 @@ const DEFAULT_PREFS = {
   glance: true,          // "Right now" on Today: open doors, someone at a camera, appliances, lights left on
   calendar: true,
   calView: 'days',       // 'days' (today and tomorrow) or 'month'
+  calWho: {},            // person id or 'both' -> the calendar their events go in; empty = matched by name
+  calFor: '',            // show only one person's events (and shared ones) on this screen
   notifications: true,   // the notifications card on Today (the bell is always there)
   todayExtras: false,    // cameras, thermostats and scenes on Today too
   peopleMap: true,       // the Places page and the map on Today
@@ -490,13 +493,16 @@ async function loadEvents(force = false) {
   if (!ids.length) { day.events = []; day.eventsKey = key; return; }
   day.eventsLoading = true;
   try {
-    const res = await store.client.send({
-      type: 'call_service', domain: 'calendar', service: 'get_events',
-      service_data: { start_date_time: start.toISOString(), end_date_time: end.toISOString() },
-      target: { entity_id: ids }, return_response: true,
+    day.events = await eventsRest(ids, start, end).catch(async () => {
+      // Without the REST API (another address that HA doesn't allow), events show but can't be changed.
+      const res = await store.client.send({
+        type: 'call_service', domain: 'calendar', service: 'get_events',
+        service_data: { start_date_time: start.toISOString(), end_date_time: end.toISOString() },
+        target: { entity_id: ids }, return_response: true,
+      });
+      const r = res?.response || {};
+      return ids.flatMap((id) => (r[id]?.events || []).map((e) => calParse(e, id)));
     });
-    const r = res?.response || {};
-    day.events = ids.flatMap((id) => (r[id]?.events || []).map((e) => calParse(e, id)));
     day.eventsError = '';
   } catch (err) {
     day.eventsError = err?.message || 'Could not load the calendar';
@@ -506,6 +512,292 @@ async function loadEvents(force = false) {
   day.eventsLoading = false;
   queueRefresh();
   updateBrief();
+}
+
+/** The REST calendar API, which (unlike calendar.get_events) gives each event's uid so it can be changed. */
+async function eventsRest(ids, start, end) {
+  const client = store.client;
+  const token = await client.getToken();
+  const q = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+  const lists = await Promise.all(ids.map(async (id) => {
+    const r = await fetch(`${client.url}/api/calendars/${id}?${q}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.json()).map((e) => calParse(e, id));
+  }));
+  return lists.flat();
+}
+
+// ---------- family calendar: who each event is for, and adding or changing events ----------
+
+const WHO_COLORS = ['#e0598b', '#2f6fde', '#1f9d55', '#e09a1f'];
+const BOTH_COLOR = '#7c5cd6';
+
+/** Settings → Today: which calendar holds each person's events, and the shared ones. */
+function calWhoSettingsHtml() {
+  const cals = writableCals();
+  const people = household();
+  if (!people.length) return '';
+  if (!cals.length) {
+    return `<p class="muted cal-who-note">To add events here, with who each one is for, add a <b>Local Calendar</b> in Home Assistant
+      (Settings → Devices &amp; services → Add integration) called Family. Each event says who it's for in its notes.</p>`;
+  }
+  const targets = calTargets();
+  const picks = store.prefs.calWho || {};
+  const keys = [...people.map((p) => p.id), ...(people.length > 1 ? ['both'] : [])];
+  return `<div class="cal-who-set">
+    <p class="muted">Where new events go. A calendar named after someone is theirs and one called Family is for both; otherwise events say who in their notes.</p>
+    ${keys.map((k) => {
+      const w = whoInfo(k, people);
+      const auto = targets[k] && !picks[k] ? ` (${nameOf(store.states.get(targets[k]))})` : '';
+      return `<label class="row cal-pick" style="--cal:${w.color}"><span><b>${esc(k === 'both' ? 'Events for both' : `${w.label}'s events`)}</b></span>
+        <select data-cal-who="${esc(k)}"><option value="">Automatic${esc(auto)}</option>${cals.map((c) => `<option value="${esc(c.entity_id)}"${picks[k] === c.entity_id ? ' selected' : ''}>${esc(nameOf(c))}</option>`).join('')}</select></label>`;
+    }).join('')}
+  </div>`;
+}
+
+/** The household for "Who": the people shown on Places (not the wall tablet), first names. */
+function household() {
+  return shownPeople().map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
+}
+
+/** Calendars Home Assistant can add events to (Local Calendar, Google, CalDAV). */
+function writableCals() {
+  return calendarsOf(store.states).filter((s) => calCan(s, CAL_CREATE));
+}
+
+const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Who each calendar is for: { [person id]: calendar, both: calendar }. A calendar named after someone
+ * ("Azelia", "Andrew's calendar") is theirs; one called Family, Both, Shared or Everyone is for both.
+ * Settings can pick them by hand. A missing one is '' and the event is tagged "Who: …" instead.
+ */
+function calTargets() {
+  const cals = writableCals();
+  const ok = (id) => id && cals.some((c) => c.entity_id === id);
+  const picks = store.prefs.calWho || {};
+  const words = (c) => `${nameOf(c)} ${c.entity_id.split('.')[1].replace(/_/g, ' ')}`;
+  const out = {};
+  for (const p of household()) {
+    const re = new RegExp(`\\b(${reEsc(p.name)}|${reEsc(p.id.split('.')[1])})\\b`, 'i');
+    out[p.id] = ok(picks[p.id]) ? picks[p.id] : cals.find((c) => re.test(words(c)))?.entity_id || '';
+  }
+  const theirs = new Set(Object.values(out));
+  out.both = ok(picks.both) ? picks.both
+    : (cals.find((c) => !theirs.has(c.entity_id) && /family|both|everyone|shared|household|together|\bus\b/i.test(words(c)))
+      || cals.find((c) => !theirs.has(c.entity_id)))?.entity_id || '';
+  return out;
+}
+
+/** Who an event is for: a person id, 'both', or '' (a calendar that isn't anyone's, like Family Wall's feed). */
+function whoOf(ev, people = household(), targets = calTargets()) {
+  const tag = calWhoTag(ev.description).map((t) => t.toLowerCase());
+  if (tag.length) {
+    if (tag.some((t) => /^(both|everyone|all|family|us)$/.test(t))) return 'both';
+    const ids = people.filter((p) => tag.includes(p.name.toLowerCase()) || tag.includes(p.full.toLowerCase())).map((p) => p.id);
+    if (ids.length === 1) return ids[0];
+    if (ids.length) return 'both';
+  }
+  return calOwner(ev.cal, targets);
+}
+
+/** Whose a calendar is, when only one of { each person, both } uses it; '' when it's shared or nobody's. */
+function calOwner(cal, targets = calTargets()) {
+  const keys = Object.keys(targets).filter((k) => targets[k] === cal);
+  return keys.length === 1 ? keys[0] : '';
+}
+
+function whoInfo(key, people = household()) {
+  if (key === 'both') return { label: people.length === 2 ? 'Both' : 'Everyone', color: BOTH_COLOR };
+  const p = people.find((x) => x.id === key);
+  return p ? { label: p.name, color: p.color } : null;
+}
+
+/** Shared helpers for drawing the calendar: who, colours and the screen's "just me" filter. */
+function calView() {
+  const people = household();
+  const targets = calTargets();
+  const colors = calColors();
+  const cache = new Map();
+  const who = (ev) => {
+    if (!cache.has(ev)) cache.set(ev, whoOf(ev, people, targets));
+    return cache.get(ev);
+  };
+  const forId = people.some((p) => p.id === store.prefs.calFor) ? store.prefs.calFor : '';
+  return {
+    people,
+    who,
+    info: (ev) => whoInfo(who(ev), people),
+    colorOf: (ev) => whoInfo(who(ev), people)?.color || colors[ev.cal] || CAL_COLORS[0],
+    // One person's view keeps their events, shared ones and ones that aren't anyone's.
+    events: forId ? day.events.filter((ev) => !people.some((p) => p.id === who(ev)) || who(ev) === forId) : day.events,
+    forId,
+    canAdd: writableCals().length > 0,
+  };
+}
+
+const evByKey = (key) => day.events.find((ev) => calEvKey(ev) === key) || null;
+
+function canChange(ev) {
+  const s = store.states.get(ev.cal);
+  return !!ev.uid && (calCan(s, CAL_UPDATE) || (calCan(s, CAL_CREATE) && calCan(s, CAL_DELETE)));
+}
+
+function nextHour() {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  return d;
+}
+
+function eventSheetHtml(sh) {
+  const people = household();
+  const ev = sh.id === 'new' ? null : evByKey(sh.id);
+  const back = !!sh.back;
+  if (sh.id !== 'new' && !ev) return `${sheetHead('Event', '', { ic: 'calendar', back })}<div class="sheet-body"><p class="muted">This event has gone.</p></div>`;
+  if (ev && !canChange(ev)) {
+    const w = whoInfo(whoOf(ev), people);
+    const notes = calNotes(ev.description);
+    const calName = nameOf(store.states.get(ev.cal) || { entity_id: ev.cal });
+    return `${sheetHead(ev.title, calDayLabel(ev.start, new Date()), { ic: 'calendar', back })}
+      <div class="sheet-body">
+        <dl class="kv-big">
+          <div><dt>When</dt><dd>${esc(calTimeLabel(ev, calStartOfDay(ev.start)))}</dd></div>
+          ${w ? `<div><dt>Who</dt><dd>${esc(w.label)}</dd></div>` : ''}
+          ${ev.location ? `<div><dt>Where</dt><dd>${esc(ev.location)}</dd></div>` : ''}
+          <div><dt>Calendar</dt><dd>${esc(calName)}</dd></div>
+        </dl>
+        ${notes ? `<p class="cal-desc">${esc(notes)}</p>` : ''}
+        <p class="muted">${!canChange({ ...ev, uid: 'x' }) ? `${esc(calName)} can only be read here, so change this event where it was made.`
+          : 'This screen can\'t reach Home Assistant\'s calendar API, so events can be seen but not changed here.'}</p>
+      </div>`;
+  }
+  const d = sh.form; // the starting values, worked out once so a redraw doesn't reset what's typed
+  const whoKeys = [...people.map((p) => p.id), ...(people.length > 1 ? ['both'] : [])];
+  const repeats = d.rrule && !CAL_REPEATS.some(([v]) => v === d.rrule) ? [[d.rrule, 'Keep how it repeats'], ...CAL_REPEATS] : CAL_REPEATS;
+  return `${sheetHead(ev ? 'Change event' : 'New event', ev ? ev.title : '', { ic: 'calendar', back })}
+    <div class="sheet-body">
+      <form class="ev-form" data-ev-form data-key="${esc(sh.id)}" novalidate>
+        <input type="text" name="title" value="${esc(d.title)}" placeholder="What's on?" aria-label="What's on?" autocomplete="off" enterkeyhint="done" required>
+        ${whoKeys.length ? `<fieldset class="who-pick"><legend>Who</legend>
+          ${whoKeys.map((k) => { const w = whoInfo(k, people); return `<label style="--cal:${w.color}"><input type="radio" name="who" value="${esc(k)}"${d.who === k ? ' checked' : ''}><span>${esc(w.label)}</span></label>`; }).join('')}
+        </fieldset>` : ''}
+        <label class="row"><span><b>All day</b></span><input type="checkbox" name="allDay"${d.allDay ? ' checked' : ''}></label>
+        <div class="ev-when">
+          <label><span>Starts</span><input type="date" name="date" value="${esc(d.date)}" required><input type="time" name="start" value="${esc(d.start)}" class="ev-t" aria-label="Start time"></label>
+          <label><span>Ends</span><input type="date" name="endDate" value="${esc(d.endDate)}"><input type="time" name="end" value="${esc(d.end)}" class="ev-t" aria-label="End time"></label>
+        </div>
+        <label class="row"><span><b>Repeats</b></span><select name="rrule">${repeats.map(([v, l]) => `<option value="${esc(v)}"${d.rrule === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+        ${ev?.recurrenceId ? `<label class="row"><span><b>Change</b><small class="muted">It's one of a repeating series</small></span><select name="scope">
+          <option value="one">Only this one</option><option value="future">This one and later ones</option></select></label>` : ''}
+        <input type="text" name="location" value="${esc(d.location)}" placeholder="Where (optional)" aria-label="Where" autocomplete="off">
+        <textarea name="notes" rows="2" placeholder="Notes (optional)" aria-label="Notes">${esc(d.notes)}</textarea>
+        <p class="ev-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button class="btn primary" type="submit">${icon('check')}${ev ? 'Save' : 'Add'}</button>
+          ${ev ? `<button type="button" class="btn danger" data-ev-delete>${icon('delete')}Delete</button>` : ''}
+        </div>
+      </form>
+    </div>`;
+}
+
+function openEvent(key, { date = '', back = null } = {}) {
+  const ev = key === 'new' ? null : evByKey(key);
+  const vw = calView();
+  const startAt = ev ? ev.start : (() => { const t = nextHour(); return date ? new Date(`${date}T${calTimeValue(t)}:00`) : t; })();
+  const endAt = ev ? (ev.allDay ? calAddDays(ev.end, -1) : ev.end) : new Date(+startAt + 3_600_000);
+  const form = {
+    title: ev?.title || '',
+    who: ev ? vw.who(ev) : vw.forId || (vw.people.length > 1 ? 'both' : vw.people[0]?.id || ''),
+    allDay: !!ev?.allDay,
+    date: calDayKey(startAt),
+    start: calTimeValue(startAt),
+    endDate: calDayKey(endAt),
+    end: calTimeValue(endAt),
+    rrule: ev?.rrule || '',
+    location: ev?.location || '',
+    notes: calNotes(ev?.description),
+  };
+  openSheet({ kind: 'event', id: key, back, form });
+}
+
+async function calSend(msg) {
+  return store.client.send(msg);
+}
+
+async function saveEvent(formEl) {
+  const sh = ui.sheet;
+  const f = new FormData(formEl);
+  const ev = sh.id === 'new' ? null : evByKey(sh.id);
+  const people = household();
+  const targets = calTargets();
+  const who = String(f.get('who') || '');
+  const fallback = targets.both || writableCals()[0]?.entity_id || '';
+  const cal = (who && targets[who]) || (ev && canChange(ev) && !targets[who] ? ev.cal : '') || fallback;
+  // Say who in the event itself when its calendar doesn't (one shared calendar, or no calendar for them).
+  const calSays = who && calOwner(cal, targets) === who;
+  const whoLine = who && !calSays ? `Who: ${who === 'both' ? people.map((p) => p.name).join(' & ') : whoInfo(who, people)?.label}` : '';
+  const scope = String(f.get('scope') || 'one');
+  const { event, error } = calEventFromForm({
+    title: f.get('title'), allDay: f.get('allDay') === 'on', date: f.get('date'), endDate: f.get('endDate'),
+    start: f.get('start'), end: f.get('end'), location: f.get('location'), notes: f.get('notes'), whoLine,
+    rrule: ev?.recurrenceId && scope === 'one' ? '' : String(f.get('rrule') || ''),
+  });
+  const errEl = formEl.querySelector('.ev-error');
+  if (error || !cal) {
+    errEl.textContent = error || 'There is no calendar to add it to. Add a Local Calendar in Home Assistant first.';
+    errEl.hidden = false;
+    return;
+  }
+  const btn = formEl.querySelector('[type="submit"]');
+  btn.disabled = true;
+  try {
+    const which = ev?.recurrenceId ? { recurrence_id: ev.recurrenceId, ...(scope === 'future' ? { recurrence_range: 'THISANDFUTURE' } : {}) } : {};
+    if (!ev) {
+      await calSend({ type: 'calendar/event/create', entity_id: cal, event });
+    } else if (cal === ev.cal && calCan(store.states.get(cal), CAL_UPDATE)) {
+      await calSend({ type: 'calendar/event/update', entity_id: cal, uid: ev.uid, ...which, event });
+    } else {
+      // A new person's calendar (or one that can't update): add it there, then take it out of the old one.
+      await calSend({ type: 'calendar/event/create', entity_id: cal, event });
+      await calSend({ type: 'calendar/event/delete', entity_id: ev.cal, uid: ev.uid, ...which });
+    }
+    toast(ev ? 'Event saved' : `Added for ${whoInfo(who, people)?.label || 'the family'}`);
+    const back = sh.back;
+    if (back) { ui.sheet = back; ui.sheetHtml = ''; renderSheet(); } else closeSheet();
+    loadEvents(true);
+  } catch (err) {
+    btn.disabled = false;
+    errEl.textContent = `Couldn't save: ${err.message || err}`;
+    errEl.hidden = false;
+  }
+}
+
+async function deleteEvent(btn) {
+  const sh = ui.sheet;
+  const ev = evByKey(sh?.id);
+  if (!ev) return;
+  // A second tap confirms, so there's no pop-up to dismiss on a wall tablet.
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = '1';
+    btn.lastChild.textContent = 'Tap again to delete';
+    setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.lastChild.textContent = 'Delete'; } }, 4000);
+    return;
+  }
+  const scope = btn.form?.elements.scope?.value || 'one';
+  try {
+    await calSend({
+      type: 'calendar/event/delete', entity_id: ev.cal, uid: ev.uid,
+      ...(ev.recurrenceId ? { recurrence_id: ev.recurrenceId, ...(scope === 'future' ? { recurrence_range: 'THISANDFUTURE' } : {}) } : {}),
+    });
+    day.events = day.events.filter((x) => x !== ev);
+    toast('Event deleted');
+    const back = sh.back;
+    if (back) { ui.sheet = back; ui.sheetHtml = ''; renderSheet(); } else closeSheet();
+    loadEvents(true);
+  } catch (err) {
+    toast(`Couldn't delete: ${err.message || err}`);
+  }
 }
 
 /** People to show: everyone except the ones hidden in Settings (wall tablets by default). */
@@ -554,7 +846,8 @@ function briefInputs() {
     weather: weatherEntity(),
     unit: tempUnit().replace(/^°.*/, '°'),
     forecast: fc,
-    events: day.events,
+    // "Dentist (Andrew)", so the summary can say whose it is.
+    events: (() => { const vw = calView(); return day.events.map((ev) => { const w = vw.info(ev); return w ? { ...ev, title: `${ev.title} (${w.label})` } : ev; }); })(),
     calNames: Object.fromEntries(calendarsOf(store.states).map((s) => [s.entity_id, nameOf(s)])),
     people: shownPeople().map((p) => ({ name: p.name, place: personPlace(p) })),
   });
@@ -653,27 +946,34 @@ function agendaHtml() {
   const month = store.prefs.calView === 'month';
   const now = new Date();
   const today = calStartOfDay(now);
-  const colors = calColors();
+  const vw = calView();
   const dayBlock = (d, label) => {
-    let evs = calOnDay(day.events, d);
+    let evs = calOnDay(vw.events, d);
     if (+d === +today) evs = evs.filter((ev) => ev.allDay || ev.end > now);
     return `<div class="agenda-day">
       <h3>${esc(label)}</h3>
-      ${evs.length ? `<ul class="agenda">${evs.map((ev) => `<li style="--cal:${colors[ev.cal] || 'var(--accent)'}">
+      ${evs.length ? `<ul class="agenda">${evs.map((ev) => { const w = vw.info(ev); return `<li style="--cal:${vw.colorOf(ev)}"><button type="button" data-cal-ev="${esc(calEvKey(ev))}">
         <span class="ev-time">${esc(ev.allDay ? 'All day' : calTimeLabel(ev, d))}</span>
-        <span class="ev-title">${esc(ev.title)}${ev.location ? `<small>${esc(ev.location)}</small>` : ''}</span>
-      </li>`).join('')}</ul>` : `<p class="muted quiet">${+d === +today ? 'Nothing else on today' : 'Nothing planned'}</p>`}
+        <span class="ev-title">${esc(ev.title)}${w ? ` <span class="who-pill">${esc(w.label)}</span>` : ''}${ev.location ? `<small>${esc(ev.location)}</small>` : ''}</span>
+      </button></li>`; }).join('')}</ul>` : `<p class="muted quiet">${+d === +today ? 'Nothing else on today' : 'Nothing planned'}</p>`}
     </div>`;
   };
   const body = !day.eventsKey ? (day.eventsError ? `<p class="muted">${esc(day.eventsError)}</p>` : '<div class="spinner"></div>')
-    : month ? calMonthHtml(day.events, calMonthShown(), { now, colors })
+    : month ? calMonthHtml(vw.events, calMonthShown(), { now, colorOf: vw.colorOf })
       : `${dayBlock(today, 'Today')}${dayBlock(calAddDays(today, 1), 'Tomorrow')}`;
+  // "Everyone" or one person's events (with the shared ones); remembered on this screen.
+  const filter = vw.people.length > 1 && writableCals().length ? `<div class="who-filter" role="group" aria-label="Whose events">
+      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">Everyone</button>
+      ${vw.people.map((p) => `<button type="button" data-cal-for="${esc(p.id)}" aria-pressed="${vw.forId === p.id}" style="--cal:${p.color}">${esc(p.name)}</button>`).join('')}
+    </div>` : '';
   return `<section class="card agenda-card${month ? ' month' : ''}">
     <h2 class="card-title">${icon('calendar')}Calendar
       <span class="seg" role="group" aria-label="Calendar view">
         <button type="button" data-cal-view="days" aria-pressed="${!month}">Days</button>
         <button type="button" data-cal-view="month" aria-pressed="${month}">Month</button>
-      </span></h2>
+      </span>
+      ${vw.canAdd ? `<button type="button" class="icon-btn cal-add" data-cal-add="" aria-label="Add an event">${icon('plus')}</button>` : ''}</h2>
+    ${filter}
     ${body}
   </section>`;
 }
@@ -1486,7 +1786,8 @@ const VIEWS = {
           agents.length ? 'Written by the AI in your Home Assistant from the weather, the calendar and where everyone is, and shared with your other screens.'
             : 'Add an AI integration (Anthropic, OpenAI or Google Gemini) with an AI Task in Home Assistant to have it written for you.') : ''}
         ${check('calendar', 'Calendar', cals.length ? '' : 'No calendars in Home Assistant yet')}
-        ${p.calendar ? cals.map((c) => `<label class="row cal-pick" style="--cal:${colors[c.entity_id]}"><span><b>${esc(nameOf(c))}</b></span><input type="checkbox" data-cal="${esc(c.entity_id)}"${p.calHidden[c.entity_id] ? '' : ' checked'}></label>`).join('') : ''}
+        ${p.calendar ? cals.map((c) => `<label class="row cal-pick" style="--cal:${colors[c.entity_id]}"><span><b>${esc(nameOf(c))}</b>${calCan(c, CAL_CREATE) ? '' : '<small class="muted">Read only</small>'}</span><input type="checkbox" data-cal="${esc(c.entity_id)}"${p.calHidden[c.entity_id] ? '' : ' checked'}></label>`).join('') : ''}
+        ${p.calendar ? calWhoSettingsHtml() : ''}
         ${todos.length ? `${check('shopping', 'Shopping list', esc(shop.id ? nameOf(store.states.get(shop.id)) : ''))}
           ${todos.length > 1 && p.shopping ? choose('shopList', 'Which list', [['', 'Automatic'], ...todos.map((s) => [s.entity_id, nameOf(s)])]) : ''}` : ''}
         ${check('notifications', 'Notifications card', 'The bell in the top bar always has them')}
@@ -1789,10 +2090,15 @@ function renderSheet() {
       </div>`);
   } else if (sh.kind === 'day') {
     const dayDate = new Date(`${sh.id}T00:00:00`);
-    setSheet(d, calDaySheetHtml(day.events, dayDate, {
-      colors: calColors(),
+    const vw = calView();
+    setSheet(d, calDaySheetHtml(vw.events, dayDate, {
+      colors: calColors(), who: vw.info, canAdd: vw.canAdd,
       calNames: Object.fromEntries(calendarsOf(store.states).map((c) => [c.entity_id, nameOf(c)])),
     }));
+  } else if (sh.kind === 'event') {
+    // Keep the form while it's open, so a redraw (a light changing) doesn't lose what's being typed.
+    if (d.querySelector('[data-ev-form]')?.dataset.key === sh.id && d.open) return;
+    setSheet(d, eventSheetHtml(sh));
   } else if (sh.kind === 'notes') {
     const items = noteItems(notes);
     setSheet(d, `${sheetHead('Notifications', plural(items.length, 'notification'), { ic: 'bell' })}
@@ -2269,6 +2575,13 @@ document.addEventListener('change', (e) => {
     writePrefs();
     return;
   }
+  if (t.dataset.calWho) {
+    store.prefs.calWho = { ...store.prefs.calWho, [t.dataset.calWho]: t.value };
+    if (!t.value) delete store.prefs.calWho[t.dataset.calWho];
+    writePrefs();
+    render();
+    return;
+  }
   if (t.dataset.cal) {
     if (t.checked) delete store.prefs.calHidden[t.dataset.cal]; else store.prefs.calHidden[t.dataset.cal] = true;
     writePrefs();
@@ -2319,6 +2632,14 @@ function handleCalendarClick(t) {
     render();
     return true;
   }
+  const add = t.closest('[data-cal-add]');
+  if (add) { openEvent('new', { date: add.dataset.calAdd, back: add.closest('#sheet') ? ui.sheet : null }); return true; }
+  const ev = t.closest('[data-cal-ev]');
+  if (ev) { openEvent(ev.dataset.calEv, { back: ev.closest('#sheet') ? ui.sheet : null }); return true; }
+  const who = t.closest('[data-cal-for]');
+  if (who) { store.prefs.calFor = who.dataset.calFor; writePrefs(); render(); return true; }
+  const del = t.closest('[data-ev-delete]');
+  if (del) { deleteEvent(del); return true; }
   const d = t.closest('[data-cal-day]');
   if (d) { openSheet({ kind: 'day', id: d.dataset.calDay }); return true; }
   return false;
@@ -2346,6 +2667,11 @@ document.addEventListener('toggle', (e) => {
 document.addEventListener('pointerup', () => { if (ui.dragging) setTimeout(() => { ui.dragging = false; }, 300); });
 
 document.addEventListener('submit', (e) => {
+  if (e.target.matches('[data-ev-form]')) {
+    e.preventDefault();
+    saveEvent(e.target);
+    return;
+  }
   if (e.target.matches('[data-shop-add]')) {
     e.preventDefault();
     const input = e.target.querySelector('input');
