@@ -569,7 +569,7 @@ const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Who each calendar is for: { [person id]: calendar, both: calendar }. A calendar named after someone
- * ("Azelia", "Andrew's calendar") is theirs; one called Family, Both, Shared or Everyone is for both.
+ * ("Alex", "Sam's calendar") is theirs; one called Family, Both, Shared or Everyone is for both.
  * Settings can pick them by hand. A missing one is '' and the event is tagged "Who: …" instead.
  */
 function calTargets() {
@@ -846,7 +846,7 @@ function briefInputs() {
     weather: weatherEntity(),
     unit: tempUnit().replace(/^°.*/, '°'),
     forecast: fc,
-    // "Dentist (Andrew)", so the summary can say whose it is.
+    // "Dentist (Sam)", so the summary can say whose it is.
     events: (() => { const vw = calView(); return day.events.map((ev) => { const w = vw.info(ev); return w ? { ...ev, title: `${ev.title} (${w.label})` } : ev; }); })(),
     calNames: Object.fromEntries(calendarsOf(store.states).map((s) => [s.entity_id, nameOf(s)])),
     people: shownPeople().map((p) => ({ name: p.name, place: personPlace(p) })),
