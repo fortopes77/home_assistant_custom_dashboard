@@ -6218,6 +6218,17 @@ function glanceItems(ctx, { areaName, solar } = {}) {
     }
   }
 
+  // Blind openers (any battery on a device that has a cover) running flat.
+  for (const s of all) {
+    if (domainOf(s.entity_id) !== 'sensor' || s.attributes?.device_class !== 'battery') continue;
+    const level = Number(s.state);
+    if (!Number.isFinite(level) || level >= 15) continue;
+    const cover = siblings(s.entity_id, ctx, devices).find((x) => domainOf(x) === 'cover');
+    if (!cover) continue;
+    const blind = ctx.states.get(cover);
+    items.push({ key: s.entity_id, tone: level < 5 ? 'warn' : 'info', icon: 'battery', text: `${blind ? nameOf(blind) : nameOf(s)} battery low`, sub: `${Math.round(level)}%`, open: s.entity_id });
+  }
+
   // Cameras that saw someone in the last ten minutes.
   for (const s of all) {
     if (domainOf(s.entity_id) !== 'binary_sensor' || !MOTION_CLASSES.has(s.attributes?.device_class)) continue;
@@ -7968,7 +7979,7 @@ class Voice {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '29 Oct 2026, 21:07 (72fcd5e)';
+const DASH_BUILD = '31 Oct 2026, 12:31 (577b340)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8847,6 +8858,10 @@ function batteryAlert() {
     && (s.attributes?.id === 'dashboard_battery_full' || /batter.*(full|charged|100)/i.test(nameOf(s))));
 }
 
+function solarRecap() {
+  return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation' && s.attributes?.id === 'dashboard_solar_recap');
+}
+
 function hoursText(h) {
   if (!Number.isFinite(h) || h <= 0) return '';
   if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
@@ -9254,6 +9269,7 @@ const VIEWS = {
     const est = (o) => (o?.est ? '<i class="est" title="Worked out from the last 24 hours">est.</i>' : '');
     const alert = batteryAlert();
     const lastFull = alert?.attributes?.last_triggered;
+    const recap = solarRecap();
     const net = r.feedIn || r.buy ? (t.sold?.kwh || 0) * r.feedIn - (t.bought?.kwh || 0) * r.buy : null;
     return `<div class="v-energy">
       <section class="card battery-card">
@@ -9271,6 +9287,10 @@ const VIEWS = {
             <button type="button" class="switch${alert.state === 'on' ? ' on' : ''}" role="switch" aria-checked="${alert.state === 'on'}" data-entity="${esc(alert.entity_id)}" data-act="toggle" aria-label="Battery full notification"></button>`
             : `<span>${icon('bell')}<span><b>Battery full notification</b><small class="muted">Not set up in Home Assistant yet. See the README.</small></span></span>`}
         </div>
+        ${recap ? `<div class="alert-row">
+          <span>${icon('solar')}<span><b>Evening solar recap</b><small class="muted">${recap.state === 'on' ? "Sends today's solar summary at 8 pm." : 'Switched off'}</small></span></span>
+          <button type="button" class="switch${recap.state === 'on' ? ' on' : ''}" role="switch" aria-checked="${recap.state === 'on'}" data-entity="${esc(recap.entity_id)}" data-act="toggle" aria-label="Evening solar recap"></button>
+        </div>` : ''}
       </section>
 
       <section class="card flow-card">
