@@ -41,7 +41,73 @@ export function calParse(raw, cal) {
     location: raw.location || '',
     // Google Calendar descriptions can carry HTML; show them as plain text.
     description: (raw.description || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim(),
+    // Only the REST API sends these; without a uid the event can't be changed.
+    uid: raw.uid || '',
+    recurrenceId: raw.recurrence_id || '',
+    rrule: raw.rrule || '',
   };
+}
+
+// ---------- who it's for, and changing events ----------
+
+export const CAL_CREATE = 1;
+export const CAL_DELETE = 2;
+export const CAL_UPDATE = 4;
+export const calCan = (s, f) => !!((s?.attributes?.supported_features || 0) & f);
+
+/** A key that finds the same event again after a reload. */
+export const calEvKey = (ev) => [ev.cal, ev.uid || ev.title, ev.recurrenceId || +ev.start].join('|');
+
+// "Who: Azelia & Andrew" on its own line in the description, for calendars shared by everyone.
+const WHO_LINE = /^\s*who\s*:\s*(.+?)\s*$/im;
+export function calWhoTag(description) {
+  const m = (description || '').match(WHO_LINE);
+  return m ? m[1].split(/\s*(?:,|&|\+|\band\b)\s*/i).filter(Boolean) : [];
+}
+export const calNotes = (description) => (description || '').replace(WHO_LINE, '').trim();
+
+export const CAL_REPEATS = [
+  ['', "Doesn't repeat"],
+  ['FREQ=DAILY', 'Every day'],
+  ['FREQ=WEEKLY', 'Every week'],
+  ['FREQ=WEEKLY;INTERVAL=2', 'Every 2 weeks'],
+  ['FREQ=MONTHLY', 'Every month'],
+  ['FREQ=YEARLY', 'Every year'],
+];
+
+const pad = (n) => String(n).padStart(2, '0');
+export const calTimeValue = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** Local time with its UTC offset, which is how Home Assistant wants dtstart and dtend. */
+export function calIsoLocal(d) {
+  const o = -d.getTimezoneOffset();
+  return `${calDayKey(d)}T${calTimeValue(d)}:00${o >= 0 ? '+' : '-'}${pad(Math.trunc(Math.abs(o) / 60))}:${pad(Math.abs(o) % 60)}`;
+}
+
+/**
+ * The event to send from the editor's fields: { summary, dtstart, dtend, location?, description?, rrule? }.
+ * All-day events end the day after their last day, as iCalendar does. Returns { error } when it can't be saved.
+ */
+export function calEventFromForm({ title, allDay, date, endDate, start, end, location, notes, whoLine, rrule }) {
+  const summary = (title || '').trim();
+  if (!summary) return { error: 'Give it a name' };
+  if (!date) return { error: 'Pick a day' };
+  const last = endDate && endDate > date ? endDate : date;
+  const event = { summary };
+  if (allDay) {
+    event.dtstart = date;
+    event.dtend = calDayKey(calAddDays(calFromKey(last), 1));
+  } else {
+    const from = new Date(`${date}T${start || '09:00'}:00`);
+    let to = new Date(`${last}T${end || start || '10:00'}:00`);
+    if (to <= from) to = new Date(+from + 3_600_000);
+    event.dtstart = calIsoLocal(from);
+    event.dtend = calIsoLocal(to);
+  }
+  if ((location || '').trim()) event.location = location.trim();
+  const description = [(notes || '').trim(), whoLine].filter(Boolean).join('\n\n');
+  if (description) event.description = description;
+  if (rrule) event.rrule = rrule;
+  return { event };
 }
 
 export function calSort(a, b) {
@@ -118,7 +184,7 @@ export function calGridStart(month) {
   return calAddDays(first, -((first.getDay() + 6) % 7));
 }
 
-export function calMonthHtml(events, month, { now = new Date(), colors = {} } = {}) {
+export function calMonthHtml(events, month, { now = new Date(), colors = {}, colorOf = (ev) => colors[ev.cal] } = {}) {
   const start = calGridStart(month);
   const todayKey = calDayKey(now);
   const names = [...Array(7)].map((_, i) => calAddDays(start, i).toLocaleDateString(undefined, { weekday: 'narrow' }));
@@ -135,7 +201,7 @@ export function calMonthHtml(events, month, { now = new Date(), colors = {} } = 
     return `<button type="button" class="cal-cell${other ? ' other' : ''}${key === todayKey ? ' today' : ''}" data-cal-day="${key}"
         aria-label="${esc(day.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}, ${list.length} ${list.length === 1 ? 'event' : 'events'}">
       <span class="cal-num">${day.getDate()}</span>
-      ${list.slice(0, 3).map((ev) => `<span class="cal-chip" style="--cal:${colors[ev.cal] || CAL_COLORS[0]}">${esc(ev.title)}</span>`).join('')}
+      ${list.slice(0, 3).map((ev) => `<span class="cal-chip" style="--cal:${colorOf(ev) || CAL_COLORS[0]}">${esc(ev.title)}</span>`).join('')}
       ${list.length > 3 ? `<span class="cal-more">+${list.length - 3}</span>` : ''}
     </button>`;
   };
@@ -152,8 +218,10 @@ export function calMonthHtml(events, month, { now = new Date(), colors = {} } = 
   </div>`;
 }
 
-/** Everything on one day, for the sheet. */
-export function calDaySheetHtml(events, day, { now = new Date(), colors = {}, calNames = {} } = {}) {
+/** Everything on one day, for the sheet. Events open with a tap; `who(ev)` gives { label, color } or null. */
+export function calDaySheetHtml(events, day, {
+  now = new Date(), colors = {}, calNames = {}, who = () => null, canAdd = false,
+} = {}) {
   const list = calOnDay(events, day);
   return `
     <div class="sheet-head">
@@ -165,12 +233,17 @@ export function calDaySheetHtml(events, day, { now = new Date(), colors = {}, ca
       <button type="button" class="icon-btn" data-close aria-label="Close">${icon('close')}</button>
     </div>
     <div class="sheet-body cal-sheet">
-      ${list.map((ev) => `<div class="cal-ev big" style="--cal:${colors[ev.cal] || CAL_COLORS[0]}">
+      ${list.map((ev) => {
+        const w = who(ev);
+        const notes = calNotes(ev.description);
+        return `<button type="button" class="cal-ev big" data-cal-ev="${esc(calEvKey(ev))}" style="--cal:${w?.color || colors[ev.cal] || CAL_COLORS[0]}">
         <span class="cal-time">${calTimeHtml(calTimeLabel(ev, day))}</span>
-        <span class="cal-title">${esc(ev.title)}
+        <span class="cal-title">${esc(ev.title)}${w ? ` <span class="who-pill">${esc(w.label)}</span>` : ''}
           <small>${esc([calNames[ev.cal], ev.location].filter(Boolean).join(' · '))}</small>
-          ${ev.description ? `<span class="cal-desc">${esc(ev.description)}</span>` : ''}
+          ${notes ? `<span class="cal-desc">${esc(notes)}</span>` : ''}
         </span>
-      </div>`).join('') || '<p class="muted">Nothing on this day.</p>'}
+      </button>`;
+      }).join('') || '<p class="muted">Nothing on this day.</p>'}
+      ${canAdd ? `<button type="button" class="btn primary" data-cal-add="${calDayKey(day)}">${icon('plus')}Add an event</button>` : ''}
     </div>`;
 }

@@ -114,6 +114,53 @@
 }
 .cal-more { font-size: 0.66rem; color: var(--muted); padding-left: 3px; }
 .cal-sheet { display: grid; gap: 8px; }
+button.cal-ev.big { width: 100%; border: 0; border-left: 4px solid var(--cal); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 0 10px 10px 0; }
+button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix(in srgb, var(--cal) 8%, transparent); }
+.cal-sheet > .btn { margin-top: 8px; justify-self: start; }
+
+/* Who an event is for, and adding or changing events */
+.who-pill {
+  display: inline-block; vertical-align: 1px; margin-left: 4px; padding: 1px 7px; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; line-height: 1.5; color: var(--cal);
+  background: color-mix(in srgb, var(--cal) 16%, transparent);
+}
+.card-title .cal-add { width: 34px; height: 34px; margin: -4px -4px -4px 4px; }
+.card-title .seg + .cal-add { margin-left: 4px; }
+.who-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 12px; }
+.who-filter button {
+  --cal: var(--primary);
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; min-height: 32px;
+  background: none; color: var(--muted); font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.who-filter button[aria-pressed="true"] { border-color: var(--cal); background: color-mix(in srgb, var(--cal) 14%, transparent); color: var(--text); }
+.ev-form { display: grid; gap: 12px; }
+.ev-form input[type="text"], .ev-form input[type="date"], .ev-form input[type="time"], .ev-form textarea {
+  min-height: 44px; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); font: inherit; width: 100%; min-width: 0;
+}
+.ev-form input[name="title"] { font-size: 1.1rem; font-weight: 600; }
+.ev-form textarea { resize: vertical; }
+.ev-form .row { padding: 0; }
+.who-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
+.who-pick legend { width: 100%; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; }
+.who-pick label { position: relative; }
+.who-pick input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.who-pick span {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 999px;
+  border: 2px solid var(--border); font-weight: 600;
+}
+.who-pick span::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--cal); }
+.who-pick input:checked + span { border-color: var(--cal); background: color-mix(in srgb, var(--cal) 16%, transparent); }
+.who-pick input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ev-when { display: grid; gap: 8px; }
+.ev-when label { display: grid; grid-template-columns: 3.4em minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+.ev-when input { padding-inline: 10px !important; }
+.ev-when label > span { font-weight: 600; font-size: 0.9rem; }
+.ev-form:has([name="allDay"]:checked) .ev-t { display: none; }
+.ev-form:has([name="allDay"]:checked) .ev-when label { grid-template-columns: 3.4em minmax(0, 1fr); }
+.ev-error { margin: 0; color: var(--danger); font-weight: 600; }
+.cal-who-set { display: grid; gap: 4px; margin: 4px 0 8px; }
+.cal-who-set > p, .cal-who-note { font-size: 0.85rem; margin: 4px 0; }
 .cal-ev.big { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; padding: 8px 0 8px 12px; border-left: 4px solid var(--cal); }
 .cal-time { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .cal-time small { display: block; font-size: 0.74rem; }

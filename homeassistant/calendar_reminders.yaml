@@ -1,0 +1,43 @@
+# Example: a phone reminder before each family calendar event, sent to whoever it's for.
+# Paste into Settings → Automations → ⋮ → Edit in YAML. Change the calendars and notify services to yours.
+# Timed events remind 30 minutes before; all-day events remind at 7:00 that morning.
+# "Who" comes from the calendar (Azelia's, Andrew's, Family = both), or from a "Who: …" line in the
+# event's notes when one calendar is shared, which is what the dashboard writes in that case.
+id: dashboard_calendar_reminders
+alias: Calendar reminders
+mode: queued
+triggers:
+  - { trigger: calendar, event: start, offset: "-0:30:00", entity_id: calendar.azelia, id: azelia }
+  - { trigger: calendar, event: start, offset: "-0:30:00", entity_id: calendar.andrew, id: andrew }
+  - { trigger: calendar, event: start, offset: "-0:30:00", entity_id: calendar.family, id: both }
+  - { trigger: calendar, event: start, offset: "7:00:00", entity_id: calendar.azelia, id: azelia }
+  - { trigger: calendar, event: start, offset: "7:00:00", entity_id: calendar.andrew, id: andrew }
+  - { trigger: calendar, event: start, offset: "7:00:00", entity_id: calendar.family, id: both }
+conditions:
+  # The -30 min triggers are for timed events and the +7 h ones for all-day events.
+  - condition: template
+    value_template: "{{ trigger.calendar_event.all_day == (trigger.offset > timedelta(0)) }}"
+actions:
+  - variables:
+      ev: "{{ trigger.calendar_event }}"
+      tag: >-
+        {% set m = (ev.description or '') | regex_findall('(?im)^\s*who\s*:\s*(.+?)\s*$') %}
+        {{ m[0] | lower if m else '' }}
+      who: >-
+        {% if tag %}{{ 'both' if ('&' in tag or ',' in tag or ' and ' in tag or tag in ['both', 'everyone']) else tag }}
+        {% else %}{{ trigger.id }}{% endif %}
+      message: >-
+        {% if ev.all_day %}Today{% else %}At {{ as_timestamp(ev.start) | timestamp_custom('%-I:%M %p') }}{% endif %}
+        {%- if ev.location %} · {{ ev.location }}{% endif %}
+  - choose:
+      - conditions: "{{ who == 'azelia' }}"
+        sequence:
+          - action: notify.mobile_app_azelia_s_phone
+            data: { title: "📅 {{ ev.summary }}", message: "{{ message }}" }
+      - conditions: "{{ who == 'andrew' }}"
+        sequence:
+          - action: notify.mobile_app_sm_s938b
+            data: { title: "📅 {{ ev.summary }}", message: "{{ message }}" }
+    default:
+      - action: script.notify_family
+        data: { title: "📅 {{ ev.summary }}", message: "{{ message }}" }

@@ -480,14 +480,20 @@ small { font-size: 0.8em; }
 .agenda-day + .agenda-day { margin-top: 14px; }
 .agenda-day h3 { font-size: 0.95rem; margin-bottom: 6px; }
 .agenda { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.agenda li {
+.agenda li > button {
   display: grid;
   grid-template-columns: 5.2em 1fr;
   gap: 10px;
+  width: 100%;
   padding: 8px 10px;
+  border: 0;
   border-radius: 12px;
   background: color-mix(in srgb, var(--cal) 10%, var(--surface));
   border-left: 4px solid var(--cal);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .ev-time { font-size: 0.85rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ev-title { font-weight: 600; min-width: 0; }
