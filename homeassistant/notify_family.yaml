@@ -1,0 +1,48 @@
+# Example: one script that sends a notification to every family device through the Home Assistant app.
+# Paste into Settings → Automations & scenes → Scripts → ⋮ → Edit in YAML (script id: notify_family).
+# Change the notify services to your phones and tablets. friendly: true asks Gemini (or any ai_task
+# entity) to reword the message; if it fails the original text is sent.
+alias: Notify family
+mode: parallel
+max: 25
+fields:
+  title: { name: Title, selector: { text: {} } }
+  message: { name: Message, required: true, selector: { text: { multiline: true } } }
+  data: { name: Extra data, description: "Companion app data: image, tag, actions, etc.", selector: { object: {} } }
+  friendly: { name: Friendlier wording, default: false, selector: { boolean: {} } }
+sequence:
+  - variables:
+      text: "{{ message }}"
+  - if: "{{ friendly | default(false) and message not in ['clear_notification', 'request_location_update', 'remove_channel'] }}"
+    then:
+      - action: ai_task.generate_data
+        continue_on_error: true
+        response_variable: ai
+        data:
+          entity_id: ai_task.google_ai_task   # your AI task entity
+          task_name: Friendly notification
+          instructions: >-
+            Rewrite this smart-home phone notification so it sounds friendly and natural, like a helpful
+            housemate. Keep every fact, name and number. Under 110 characters, at most one emoji.
+            Reply with the new message only.
+
+            Title: {{ title | default('') }}
+            Message: {{ message }}
+      - variables:
+          text: >-
+            {% set t = ai.data if ai is defined and ai is mapping and ai.data is string else '' %}
+            {{ t | trim if 0 < t | trim | length < 200 else message }}
+  - parallel:
+      # One per device; a device that's offline doesn't stop the others.
+      - action: notify.mobile_app_phone_one
+        continue_on_error: true
+        data: &note
+          title: "{{ title | default('') }}"
+          message: "{{ text }}"
+          data: "{{ data if data is defined and data is mapping else {} }}"
+      - action: notify.mobile_app_phone_two
+        continue_on_error: true
+        data: *note
+      - action: notify.mobile_app_wall_ipad
+        continue_on_error: true
+        data: *note

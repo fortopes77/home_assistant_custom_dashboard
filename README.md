@@ -72,6 +72,8 @@ The Energy page shows a live power-flow diagram: solar, grid, house and battery,
 - Integrations disagree on whether a positive grid number means buying or selling, and whether a positive battery number means charging or discharging. The dashboard works this out from readings that add up. If an arrow points the wrong way, set it there yourself.
 - Enter your **feed-in rate** and what you pay per kWh to see dollars.
 - `homeassistant/battery_full.yaml` is an example automation that notifies a phone when the battery reaches 100%. Give it the id `dashboard_battery_full` and the Energy page shows a switch for it.
+- `homeassistant/solar_recap.yaml` sends an 8 pm summary of the day's solar. With the id `dashboard_solar_recap` the Energy page shows a switch for it too.
+- `homeassistant/notify_family.yaml` is a script that sends one notification to every family device through the Home Assistant app, optionally reworded by an AI task. The other examples can call it instead of a single phone.
 - To hide the Energy page, turn off **Show the Energy page**.
 
 ## Places

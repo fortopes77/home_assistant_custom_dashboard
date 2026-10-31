@@ -240,6 +240,17 @@ export function glanceItems(ctx, { areaName, solar } = {}) {
     }
   }
 
+  // Blind openers (any battery on a device that has a cover) running flat.
+  for (const s of all) {
+    if (domainOf(s.entity_id) !== 'sensor' || s.attributes?.device_class !== 'battery') continue;
+    const level = Number(s.state);
+    if (!Number.isFinite(level) || level >= 15) continue;
+    const cover = siblings(s.entity_id, ctx, devices).find((x) => domainOf(x) === 'cover');
+    if (!cover) continue;
+    const blind = ctx.states.get(cover);
+    items.push({ key: s.entity_id, tone: level < 5 ? 'warn' : 'info', icon: 'battery', text: `${blind ? nameOf(blind) : nameOf(s)} battery low`, sub: `${Math.round(level)}%`, open: s.entity_id });
+  }
+
   // Cameras that saw someone in the last ten minutes.
   for (const s of all) {
     if (domainOf(s.entity_id) !== 'binary_sensor' || !MOTION_CLASSES.has(s.attributes?.device_class)) continue;
