@@ -1717,6 +1717,238 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 }
 :root:not(.is-idle) .dimmer { transition-duration: 0.15s; }
 .fullscreen-btn[hidden] { display: none; }
+
+/* TV home screen (?tv): sized from the screen width so it reads the same at 960 or 1920 pixels wide,
+   with a big focus ring for the remote. */
+
+.v-tv {
+  --tv-gap: 1.4em;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--tv-gap);
+  min-height: calc(100dvh - 90px);
+  font-size: clamp(12px, 1.5vw, 34px);
+}
+.tv-mode .topbar { display: none; }
+.tv-mode .main { padding: 0; min-height: 100dvh; }
+.tv-mode .view { padding: 0; }
+.tv-mode .view, :root[data-view="tv"] .view { max-width: none; }
+.tv-mode .v-tv { height: 100dvh; min-height: 0; padding: 2.2em 3em 2em; overflow: hidden; }
+.tv-mode body { overflow: hidden; }
+.tv-mode .v-settings { font-size: 1.15rem; padding: 24px 5vw; }
+.tv-back { margin-bottom: 14px; }
+
+/* the remote's focus: always visible, never the browser's thin ring */
+.tv-mode :focus { outline: none; }
+.tv-mode :focus-visible, .v-tv :focus-visible,
+.tv-mode .v-settings :focus, .tv-mode #sheet :focus {
+  outline: 0.22em solid var(--text);
+  outline-offset: 0.18em;
+}
+
+.tv-top { display: flex; align-items: center; justify-content: space-between; gap: 1em; }
+.tv-tabs { display: flex; gap: 0.6em; }
+.tv-tabs button {
+  padding: 0.35em 0.6em;
+  border: 0;
+  border-radius: 0.5em;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+.tv-tabs button[aria-current] { color: var(--text); box-shadow: inset 0 -0.18em 0 var(--text); border-radius: 0.5em 0.5em 0.2em 0.2em; }
+.tv-actions { display: flex; align-items: center; gap: 0.7em; min-width: 0; }
+.tv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  height: 2.6em;
+  padding: 0 1.1em;
+  border: 0;
+  border-radius: 1.3em;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.tv-pill .icon { width: 1.25em; height: 1.25em; }
+.tv-gear { width: 2.6em; padding: 0; justify-content: center; }
+.tv-status { width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--muted); }
+.tv-status[data-status="connected"] { background: var(--positive); }
+.tv-status[data-status="disconnected"], .tv-status[data-status="auth_invalid"] { background: var(--danger); }
+.tv-clock { font-size: 2em; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-left: 0.2em; }
+
+.tv-body { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: var(--tv-gap); min-height: 0; }
+.tv-cam-wrap { min-height: 0; display: grid; }
+.tv-cam {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.9em;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font: inherit;
+}
+.tv-cam-slot, .tv-stage { position: absolute; inset: 0; }
+.tv-stage { aspect-ratio: auto; max-height: none; border-radius: inherit; }
+.tv-stage > img, .tv-stage > video { object-fit: cover; }
+.tv-cam-name, .tv-stage .cam-kind {
+  position: absolute;
+  padding: 0.25em 0.7em;
+  border-radius: 0.6em;
+  background: rgb(0 0 0 / 0.5);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+.tv-cam-name { left: 0.8em; bottom: 0.8em; }
+.tv-stage .cam-kind { left: auto; right: 0.8em; bottom: 0.8em; top: auto; width: auto; opacity: 0.8; }
+.tv-stage .cam-kind:empty { display: none; }
+.tv-cam-arrow {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 2.4em;
+  height: 2.4em;
+  margin-top: -1.2em;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.tv-cam-arrow .icon { width: 1.6em; height: 1.6em; }
+.tv-cam-arrow.left { left: 0.6em; }
+.tv-cam-arrow.right { right: 0.6em; }
+.tv-cam:focus .tv-cam-arrow, .tv-cam:hover .tv-cam-arrow { opacity: 1; }
+.tv-nocam { place-items: center; }
+
+/* the big camera filling the screen (OK on the camera; Back to leave) */
+.tv-full .tv-cam { position: fixed; inset: 0; z-index: 90; border-radius: 0; outline: none !important; }
+.tv-full .tv-cam-arrow { opacity: 1; }
+
+.tv-side { display: flex; flex-direction: column; gap: var(--tv-gap); min-height: 0; }
+.tv-card {
+  padding: 1.1em 1.3em;
+  border-radius: 0.9em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-height: 0;
+}
+.tv-wx-now { display: flex; align-items: center; gap: 0.6em; }
+.tv-wx-big { width: 2.6em; height: 2.6em; }
+.tv-wx-now > b { font-size: 2.6em; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.tv-wx-now > span { display: grid; gap: 0.1em; }
+.tv-wx-word { font-size: 1.15em; font-weight: 600; }
+.tv-wx-now small { color: var(--muted); }
+.tv-wx-hours { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3em; margin: 0.9em 0 0; padding: 0; list-style: none; text-align: center; }
+.tv-wx-hours li { display: grid; justify-items: center; gap: 0.2em; }
+.tv-wx-hours small { color: var(--muted); font-size: 0.8em; white-space: nowrap; }
+.tv-wx-hours .icon { width: 1.6em; height: 1.6em; }
+.tv-wx-hours b { font-weight: 600; }
+
+.tv-readings { flex: 1; overflow: hidden; }
+.tv-readings h3 { margin: 0 0 0.3em; font-size: 0.85em; font-weight: 600; color: var(--muted); }
+.tv-readings h3:not(:first-child) { margin-top: 0.7em; }
+.tv-readings ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.35em; }
+.tv-readings li { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; align-items: center; gap: 0.7em; }
+.tv-readings li .icon { width: 1.3em; height: 1.3em; color: var(--muted); }
+.tv-readings li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-readings li b { font-size: 1.1em; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.tv-apps {
+  display: flex;
+  gap: 1.1em;
+  padding: 0.9em;
+  margin: -0.9em;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tv-apps::-webkit-scrollbar { display: none; }
+.tv-app {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 12.5em;
+  height: 6.6em;
+  padding: 0 0.8em;
+  border: 0;
+  border-radius: 0.8em;
+  background: var(--app-bg, var(--surface-2));
+  color: var(--app-fg, var(--text));
+  font: inherit;
+  font-size: 1.15em;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
+  transition: transform 0.15s;
+}
+.tv-app span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-size: 1.35em; }
+.tv-app:focus { transform: scale(1.06); }
+
+/* Cameras tab */
+.tv-camgrid-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18em); gap: var(--tv-gap); min-height: 0; }
+.tv-camgrid-wrap:not(:has(.tv-alerts)) { grid-template-columns: minmax(0, 1fr); }
+.tv-camgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 1em; margin: 0; padding: 0.3em; list-style: none; overflow-y: auto; align-content: start; }
+.tv-camtile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 0.7em;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font: inherit;
+}
+.tv-camtile img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+.tv-camtile img.ready { opacity: 1; }
+.tv-camtile span { position: absolute; left: 0.6em; bottom: 0.5em; padding: 0.15em 0.55em; border-radius: 0.5em; background: rgb(0 0 0 / 0.5); font-size: 0.85em; font-weight: 600; }
+.tv-alerts { overflow-y: auto; }
+.tv-alerts h3 { margin: 0 0 0.5em; font-size: 0.95em; }
+.tv-alerts ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.3em; }
+.tv-alerts button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  padding: 0.45em 0.6em;
+  border: 0;
+  border-radius: 0.5em;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.tv-alerts button span { grid-column: 1; color: var(--muted); font-size: 0.85em; }
+.tv-alerts button small { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--muted); }
+.tv-alerts button.on small { color: var(--danger); font-weight: 700; }
+
+/* a TV page opened in an ordinary browser (#/tv without ?tv) */
+:root:not(.tv-mode)[data-view="tv"] .v-tv { aspect-ratio: 16 / 9; min-height: 0; max-height: calc(100dvh - 90px); }
+
+/* Settings → TV */
+#tv textarea {
+  width: 100%;
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 0.9rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+#tv summary .btn { min-height: 30px; margin-left: 8px; padding: 0 10px; font-size: 0.8rem; }
 </style>
   <script type="module">
 // ---- icons.js ----
@@ -1814,6 +2046,20 @@ const ICONS = {
   upload: 'M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z',
   download: 'M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z',
   delete: 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z',
+  wxNight: 'M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z',
+  wxCloudy: 'M6,19A5,5 0 0,1 1,14A5,5 0 0,1 6,9C7,6.65 9.3,5 12,5C15.43,5 18.24,7.66 18.5,11.03L19,11A4,4 0 0,1 23,15A4,4 0 0,1 19,19H6M19,13H17V12A5,5 0 0,0 12,7C9.5,7 7.45,8.82 7.06,11.19C6.73,11.07 6.37,11 6,11A3,3 0 0,0 3,14A3,3 0 0,0 6,17H19A2,2 0 0,0 21,15A2,2 0 0,0 19,13Z',
+  wxRainy: 'M6,14.03A1,1 0 0,1 7,15.03C7,15.58 6.55,16.03 6,16.03C3.24,16.03 1,13.79 1,11.03C1,8.27 3.24,6.03 6,6.03C7,3.68 9.3,2.03 12,2.03C15.43,2.03 18.24,4.69 18.5,8.06L19,8.03A4,4 0 0,1 23,12.03C23,14.23 21.21,16.03 19,16.03H18C17.45,16.03 17,15.58 17,15.03C17,14.47 17.45,14.03 18,14.03H19A2,2 0 0,0 21,12.03A2,2 0 0,0 19,10.03H17V9.03C17,6.27 14.76,4.03 12,4.03C9.5,4.03 7.45,5.84 7.06,8.21C6.73,8.09 6.37,8.03 6,8.03A3,3 0 0,0 3,11.03A3,3 0 0,0 6,14.03M12,14.15C12.18,14.39 12.37,14.66 12.56,14.94C13,15.56 14,17.03 14,18C14,19.11 13.1,20 12,20A2,2 0 0,1 10,18C10,17.03 11,15.56 11.44,14.94C11.63,14.66 11.82,14.4 12,14.15M12,11.03L11.5,11.59C11.5,11.59 10.65,12.55 9.79,13.81C8.93,15.06 8,16.56 8,18A4,4 0 0,0 12,22A4,4 0 0,0 16,18C16,16.56 15.07,15.06 14.21,13.81C13.35,12.55 12.5,11.59 12.5,11.59',
+  wxPouring: 'M9,12C9.53,12.14 9.85,12.69 9.71,13.22L8.41,18.05C8.27,18.59 7.72,18.9 7.19,18.76C6.65,18.62 6.34,18.07 6.5,17.54L7.78,12.71C7.92,12.17 8.47,11.86 9,12M13,12C13.53,12.14 13.85,12.69 13.71,13.22L11.64,20.95C11.5,21.5 10.95,21.8 10.41,21.66C9.88,21.5 9.56,20.97 9.7,20.43L11.78,12.71C11.92,12.17 12.47,11.86 13,12M17,12C17.53,12.14 17.85,12.69 17.71,13.22L16.41,18.05C16.27,18.59 15.72,18.9 15.19,18.76C14.65,18.62 14.34,18.07 14.5,17.54L15.78,12.71C15.92,12.17 16.47,11.86 17,12M17,10V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11C3,12.11 3.6,13.08 4.5,13.6V13.59C5,13.87 5.14,14.5 4.87,14.96C4.59,15.43 4,15.6 3.5,15.32V15.33C2,14.47 1,12.85 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12C23,13.5 22.2,14.77 21,15.46V15.46C20.5,15.73 19.91,15.57 19.63,15.09C19.36,14.61 19.5,14 20,13.72V13.73C20.6,13.39 21,12.74 21,12A2,2 0 0,0 19,10H17Z',
+  wxPartly: 'M12.74,5.47C15.1,6.5 16.35,9.03 15.92,11.46C17.19,12.56 18,14.19 18,16V16.17C18.31,16.06 18.65,16 19,16A3,3 0 0,1 22,19A3,3 0 0,1 19,22H6A4,4 0 0,1 2,18A4,4 0 0,1 6,14H6.27C5,12.45 4.6,10.24 5.5,8.26C6.72,5.5 9.97,4.24 12.74,5.47M11.93,7.3C10.16,6.5 8.09,7.31 7.31,9.07C6.85,10.09 6.93,11.22 7.41,12.13C8.5,10.83 10.16,10 12,10C12.7,10 13.38,10.12 14,10.34C13.94,9.06 13.18,7.86 11.93,7.3M13.55,3.64C13,3.4 12.45,3.23 11.88,3.12L14.37,1.82L15.27,4.71C14.76,4.29 14.19,3.93 13.55,3.64M6.09,4.44C5.6,4.79 5.17,5.19 4.8,5.63L4.91,2.82L7.87,3.5C7.25,3.71 6.65,4.03 6.09,4.44M18,9.71C17.91,9.12 17.78,8.55 17.59,8L19.97,9.5L17.92,11.73C18.03,11.08 18.05,10.4 18,9.71M3.04,11.3C3.11,11.9 3.24,12.47 3.43,13L1.06,11.5L3.1,9.28C3,9.93 2.97,10.61 3.04,11.3M19,18H16V16A4,4 0 0,0 12,12A4,4 0 0,0 8,16H6A2,2 0 0,0 4,18A2,2 0 0,0 6,20H19A1,1 0 0,0 20,19A1,1 0 0,0 19,18Z',
+  wxNightPartly: 'M22,10.28C21.74,10.3 21.5,10.31 21.26,10.31C19.32,10.31 17.39,9.57 15.91,8.09C14.25,6.44 13.5,4.19 13.72,2C13.77,1.53 13.22,1 12.71,1C12.57,1 12.44,1.04 12.32,1.12C12,1.36 11.66,1.64 11.36,1.94C9.05,4.24 8.55,7.66 9.84,10.46C8.31,11.11 7.13,12.43 6.69,14.06L6,14A4,4 0 0,0 2,18A4,4 0 0,0 6,22H19A3,3 0 0,0 22,19A3,3 0 0,0 19,16C18.42,16 17.88,16.16 17.42,16.45L17.5,15.5C17.5,15.28 17.5,15.05 17.46,14.83C19.14,14.67 20.77,13.94 22.06,12.64C22.38,12.34 22.64,12 22.88,11.68C23.27,11.13 22.65,10.28 22.04,10.28M19,18A1,1 0 0,1 20,19A1,1 0 0,1 19,20H6A2,2 0 0,1 4,18A2,2 0 0,1 6,16H8.5V15.5C8.5,13.94 9.53,12.64 10.94,12.18C11.1,12.13 11.26,12.09 11.43,12.06C11.61,12.03 11.8,12 12,12C12.23,12 12.45,12.03 12.66,12.07C12.73,12.08 12.8,12.1 12.87,12.13C13,12.16 13.15,12.2 13.28,12.25C13.36,12.28 13.44,12.32 13.5,12.36C13.63,12.41 13.74,12.47 13.84,12.54C13.92,12.59 14,12.64 14.07,12.7C14.17,12.77 14.25,12.84 14.34,12.92C14.41,13 14.5,13.05 14.55,13.12C14.63,13.2 14.69,13.29 14.76,13.37C14.82,13.45 14.89,13.53 14.94,13.62C15,13.71 15.04,13.8 15.09,13.9C15.14,14 15.2,14.08 15.24,14.18C15.41,14.59 15.5,15.03 15.5,15.5V18M16.83,12.86C15.9,11.16 14.08,10 12,10H11.87C11.41,9.19 11.14,8.26 11.14,7.29C11.14,6.31 11.39,5.37 11.86,4.55C12.21,6.41 13.12,8.14 14.5,9.5C15.86,10.88 17.58,11.79 19.45,12.14C18.66,12.6 17.76,12.84 16.83,12.86Z',
+  wxSunny: 'M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M3.36,17L5.12,13.23C5.26,14 5.53,14.78 5.95,15.5C6.37,16.24 6.91,16.86 7.5,17.37L3.36,17M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M20.64,17L16.5,17.36C17.09,16.85 17.62,16.22 18.04,15.5C18.46,14.77 18.73,14 18.87,13.21L20.64,17M12,22L9.59,18.56C10.33,18.83 11.14,19 12,19C12.82,19 13.63,18.83 14.37,18.56L12,22Z',
+  wxFog: 'M3,15H13A1,1 0 0,1 14,16A1,1 0 0,1 13,17H3A1,1 0 0,1 2,16A1,1 0 0,1 3,15M16,15H21A1,1 0 0,1 22,16A1,1 0 0,1 21,17H16A1,1 0 0,1 15,16A1,1 0 0,1 16,15M1,12A5,5 0 0,1 6,7C7,4.65 9.3,3 12,3C15.43,3 18.24,5.66 18.5,9.03L19,9C21.19,9 22.97,10.76 23,13H21A2,2 0 0,0 19,11H17V10A5,5 0 0,0 12,5C9.5,5 7.45,6.82 7.06,9.19C6.73,9.07 6.37,9 6,9A3,3 0 0,0 3,12C3,12.35 3.06,12.69 3.17,13H1.1L1,12M3,19H5A1,1 0 0,1 6,20A1,1 0 0,1 5,21H3A1,1 0 0,1 2,20A1,1 0 0,1 3,19M8,19H21A1,1 0 0,1 22,20A1,1 0 0,1 21,21H8A1,1 0 0,1 7,20A1,1 0 0,1 8,19Z',
+  wxLightning: 'M6,16A5,5 0 0,1 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12A4,4 0 0,1 19,16H18A1,1 0 0,1 17,15A1,1 0 0,1 18,14H19A2,2 0 0,0 21,12A2,2 0 0,0 19,10H17V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11A3,3 0 0,0 6,14H7A1,1 0 0,1 8,15A1,1 0 0,1 7,16H6M12,11H15L13,15H15L11.25,22L12,17H9.5L12,11Z',
+  wxWindy: 'M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z',
+  wxSnowy: 'M6,14A1,1 0 0,1 7,15A1,1 0 0,1 6,16A5,5 0 0,1 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12A4,4 0 0,1 19,16H18A1,1 0 0,1 17,15A1,1 0 0,1 18,14H19A2,2 0 0,0 21,12A2,2 0 0,0 19,10H17V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11A3,3 0 0,0 6,14M7.88,18.07L10.07,17.5L8.46,15.88C8.07,15.5 8.07,14.86 8.46,14.46C8.85,14.07 9.5,14.07 9.88,14.46L11.5,16.07L12.07,13.88C12.21,13.34 12.76,13.03 13.29,13.17C13.83,13.31 14.14,13.86 14,14.4L13.41,16.59L15.6,16C16.14,15.86 16.69,16.17 16.83,16.71C16.97,17.24 16.66,17.79 16.12,17.93L13.93,18.5L15.54,20.12C15.93,20.5 15.93,21.15 15.54,21.54C15.15,21.93 14.5,21.93 14.12,21.54L12.5,19.93L11.93,22.12C11.79,22.66 11.24,22.97 10.71,22.83C10.17,22.69 9.86,22.14 10,21.6L10.59,19.41L8.4,20C7.86,20.14 7.31,19.83 7.17,19.29C7.03,18.76 7.34,18.21 7.88,18.07Z',
+  wxHail: 'M6,14A1,1 0 0,1 7,15A1,1 0 0,1 6,16A5,5 0 0,1 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12A4,4 0 0,1 19,16H18A1,1 0 0,1 17,15A1,1 0 0,1 18,14H19A2,2 0 0,0 21,12A2,2 0 0,0 19,10H17V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11A3,3 0 0,0 6,14M10,18A2,2 0 0,1 12,20A2,2 0 0,1 10,22A2,2 0 0,1 8,20A2,2 0 0,1 10,18M14.5,16A1.5,1.5 0 0,1 16,17.5A1.5,1.5 0 0,1 14.5,19A1.5,1.5 0 0,1 13,17.5A1.5,1.5 0 0,1 14.5,16M10.5,12A1.5,1.5 0 0,1 12,13.5A1.5,1.5 0 0,1 10.5,15A1.5,1.5 0 0,1 9,13.5A1.5,1.5 0 0,1 10.5,12Z',
+  tv: 'M21,17H3V5H21M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V21H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3Z',
+  cctv: 'M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z',
 };
 
 function icon(name, cls = 'icon') {
@@ -8098,6 +8344,152 @@ class Voice {
   }
 }
 
+// ---- tv.js ----
+// TV home screen (?tv): helpers for app tiles, weather icons, picking readings, and moving focus with a
+// TV remote's arrow keys. The screen itself is drawn in main.js, which has the Home Assistant state.
+
+
+/** One app per line, "Name = Android package". Edited in Settings → TV. */
+const TV_APPS_DEFAULT = [
+  'YouTube = com.google.android.youtube.tv',
+  'Netflix = com.netflix.ninja',
+  'Prime Video = com.amazon.amazonvideo.livingroom',
+  'Disney+ = com.disney.disneyplus',
+  'Plex = com.plexapp.android',
+].join('\n');
+
+// Tile colours for apps people often add; anything else gets the plain card colour.
+const APP_COLORS = {
+  'com.google.android.youtube.tv': ['#ffffff', '#e62117'],
+  'com.netflix.ninja': ['#141414', '#e50914'],
+  'com.amazon.amazonvideo.livingroom': ['#1a98ff', '#ffffff'],
+  'com.disney.disneyplus': ['#0b1a4a', '#ffffff'],
+  'com.plexapp.android': ['#1f1f1f', '#e5a00d'],
+  'org.jellyfin.androidtv': ['#101322', '#aa5cc3'],
+  'com.wbd.stream': ['#002be7', '#ffffff'],
+  'com.hbo.hbonow': ['#000000', '#ffffff'],
+  'com.apple.atve.androidtv.appletv': ['#000000', '#ffffff'],
+  'com.spotify.tv.android': ['#121212', '#1ed760'],
+  'au.com.stan.and': ['#0a0a0a', '#00a8e1'],
+  'au.net.abc.iview': ['#000000', '#ffffff'],
+  'com.google.android.apps.youtube.unplugged': ['#ffffff', '#e62117'],
+};
+
+// Apps that can be named on their own ("kayo", or ?apps=jellyfin,kayo in the address) without the package.
+const KNOWN_APPS = {
+  youtube: ['YouTube', 'com.google.android.youtube.tv'],
+  netflix: ['Netflix', 'com.netflix.ninja'],
+  prime: ['Prime Video', 'com.amazon.amazonvideo.livingroom'],
+  disney: ['Disney+', 'com.disney.disneyplus'],
+  plex: ['Plex', 'com.plexapp.android'],
+  jellyfin: ['Jellyfin', 'org.jellyfin.androidtv'],
+  kayo: ['Kayo', 'au.com.kayosports.tv'],
+  binge: ['Binge', 'au.com.streamotion.ares.tv'],
+  stan: ['Stan', 'au.com.stan.and'],
+  iview: ['ABC iview', 'au.net.abc.iview'],
+  spotify: ['Spotify', 'com.spotify.tv.android'],
+  appletv: ['Apple TV', 'com.apple.atve.androidtv.appletv'],
+};
+const knownKey = (name) => String(name).toLowerCase().replace(/[^a-z]/g, '').replace(/^(disneyplus|disney)$/, 'disney').replace(/^primevideo$/, 'prime');
+
+/** "Name = package" lines, or just a known name per line or comma ("Jellyfin, Disney+, Kayo, Binge"). */
+function parseApps(text) {
+  return String(text || '').split(/\n|,(?![^=\n]*\.)/).map((line) => {
+    const m = line.match(/^\s*(.+?)\s*=\s*([\w.]+)\s*$/);
+    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || null };
+    const known = line.trim() && KNOWN_APPS[knownKey(line)];
+    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || null } : null;
+  }).filter(Boolean);
+}
+
+/** Home Assistant weather condition → icon name. */
+function weatherIcon(condition, night = false) {
+  switch (condition) {
+    case 'clear-night': return 'wxNight';
+    case 'sunny': return night ? 'wxNight' : 'wxSunny';
+    case 'partlycloudy': return night ? 'wxNightPartly' : 'wxPartly';
+    case 'cloudy': return 'wxCloudy';
+    case 'fog': return 'wxFog';
+    case 'hail': return 'wxHail';
+    case 'lightning': case 'lightning-rainy': return 'wxLightning';
+    case 'pouring': return 'wxPouring';
+    case 'rainy': return 'wxRainy';
+    case 'snowy': case 'snowy-rainy': return 'wxSnowy';
+    case 'windy': case 'windy-variant': return 'wxWindy';
+    case 'exceptional': return 'alert';
+    default: return 'weather';
+  }
+}
+
+// Readings worth a glance from the couch, used until some are picked in Settings.
+const GLANCE_CLASSES = ['temperature', 'humidity', 'pm25', 'pm10', 'pm1', 'carbon_dioxide', 'aqi', 'volatile_organic_compounds'];
+
+const isReading = (s) => domainOf(s.entity_id) === 'sensor' && !isUnavailable(s) && s.state !== '' && Number.isFinite(Number(s.state));
+
+/** A handful of temperature / humidity / air readings from the shown devices. */
+function autoReadings(states, listed, max = 6) {
+  return [...states.values()]
+    .filter((s) => isReading(s) && listed(s.entity_id) && GLANCE_CLASSES.includes(s.attributes?.device_class))
+    .sort((a, b) => GLANCE_CLASSES.indexOf(a.attributes.device_class) - GLANCE_CLASSES.indexOf(b.attributes.device_class))
+    .slice(0, max)
+    .map((s) => s.entity_id);
+}
+
+// ---------- moving focus with the remote ----------
+
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea, summary, [tabindex="0"]';
+
+function visible(el) {
+  if (el.closest('[hidden], [inert]')) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0;
+}
+
+/**
+ * Moves focus to the nearest focusable thing in `dir` ('up' | 'down' | 'left' | 'right') inside `root`.
+ * Returns false when nothing lies that way, so the caller can leave the key alone.
+ */
+function moveFocus(dir, root) {
+  const cur = document.activeElement;
+  const items = [...root.querySelectorAll(FOCUSABLE)].filter(visible);
+  if (!items.length) return false;
+  if (!cur || !root.contains(cur) || cur === root) {
+    const first = root.querySelector('[data-tv-start]') || items[0];
+    first.focus();
+    return true;
+  }
+  const a = cur.getBoundingClientRect();
+  let best = null;
+  let bestScore = Infinity;
+  for (const el of items) {
+    if (el === cur || el.contains(cur) || cur.contains(el)) continue;
+    const b = el.getBoundingClientRect();
+    let along; let across;
+    if (dir === 'right') { along = b.left - a.right; across = overlap(a.top, a.bottom, b.top, b.bottom); }
+    else if (dir === 'left') { along = a.left - b.right; across = overlap(a.top, a.bottom, b.top, b.bottom); }
+    else if (dir === 'down') { along = b.top - a.bottom; across = overlap(a.left, a.right, b.left, b.right); }
+    else { along = a.top - b.bottom; across = overlap(a.left, a.right, b.left, b.right); }
+    if (along < -4) continue; // behind us, or mostly beside
+    const score = Math.max(0, along) + across * 2;
+    if (score < bestScore) { bestScore = score; best = el; }
+  }
+  if (!best) return false;
+  best.focus({ preventScroll: true });
+  best.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  return true;
+}
+
+/** How far apart two spans are sideways: 0 when they overlap, else the gap between them. */
+function overlap(a1, a2, b1, b2) {
+  if (b2 >= a1 && b1 <= a2) return 0;
+  return b1 > a2 ? b1 - a2 : a1 - b2;
+}
+
+const TV_KEYS = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+};
+const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 4;
+
 // ---- main.js ----
 // The dashboard: Today (the day at a glance, notifications, news), Energy (solar, battery, selling to
 // the grid), Places (where everyone is) and Home (floor plan and rooms). Devices are the ones exposed
@@ -8105,7 +8497,7 @@ class Voice {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '31 Oct 2026, 13:13 (b52e7aa)';
+const DASH_BUILD = '2 Nov 2026, 10:47 (1bda2fe)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8148,6 +8540,11 @@ const DEFAULT_PREFS = {
   dim: 0.55,
   dimNight: true,
   keepAwake: true,
+  tvCams: [],            // TV screen: cameras in order; empty = every shown camera
+  tvReadings: [],        // TV screen: sensors on the right; empty = a few temperature / air readings
+  tvButtons: [],         // TV screen: scenes and scripts in the top bar; empty = the first two
+  tvApps: TV_APPS_DEFAULT, // TV screen: "Name = package" per line
+  tvRemote: '',          // remote.* that opens apps when this isn't Fully Kiosk; '' = the first, 'none' = never
 };
 
 function readPrefs() {
@@ -8264,12 +8661,16 @@ const VIEWS_META = {
   energy: { title: 'Energy', icon: 'solar' },
   places: { title: 'Places', icon: 'mapMarker' },
   home: { title: 'Home', icon: 'home' },
+  tv: { title: 'TV', icon: 'tv' },
   settings: { title: 'Settings', icon: 'settings' },
 };
 const urlParams = new URLSearchParams(location.search);
 const kiosk = urlParams.has('kiosk');
 const urlWall = kiosk || urlParams.has('wall');
-if (kiosk) document.documentElement.classList.add('kiosk');
+// ?tv: the TV home screen (Google TV / Android TV in Fully Kiosk Browser), worked with the remote.
+const tvMode = urlParams.has('tv');
+if (kiosk || tvMode) document.documentElement.classList.add('kiosk');
+if (tvMode) document.documentElement.classList.add('tv-mode');
 
 /** Pages turned off in Settings drop out of the menu. */
 function viewOn(v) {
@@ -8280,12 +8681,12 @@ function viewOn(v) {
 
 function parseRoute() {
   const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
-  const view = VIEWS_META[path] && viewOn(path) ? path : 'today';
+  const view = VIEWS_META[path] && viewOn(path) ? path : tvMode ? 'tv' : 'today';
   return { view, params: Object.fromEntries(new URLSearchParams(query)) };
 }
 
 function renderNav() {
-  $('#nav').innerHTML = `<span class="brand" aria-hidden="true">${icon('home')}</span>${Object.entries(VIEWS_META).filter(([v]) => viewOn(v)).map(([v, m]) => `
+  $('#nav').innerHTML = `<span class="brand" aria-hidden="true">${icon('home')}</span>${Object.entries(VIEWS_META).filter(([v]) => viewOn(v) && v !== 'tv').map(([v, m]) => `
     <a href="#/${v}" data-view="${v}" class="nav-${v}"${ui.view === v ? ' aria-current="page"' : ''}>${icon(m.icon)}<span>${m.title}</span></a>`).join('')}`;
 }
 
@@ -8300,6 +8701,8 @@ function renderStatus() {
 function tickClock() {
   const now = new Date();
   $('#clock').textContent = fmtTime(now);
+  const tvClock = $('.tv-clock');
+  if (tvClock) tvClock.textContent = fmtTime(now);
   const big = $('.hero-time');
   if (big) big.textContent = fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, '');
   applyTheme();
@@ -8310,6 +8713,7 @@ function applyTheme() {
   const t = store.prefs.theme;
   let theme = '';
   if (t === 'light' || t === 'dark') theme = t;
+  else if (tvMode && t === 'auto') theme = 'dark'; // a TV in a lounge room: dark unless chosen otherwise
   else if (t === 'sun') theme = store.states.get('sun.sun')?.state === 'below_horizon' ? 'dark' : 'light';
   if ((document.documentElement.dataset.theme || '') !== theme) {
     if (theme) document.documentElement.dataset.theme = theme;
@@ -8436,7 +8840,7 @@ function applySky() {
 
 function render() {
   const r = parseRoute();
-  if (r.view !== ui.view) { closeSheet(); ui.camEdit = false; ui.camPick = ''; }
+  if (r.view !== ui.view) { closeSheet(); ui.camEdit = false; ui.camPick = ''; if (ui.view === 'tv') tvLeave(); }
   ui.view = r.view;
   ui.params = r.params;
   document.documentElement.dataset.view = ui.view;
@@ -8451,8 +8855,13 @@ function render() {
   ui.viewHtml = html;
   view.dataset.view = ui.view;
   const typing = document.activeElement?.matches('#view .shop-add input');
+  // Redraws must not lose the remote's place: put focus back on the same thing.
+  const focusKey = document.activeElement?.closest?.('#view [data-tv-key]')?.dataset.tvKey;
+  const rowScroll = $('.tv-apps', view)?.scrollLeft || 0;
   view.innerHTML = html;
   if (typing) view.querySelector('.shop-add input')?.focus();
+  if (rowScroll && $('.tv-apps', view)) $('.tv-apps', view).scrollLeft = rowScroll;
+  if (focusKey) view.querySelector(`[data-tv-key="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
   after[ui.view]?.(view);
   ui.lastRender = Date.now();
   paintCameras(view);
@@ -9662,10 +10071,319 @@ function camEditAct(act) {
 }
 
 // ============================================================
+// TV home screen (?tv)
+// ============================================================
+
+const tv = {
+  tab: 'home',        // 'home' | 'cameras'
+  cam: '',            // the camera shown big
+  full: false,        // the big camera filling the screen
+  hourly: [],
+  hourlyAt: 0,
+  player: null,
+  stage: null,        // kept between redraws so the video keeps playing
+};
+
+/** Effective lists: what was picked in Settings, or the automatic choice. */
+function tvList(key) {
+  const picked = (store.prefs[key] || []).filter((id) => store.states.has(id));
+  if (picked.length) return picked;
+  if (key === 'tvCams') {
+    const cams = listedCameras();
+    return (cams.length ? cams : [...store.states.keys()].filter((id) => domainOf(id) === 'camera'))
+      .filter((id) => !isUnavailable(store.states.get(id)));
+  }
+  if (key === 'tvReadings') {
+    const shownOnes = autoReadings(store.states, listed);
+    // None exposed to the voice assistant: fall back to any ordinary (non-diagnostic) sensor.
+    return shownOnes.length ? shownOnes : autoReadings(store.states, (id) => !store.entityInfo.get(id)?.category && !store.entityInfo.get(id)?.hidden);
+  }
+  if (key === 'tvButtons') {
+    return [...store.states.keys()].filter((id) => ['scene', 'script'].includes(domainOf(id)) && listed(id))
+      .sort((a, b) => nameOf(store.states.get(a)).localeCompare(nameOf(store.states.get(b)))).slice(0, 2);
+  }
+  return [];
+}
+
+function tvCamera() {
+  const cams = tvList('tvCams');
+  if (!cams.includes(tv.cam)) tv.cam = cams[0] || '';
+  return { cams, cam: tv.cam };
+}
+
+async function loadHourly() {
+  const w = weatherEntity();
+  if (!w || !store.client || Date.now() - tv.hourlyAt < 20 * 60_000) return;
+  tv.hourlyAt = Date.now();
+  try {
+    const res = await store.client.send({
+      type: 'call_service', domain: 'weather', service: 'get_forecasts', service_data: { type: 'hourly' },
+      target: { entity_id: w.entity_id }, return_response: true,
+    });
+    tv.hourly = res?.response?.[w.entity_id]?.forecast || [];
+  } catch {
+    tv.hourly = []; // no hourly forecast: the card shows the next days instead
+  }
+  queueRefresh();
+}
+
+function tvNight() {
+  return store.states.get('sun.sun')?.state === 'below_horizon';
+}
+
+function tvWeatherHtml() {
+  const w = weatherEntity();
+  if (!w) return '';
+  const a = w.attributes || {};
+  const fc = forecastFor(new Date());
+  const rain = fc?.precipitation_probability;
+  const soon = Date.now() - 30 * 60_000;
+  const hours = tv.hourly.filter((f) => new Date(f.datetime).getTime() >= soon).slice(0, 6);
+  const days = hours.length ? [] : day.forecast.slice(1, 7);
+  const word = weatherWord(w.state).replace(/^\w/, (c) => c.toUpperCase());
+  return `<section class="tv-card tv-weather">
+    <div class="tv-wx-now">
+      ${icon(weatherIcon(w.state, tvNight()), 'icon tv-wx-big')}
+      <b>${deg(a.temperature)}</b>
+      <span><span class="tv-wx-word">${esc(word)}</span>
+        ${fc ? `<small>${deg(fc.temperature)} / ${deg(fc.templow)} · ${rain ? `${rain}% rain` : 'no rain'}</small>` : ''}</span>
+    </div>
+    ${hours.length || days.length ? `<ol class="tv-wx-hours">${(hours.length ? hours : days).map((f) => {
+      const d = new Date(f.datetime);
+      const label = hours.length ? d.toLocaleTimeString(undefined, { hour: 'numeric' }) : d.toLocaleDateString(undefined, { weekday: 'short' });
+      return `<li><small>${esc(label)}</small>${icon(weatherIcon(f.condition, f.is_daytime === false))}<b>${deg(f.temperature)}</b></li>`;
+    }).join('')}</ol>` : ''}
+  </section>`;
+}
+
+function tvReadingsHtml() {
+  const ids = tvList('tvReadings');
+  if (!ids.length) return '';
+  const groups = new Map();
+  for (const id of ids) {
+    const area = store.areas.get(areaOf(id)) || 'Other';
+    if (!groups.has(area)) groups.set(area, []);
+    groups.get(area).push(store.states.get(id));
+  }
+  return `<section class="tv-card tv-readings">${[...groups].map(([area, list]) => `
+    <h3>${esc(area)}</h3>
+    <ul>${list.map((s) => `<li>${icon(iconFor(s))}<span>${esc(nameOf(s))}</span><b>${esc(formatState(s))}</b></li>`).join('')}</ul>`).join('')}
+  </section>`;
+}
+
+function tvTopHtml() {
+  const buttons = tvList('tvButtons').map((id) => store.states.get(id));
+  return `<header class="tv-top">
+    <nav class="tv-tabs">
+      ${[['home', 'Home'], ['cameras', 'Cameras']].map(([k, l]) => `<button type="button" data-tv-tab="${k}" data-tv-key="tab-${k}"${tv.tab === k ? ' aria-current="page"' : ''}>${l}</button>`).join('')}
+    </nav>
+    <div class="tv-actions">
+      ${buttons.map((s) => `<button type="button" class="tv-pill" data-tv-run="${esc(s.entity_id)}" data-tv-key="run-${esc(s.entity_id)}">${icon(iconFor(s))}${esc(nameOf(s))}</button>`).join('')}
+      <a class="tv-pill tv-gear" href="#/settings?section=tv" data-tv-key="settings" aria-label="Settings">${icon('settings')}</a>
+      <span class="tv-status" data-status="${esc(store.status)}"></span>
+      <time class="tv-clock">${esc(fmtTime(new Date()))}</time>
+    </div>
+  </header>`;
+}
+
+function tvAppsHtml() {
+  const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
+  if (!apps.length) return '';
+  return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
+      ${a.colors ? `style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]}"` : ''}><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
+}
+
+/** Motion, person and similar sensors on each camera, newest first: a simple alerts list. */
+function tvAlerts(cams) {
+  const byDevice = new Map(cams.map((id) => [store.entityInfo.get(id)?.deviceId, id]).filter(([d]) => d));
+  const out = [];
+  for (const s of store.states.values()) {
+    if (domainOf(s.entity_id) !== 'binary_sensor' || isUnavailable(s)) continue;
+    const cam = byDevice.get(store.entityInfo.get(s.entity_id)?.deviceId);
+    if (!cam) continue;
+    if (!MOTION_CLASSES.has(s.attributes?.device_class) && !/_(person|motion|visitor|vehicle|animal|pet)$/.test(s.entity_id)) continue;
+    if (s.state !== 'on' && Date.now() - new Date(s.last_changed).getTime() > 86_400_000) continue; // nothing in the last day
+    const kind = nameOf(s).replace(nameOf(store.states.get(cam)).replace(/\s*fluent$/i, ''), '').trim() || 'Motion';
+    out.push({ cam, on: s.state === 'on', when: s.last_changed, kind });
+  }
+  return out.sort((a, b) => (b.on - a.on) || String(b.when).localeCompare(String(a.when))).slice(0, 8);
+}
+
+function tvCamerasTabHtml(cams) {
+  if (!cams.length) return emptyHtml('No cameras', 'Pick cameras in Settings → TV.');
+  const alerts = tvAlerts(cams);
+  return `<div class="tv-camgrid-wrap">
+    <ul class="tv-camgrid">${cams.map((id) => `<li><button type="button" class="tv-camtile" data-tv-pick-cam="${esc(id)}" data-tv-key="pick-${esc(id)}">
+      <img data-cam="${esc(id)}" alt="" decoding="async"><span>${esc(camName(store.states.get(id)))}</span></button></li>`).join('')}</ul>
+    ${alerts.length ? `<section class="tv-card tv-alerts"><h3>Recent activity</h3><ul>${alerts.map((x) => `<li>
+      <button type="button" data-tv-pick-cam="${esc(x.cam)}" data-tv-key="alert-${esc(x.cam)}-${esc(x.kind)}" class="${x.on ? 'on' : ''}">
+        <b>${esc(camName(store.states.get(x.cam)))}</b><span>${esc(x.kind)}</span><small>${x.on ? 'Now' : esc(relativeTime(x.when))}</small></button></li>`).join('')}</ul></section>` : ''}
+  </div>`;
+}
+
+function tvHomeHtml(cams, cam) {
+  return `<div class="tv-body">
+    ${cam ? `<div class="tv-cam-wrap">
+      <button type="button" class="tv-cam" data-tv-cam data-tv-key="cam" aria-label="${esc(camName(store.states.get(cam)))}: left and right change camera, OK fills the screen">
+        <span class="tv-cam-slot"></span>
+        ${cams.length > 1 ? `<span class="tv-cam-arrow left">${icon('chevronLeft')}</span><span class="tv-cam-arrow right">${icon('chevronRight')}</span>` : ''}
+        <span class="tv-cam-name">${esc(camName(store.states.get(cam)))}${cams.length > 1 ? ` · ${cams.indexOf(cam) + 1}/${cams.length}` : ''}</span>
+      </button>
+    </div>` : `<div class="tv-cam-wrap tv-card tv-nocam"><p class="muted">No cameras to show. Pick some in Settings → TV.</p></div>`}
+    <div class="tv-side">${tvWeatherHtml()}${tvReadingsHtml()}</div>
+  </div>`;
+}
+
+/** The big camera's video, made once per camera and moved into each redraw. */
+function tvStage(cam) {
+  if (tv.stage?.dataset.cam === cam) return tv.stage;
+  tv.player?.stop();
+  tv.player = null;
+  const el = document.createElement('div');
+  el.className = 'cam-stage tv-stage';
+  el.dataset.cam = cam;
+  el.dataset.phase = 'connecting';
+  el.innerHTML = `<img class="cam-poster" data-cam="${esc(cam)}" alt="">
+    <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span></div><span class="cam-kind"></span>`;
+  tv.stage = el;
+  return el;
+}
+
+function tvPlay() {
+  const cam = tv.stage?.dataset.cam;
+  if (!cam || tv.player || document.hidden || !store.client) return;
+  const stage = tv.stage;
+  tv.player = new CameraPlayer({
+    client: store.client, entityId: cam, getState: () => store.states.get(cam), stage,
+    onState: ({ phase, kind, message }) => {
+      stage.dataset.phase = phase;
+      $('.cam-status-text', stage).textContent = phase === 'failed' ? `No live video. ${message || ''}` : `Connecting${kind ? ` (${streamLabel(kind)})` : ''}…`;
+      $('.cam-kind', stage).textContent = phase === 'playing' ? `Live · ${streamLabel(kind)}` : '';
+    },
+  });
+  tv.player.start();
+}
+
+function tvStop() {
+  tv.player?.stop();
+  tv.player = null;
+}
+
+function tvLeave() {
+  tvStop();
+  tv.stage = null;
+  tv.full = false;
+  document.documentElement.classList.remove('tv-full');
+}
+
+function tvSetFull(on) {
+  tv.full = on;
+  document.documentElement.classList.toggle('tv-full', on);
+}
+
+function tvSwitchCam(step) {
+  const { cams, cam } = tvCamera();
+  if (cams.length < 2) return;
+  tv.cam = cams[(cams.indexOf(cam) + step + cams.length) % cams.length];
+  render();
+}
+
+function tvSetTab(tab) {
+  tv.tab = tab;
+  tvSetFull(false);
+  if (tab !== 'home') { tvStop(); tv.stage = null; }
+  render();
+  $(`[data-tv-key="tab-${tab}"]`)?.focus();
+}
+
+/** Opens an Android TV app: through Fully Kiosk Browser if that's what shows this page, else HA's remote. */
+function tvLaunch(pkg, name) {
+  if (window.fully?.startApplication) { window.fully.startApplication(pkg); return; }
+  const remotes = [...store.states.keys()].filter((id) => domainOf(id) === 'remote' && !isUnavailable(store.states.get(id)));
+  const pick = store.prefs.tvRemote;
+  const remote = pick === 'none' ? '' : remotes.includes(pick) ? pick : remotes[0];
+  if (!remote) { toast(`To open ${name}, show this page in Fully Kiosk Browser on the TV, or add the Android TV Remote integration.`); return; }
+  call('remote', 'turn_on', { activity: pkg }, remote);
+  toast(`Opening ${name}…`);
+}
+
+function tvKeydown(e) {
+  if (!(tvMode || ui.view === 'tv') || e.defaultPrevented) return;
+  const t = e.target;
+  const typing = t.matches?.('input:not([type=checkbox]):not([type=range]), textarea, select');
+  if (isBackKey(e) || (e.key === 'Backspace' && !typing)) {
+    if (tv.full) { tvSetFull(false); $('[data-tv-cam]')?.focus(); e.preventDefault(); return; }
+    if ($('#sheet').open) return; // the dialog closes itself
+    if (ui.view === 'tv' && tv.tab !== 'home') { tvSetTab('home'); e.preventDefault(); return; }
+    if (ui.view !== 'tv' && tvMode) { location.hash = '#/tv'; e.preventDefault(); }
+    return;
+  }
+  const dir = TV_KEYS[e.key];
+  if (!dir || (typing && (dir === 'left' || dir === 'right'))) return;
+  if (ui.view === 'tv' && t.closest?.('[data-tv-cam]') && (dir === 'left' || dir === 'right')) {
+    tvSwitchCam(dir === 'left' ? -1 : 1);
+    e.preventDefault();
+    return;
+  }
+  if (tv.full) { e.preventDefault(); return; }
+  const root = $('#sheet').open ? $('#sheet') : ui.view === 'tv' ? $('#view') : document.body;
+  if (moveFocus(dir, root)) e.preventDefault();
+}
+document.addEventListener('keydown', tvKeydown);
+document.addEventListener('visibilitychange', () => {
+  if (ui.view !== 'tv') return;
+  if (document.hidden) tvStop(); else tvPlay();
+});
+
+function tvSettingsHtml() {
+  const p = store.prefs;
+  const pickList = (key, items, empty) => {
+    const on = new Set(tvList(key));
+    if (!items.length) return `<p class="muted">${empty}</p>`;
+    return items.map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc([store.areas.get(areaOf(s.entity_id)), isReading(s) ? formatState(s) : ''].filter(Boolean).join(' · '))}</small></span>
+      <input type="checkbox" data-tv-list="${key}" value="${esc(s.entity_id)}"${on.has(s.entity_id) ? ' checked' : ''}></label>`).join('');
+  };
+  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
+  const all = [...store.states.values()];
+  const cams = all.filter((s) => domainOf(s.entity_id) === 'camera').sort(byName);
+  const readings = all.filter((s) => isReading(s) && !store.entityInfo.get(s.entity_id)?.category).sort((a, b) =>
+    (store.areas.get(areaOf(a.entity_id)) || '~').localeCompare(store.areas.get(areaOf(b.entity_id)) || '~') || byName(a, b));
+  const buttons = all.filter((s) => ['scene', 'script'].includes(domainOf(s.entity_id))).sort(byName);
+  const remotes = all.filter((s) => domainOf(s.entity_id) === 'remote');
+  const auto = (key) => (p[key]?.length ? ` <button type="button" class="btn small" data-tv-auto="${key}">Back to automatic</button>` : ' <small class="muted">(automatic)</small>');
+  return `<section class="card" id="tv">
+    <h2 class="card-title">${icon('tv')}TV home screen</h2>
+    <p class="muted">A home screen for a Google TV or Android TV, worked with the remote: a big camera, the weather, a few readings, buttons for scenes, and your apps along the bottom. Add <b>?tv</b> to this page's address (for example <code>index.html?tv&amp;token=…</code>) and open it in Fully Kiosk Browser on the TV.</p>
+    <a class="btn" href="#/tv">${icon('tv')}Open the TV screen</a>
+    <details><summary>Cameras${auto('tvCams')}</summary>${pickList('tvCams', cams, 'No cameras in Home Assistant.')}</details>
+    <details><summary>Readings on the right${auto('tvReadings')}</summary>${pickList('tvReadings', readings, 'No sensors with numbers yet.')}</details>
+    <details><summary>Buttons in the top bar${auto('tvButtons')}</summary>${pickList('tvButtons', buttons, 'No scenes or scripts in Home Assistant.')}</details>
+    <label class="row tv-apps-edit"><span><b>Apps</b><small class="muted">One per line: <code>Name = Android package</code> (the package is in the app's Play Store address after <code>id=</code>), or just the name for ${esc(parseApps('youtube,netflix,prime,disney,plex,jellyfin,kayo,binge,stan,iview,spotify,appletv').map((a) => a.name).join(', '))}. Typing on a TV is slow, so you can also put <code>&amp;apps=jellyfin,disney,kayo,binge</code> in the TV's address instead.${urlParams.get('apps') ? ' <b>This screen\'s address sets its apps, so this list is not used here.</b>' : ''}</small></span></label>
+    <textarea data-pref="tvApps" rows="6" spellcheck="false">${esc(p.tvApps)}</textarea>
+    <label class="row"><span><b>Open apps with</b><small class="muted">Inside Fully Kiosk Browser apps open directly. Anywhere else this needs Home Assistant's Android TV Remote integration.</small></span>
+      <select data-pref="tvRemote">
+        <option value=""${p.tvRemote === '' ? ' selected' : ''}>${esc(remotes[0] ? `Automatic (${nameOf(remotes[0])})` : 'Automatic (no remote found)')}</option>
+        ${remotes.map((s) => `<option value="${esc(s.entity_id)}"${p.tvRemote === s.entity_id ? ' selected' : ''}>${esc(nameOf(s))}</option>`).join('')}
+        <option value="none"${p.tvRemote === 'none' ? ' selected' : ''}>Only Fully Kiosk</option>
+      </select></label>
+  </section>`;
+}
+
+// ============================================================
 // the views
 // ============================================================
 
 const VIEWS = {
+  tv() {
+    if (!ready()) return `<div class="v-tv">${notReady()}</div>`;
+    loadForecast();
+    loadHourly();
+    const { cams, cam } = tvCamera();
+    return `<div class="v-tv tab-${tv.tab}">${tvTopHtml()}
+      ${tv.tab === 'cameras' ? tvCamerasTabHtml(cams) : tvHomeHtml(cams, cam)}
+      ${tvAppsHtml()}</div>`;
+  },
+
   today() {
     if (!ready()) return notReady();
     loadForecast();
@@ -9837,6 +10555,7 @@ const VIEWS = {
     const signs = energySigns();
     const wallOn = p.wall || urlWall;
     return `<div class="v-settings">
+      ${tvMode ? `<a class="btn primary tv-back" href="#/tv">${icon('back')}Back to the TV screen</a>${tvSettingsHtml()}` : ''}
       <section class="card" id="devices">
         <h2 class="card-title">${icon('home')}Devices</h2>
         ${check('exposedOnly', 'Only devices exposed to the voice assistant', `${esc(exposedNote)} Change which ones in Home Assistant: Settings → Voice assistants → Expose.`)}
@@ -9848,6 +10567,8 @@ const VIEWS = {
       <section class="card" id="plan-settings"></section>
 
       <section class="card" id="entity-rooms"></section>
+
+      ${tvMode ? '' : tvSettingsHtml()}
 
       <section class="card" id="today">
         <h2 class="card-title">${icon('today')}Today</h2>
@@ -9962,6 +10683,11 @@ const VIEWS = {
 
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
+  tv(view) {
+    const slot = $('.tv-cam-slot', view);
+    if (slot && tv.tab === 'home' && tv.cam) { slot.append(tvStage(tv.cam)); tvPlay(); } else { tvStop(); tv.stage = null; }
+    if (!view.contains(document.activeElement) || document.activeElement === view) $('[data-tv-start]', view)?.focus({ preventScroll: true });
+  },
   today(view) {
     const slot = $('.pmap-slot', view);
     if (slot) { peopleMap.attach(slot); syncMap(); }
@@ -10457,7 +11183,7 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
-  if (handleSettingsClick(t) || handleCalendarClick(t)) return;
+  if (handleSettingsClick(t) || handleCalendarClick(t) || handleTvClick(t)) return;
   const ce = t.closest('[data-cam-edit]');
   if (ce) { camEditAct(ce.dataset.camEdit); return; }
   const cp = t.closest('[data-cam-pick]');
@@ -10618,6 +11344,14 @@ document.addEventListener('change', (e) => {
     renderEntityRooms();
     return;
   }
+  if (t.dataset.tvList) {
+    const key = t.dataset.tvList;
+    const list = tvList(key).filter((id) => id !== t.value);
+    if (t.checked) list.push(t.value);
+    store.prefs[key] = list;
+    writePrefs();
+    return;
+  }
   if (t.dataset.energyRole) {
     const picks = { ...store.prefs.energyPicks };
     if (t.value) picks[t.dataset.energyRole] = t.value; else delete picks[t.dataset.energyRole];
@@ -10660,6 +11394,29 @@ document.addEventListener('change', (e) => {
     loadEvents(true);
   }
 });
+function handleTvClick(t) {
+  const tab = t.closest('[data-tv-tab]');
+  if (tab) { tvSetTab(tab.dataset.tvTab); return true; }
+  const run = t.closest('[data-tv-run]');
+  if (run) {
+    const id = run.dataset.tvRun;
+    call(domainOf(id), 'turn_on', {}, id);
+    toast(`${nameOf(store.states.get(id) || { entity_id: id })} ✓`);
+    return true;
+  }
+  const app = t.closest('[data-tv-app]');
+  if (app) { tvLaunch(app.dataset.tvApp, app.textContent.trim()); return true; }
+  if (t.closest('[data-tv-cam]')) {
+    tvSetFull(!tv.full);
+    return true;
+  }
+  const pick = t.closest('[data-tv-pick-cam]');
+  if (pick) { tv.cam = pick.dataset.tvPickCam; tvSetTab('home'); $('[data-tv-cam]')?.focus(); return true; }
+  const autoBtn = t.closest('[data-tv-auto]');
+  if (autoBtn) { store.prefs[autoBtn.dataset.tvAuto] = []; writePrefs(); ui.viewHtml = ''; render(); return true; }
+  return false;
+}
+
 function handleSettingsClick(t) {
   if (t.closest('[data-test-ding]')) { ding.play(); return true; }
   const prev = t.closest('[data-sky-preview]');
