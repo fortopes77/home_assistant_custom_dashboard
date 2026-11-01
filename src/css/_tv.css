@@ -1,0 +1,231 @@
+/* TV home screen (?tv): sized from the screen width so it reads the same at 960 or 1920 pixels wide,
+   with a big focus ring for the remote. */
+
+.v-tv {
+  --tv-gap: 1.4em;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--tv-gap);
+  min-height: calc(100dvh - 90px);
+  font-size: clamp(12px, 1.5vw, 34px);
+}
+.tv-mode .topbar { display: none; }
+.tv-mode .main { padding: 0; min-height: 100dvh; }
+.tv-mode .view { padding: 0; }
+.tv-mode .view, :root[data-view="tv"] .view { max-width: none; }
+.tv-mode .v-tv { height: 100dvh; min-height: 0; padding: 2.2em 3em 2em; overflow: hidden; }
+.tv-mode body { overflow: hidden; }
+.tv-mode .v-settings { font-size: 1.15rem; padding: 24px 5vw; }
+.tv-back { margin-bottom: 14px; }
+
+/* the remote's focus: always visible, never the browser's thin ring */
+.tv-mode :focus { outline: none; }
+.tv-mode :focus-visible, .v-tv :focus-visible,
+.tv-mode .v-settings :focus, .tv-mode #sheet :focus {
+  outline: 0.22em solid var(--text);
+  outline-offset: 0.18em;
+}
+
+.tv-top { display: flex; align-items: center; justify-content: space-between; gap: 1em; }
+.tv-tabs { display: flex; gap: 0.6em; }
+.tv-tabs button {
+  padding: 0.35em 0.6em;
+  border: 0;
+  border-radius: 0.5em;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+.tv-tabs button[aria-current] { color: var(--text); box-shadow: inset 0 -0.18em 0 var(--text); border-radius: 0.5em 0.5em 0.2em 0.2em; }
+.tv-actions { display: flex; align-items: center; gap: 0.7em; min-width: 0; }
+.tv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  height: 2.6em;
+  padding: 0 1.1em;
+  border: 0;
+  border-radius: 1.3em;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.tv-pill .icon { width: 1.25em; height: 1.25em; }
+.tv-gear { width: 2.6em; padding: 0; justify-content: center; }
+.tv-status { width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--muted); }
+.tv-status[data-status="connected"] { background: var(--positive); }
+.tv-status[data-status="disconnected"], .tv-status[data-status="auth_invalid"] { background: var(--danger); }
+.tv-clock { font-size: 2em; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-left: 0.2em; }
+
+.tv-body { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: var(--tv-gap); min-height: 0; }
+.tv-cam-wrap { min-height: 0; display: grid; }
+.tv-cam {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.9em;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font: inherit;
+}
+.tv-cam-slot, .tv-stage { position: absolute; inset: 0; }
+.tv-stage { aspect-ratio: auto; max-height: none; border-radius: inherit; }
+.tv-stage > img, .tv-stage > video { object-fit: cover; }
+.tv-cam-name, .tv-stage .cam-kind {
+  position: absolute;
+  padding: 0.25em 0.7em;
+  border-radius: 0.6em;
+  background: rgb(0 0 0 / 0.5);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+.tv-cam-name { left: 0.8em; bottom: 0.8em; }
+.tv-stage .cam-kind { left: auto; right: 0.8em; bottom: 0.8em; top: auto; width: auto; opacity: 0.8; }
+.tv-stage .cam-kind:empty { display: none; }
+.tv-cam-arrow {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 2.4em;
+  height: 2.4em;
+  margin-top: -1.2em;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.tv-cam-arrow .icon { width: 1.6em; height: 1.6em; }
+.tv-cam-arrow.left { left: 0.6em; }
+.tv-cam-arrow.right { right: 0.6em; }
+.tv-cam:focus .tv-cam-arrow, .tv-cam:hover .tv-cam-arrow { opacity: 1; }
+.tv-nocam { place-items: center; }
+
+/* the big camera filling the screen (OK on the camera; Back to leave) */
+.tv-full .tv-cam { position: fixed; inset: 0; z-index: 90; border-radius: 0; outline: none !important; }
+.tv-full .tv-cam-arrow { opacity: 1; }
+
+.tv-side { display: flex; flex-direction: column; gap: var(--tv-gap); min-height: 0; }
+.tv-card {
+  padding: 1.1em 1.3em;
+  border-radius: 0.9em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-height: 0;
+}
+.tv-wx-now { display: flex; align-items: center; gap: 0.6em; }
+.tv-wx-big { width: 2.6em; height: 2.6em; }
+.tv-wx-now > b { font-size: 2.6em; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.tv-wx-now > span { display: grid; gap: 0.1em; }
+.tv-wx-word { font-size: 1.15em; font-weight: 600; }
+.tv-wx-now small { color: var(--muted); }
+.tv-wx-hours { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3em; margin: 0.9em 0 0; padding: 0; list-style: none; text-align: center; }
+.tv-wx-hours li { display: grid; justify-items: center; gap: 0.2em; }
+.tv-wx-hours small { color: var(--muted); font-size: 0.8em; white-space: nowrap; }
+.tv-wx-hours .icon { width: 1.6em; height: 1.6em; }
+.tv-wx-hours b { font-weight: 600; }
+
+.tv-readings { flex: 1; overflow: hidden; }
+.tv-readings h3 { margin: 0 0 0.3em; font-size: 0.85em; font-weight: 600; color: var(--muted); }
+.tv-readings h3:not(:first-child) { margin-top: 0.7em; }
+.tv-readings ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.35em; }
+.tv-readings li { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; align-items: center; gap: 0.7em; }
+.tv-readings li .icon { width: 1.3em; height: 1.3em; color: var(--muted); }
+.tv-readings li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-readings li b { font-size: 1.1em; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.tv-apps {
+  display: flex;
+  gap: 1.1em;
+  padding: 0.9em;
+  margin: -0.9em;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tv-apps::-webkit-scrollbar { display: none; }
+.tv-app {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 12.5em;
+  height: 6.6em;
+  padding: 0 0.8em;
+  border: 0;
+  border-radius: 0.8em;
+  background: var(--app-bg, var(--surface-2));
+  color: var(--app-fg, var(--text));
+  font: inherit;
+  font-size: 1.15em;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
+  transition: transform 0.15s;
+}
+.tv-app span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-size: 1.35em; }
+.tv-app:focus { transform: scale(1.06); }
+
+/* Cameras tab */
+.tv-camgrid-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18em); gap: var(--tv-gap); min-height: 0; }
+.tv-camgrid-wrap:not(:has(.tv-alerts)) { grid-template-columns: minmax(0, 1fr); }
+.tv-camgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14em, 1fr)); gap: 1em; margin: 0; padding: 0.3em; list-style: none; overflow-y: auto; align-content: start; }
+.tv-camtile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 0.7em;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font: inherit;
+}
+.tv-camtile img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.3s; }
+.tv-camtile img.ready { opacity: 1; }
+.tv-camtile span { position: absolute; left: 0.6em; bottom: 0.5em; padding: 0.15em 0.55em; border-radius: 0.5em; background: rgb(0 0 0 / 0.5); font-size: 0.85em; font-weight: 600; }
+.tv-alerts { overflow-y: auto; }
+.tv-alerts h3 { margin: 0 0 0.5em; font-size: 0.95em; }
+.tv-alerts ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.3em; }
+.tv-alerts button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  padding: 0.45em 0.6em;
+  border: 0;
+  border-radius: 0.5em;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.tv-alerts button span { grid-column: 1; color: var(--muted); font-size: 0.85em; }
+.tv-alerts button small { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--muted); }
+.tv-alerts button.on small { color: var(--danger); font-weight: 700; }
+
+/* a TV page opened in an ordinary browser (#/tv without ?tv) */
+:root:not(.tv-mode)[data-view="tv"] .v-tv { aspect-ratio: 16 / 9; min-height: 0; max-height: calc(100dvh - 90px); }
+
+/* Settings → TV */
+#tv textarea {
+  width: 100%;
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 0.9rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+#tv summary .btn { min-height: 30px; margin-left: 8px; padding: 0 10px; font-size: 0.8rem; }

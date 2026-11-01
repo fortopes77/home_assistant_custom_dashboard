@@ -25,6 +25,7 @@ Open the address directly. In Home Assistant, go to your profile, then the **Sec
 
 - `?wall` turns on wall mode for that address.
 - `?kiosk` also hides the menu.
+- `?tv` opens the [TV home screen](#tv-home-screen-google-tv--android-tv) for a Google TV or Android TV.
 - `?token=<token>` signs in a screen without a keyboard, such as a Nest Hub cast with `catt`.
 
 ### Updating
@@ -138,6 +139,23 @@ Turn on **Settings → Wall mode** on the tablet, or add `?wall` to the address.
 - **Keep the screen on** stops the tablet sleeping. Browsers allow this only on `https` addresses.
 - The first touch only wakes the screen. A full screen button appears in the top bar.
 
+## TV home screen (Google TV / Android TV)
+
+Add `?tv` to the address for a home screen made for a TV and its remote: a big live camera, the weather with the next few hours, a few readings, buttons for scenes along the top, a Cameras tab, and your TV apps along the bottom.
+
+1. On the TV, install **Fully Kiosk Browser** (Android TV version from fully-kiosk.com, for example with the Downloader app).
+2. Make a long-lived token for a separate, non-administrator Home Assistant user, and set Fully's **Start URL** to `http://<your-home-assistant>:8123/local/dashboard/index.html?tv&token=<token>`.
+3. Optional: make it the home screen. A launcher such as Projectivy Launcher can send the Home button to Fully Kiosk. This is fully reversible: turn the override off or uninstall the launcher and the stock home screen comes back.
+
+Using it with the remote:
+
+- The arrows move between buttons, and focus starts on the first app.
+- On the camera, **left** and **right** change camera and **OK** fills the screen. **Back** leaves full screen and the Cameras tab.
+- The Cameras tab shows every camera and recent motion and person detections; pick one to watch it big.
+- App tiles open apps through Fully Kiosk. In any other browser they use Home Assistant's **Android TV Remote** integration (`remote.turn_on` with the app's package), if you have it.
+
+**Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`, where the package is the `id=` in the app's Play Store address, or just the name for common ones such as Netflix, Disney+, Jellyfin, Kayo or Binge). Typing on a TV is slow, so you can also add `&apps=jellyfin,disney,kayo,binge` to the TV's address instead. The TV screen is dark unless you choose Light under Theme.
+
 ## Time and weather tint
 
 Today has a soft wash of colour behind it that follows the sun (`sun.sun`) and the weather: gold in the morning, blue at midday, rose at sunset, indigo at night, and greyer or bluer when it's cloudy or raining. The colours drift slowly as things change, and the other pages stay plain. Turn it off under **Settings → Look → Time and weather tint on Today**. It steps aside while the live sky is on.
@@ -185,7 +203,7 @@ If a download fails, a notice appears in Home Assistant.
 | `index.html`, `version.json` | The built dashboard to upload (made by GitHub; don't edit) |
 | `build.py` | Bundles `src/` into `dist/index.html` and `dist/version.json` |
 | `src/index.html` | Page shell |
-| `src/css/app.css` | Layout and themes; the `_*.css` partials style the floor plan, map, cameras, settings and wall mode |
+| `src/css/app.css` | Layout and themes; the `_*.css` partials style the floor plan, map, cameras, settings, wall mode and the TV screen |
 | `src/js/main.js` | The app: views, sheets, actions, Settings, the exposed list, notifications, news and the shopping list |
 | `src/js/ha.js`, `auth.js` | WebSocket client and sign-in |
 | `src/js/entities.js`, `controls.js`, `icons.js` | Entity names and states, tiles and controls, icons |
@@ -196,4 +214,5 @@ If a download fails, a notice appears in Home Assistant.
 | `src/js/calendar.js`, `brief.js`, `notify.js`, `news.js` | Calendar, day summary, notifications and news |
 | `src/js/camera.js`, `voice.js` | Camera player and Assist |
 | `src/js/sky.js`, `tint.js`, `wall.js`, `install.js` | Live sky, the Today tint, wall mode, and installing as an app |
+| `src/js/tv.js` | The TV home screen's app list, weather icons and moving focus with a remote |
 | `homeassistant/` | Example automations and the GitHub update package |
