@@ -1729,7 +1729,7 @@ function tvTopHtml() {
 }
 
 function tvAppsHtml() {
-  const apps = parseApps(store.prefs.tvApps);
+  const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
   if (!apps.length) return '';
   return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
       ${a.colors ? `style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]}"` : ''}><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
@@ -1900,7 +1900,7 @@ function tvSettingsHtml() {
     <details><summary>Cameras${auto('tvCams')}</summary>${pickList('tvCams', cams, 'No cameras in Home Assistant.')}</details>
     <details><summary>Readings on the right${auto('tvReadings')}</summary>${pickList('tvReadings', readings, 'No sensors with numbers yet.')}</details>
     <details><summary>Buttons in the top bar${auto('tvButtons')}</summary>${pickList('tvButtons', buttons, 'No scenes or scripts in Home Assistant.')}</details>
-    <label class="row tv-apps-edit"><span><b>Apps</b><small class="muted">One per line: <code>Name = Android package</code>. The package is in the app's Play Store address after <code>id=</code>.</small></span></label>
+    <label class="row tv-apps-edit"><span><b>Apps</b><small class="muted">One per line: <code>Name = Android package</code> (the package is in the app's Play Store address after <code>id=</code>), or just the name for ${esc(parseApps('youtube,netflix,prime,disney,plex,jellyfin,kayo,binge,stan,iview,spotify,appletv').map((a) => a.name).join(', '))}. Typing on a TV is slow, so you can also put <code>&amp;apps=jellyfin,disney,kayo,binge</code> in the TV's address instead.${urlParams.get('apps') ? ' <b>This screen\'s address sets its apps, so this list is not used here.</b>' : ''}</small></span></label>
     <textarea data-pref="tvApps" rows="6" spellcheck="false">${esc(p.tvApps)}</textarea>
     <label class="row"><span><b>Open apps with</b><small class="muted">Inside Fully Kiosk Browser apps open directly. Anywhere else this needs Home Assistant's Android TV Remote integration.</small></span>
       <select data-pref="tvRemote">

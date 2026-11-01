@@ -154,7 +154,7 @@ Using it with the remote:
 - The Cameras tab shows every camera and recent motion and person detections; pick one to watch it big.
 - App tiles open apps through Fully Kiosk. In any other browser they use Home Assistant's **Android TV Remote** integration (`remote.turn_on` with the app's package), if you have it.
 
-**Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`; the package is the `id=` in the app's Play Store address). The TV screen is dark unless you choose Light under Theme.
+**Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`, where the package is the `id=` in the app's Play Store address, or just the name for common ones such as Netflix, Disney+, Jellyfin, Kayo or Binge). Typing on a TV is slow, so you can also add `&apps=jellyfin,disney,kayo,binge` to the TV's address instead. The TV screen is dark unless you choose Light under Theme.
 
 ## Time and weather tint
 

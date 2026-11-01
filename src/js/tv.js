@@ -29,10 +29,30 @@ const APP_COLORS = {
   'com.google.android.apps.youtube.unplugged': ['#ffffff', '#e62117'],
 };
 
+// Apps that can be named on their own ("kayo", or ?apps=jellyfin,kayo in the address) without the package.
+const KNOWN_APPS = {
+  youtube: ['YouTube', 'com.google.android.youtube.tv'],
+  netflix: ['Netflix', 'com.netflix.ninja'],
+  prime: ['Prime Video', 'com.amazon.amazonvideo.livingroom'],
+  disney: ['Disney+', 'com.disney.disneyplus'],
+  plex: ['Plex', 'com.plexapp.android'],
+  jellyfin: ['Jellyfin', 'org.jellyfin.androidtv'],
+  kayo: ['Kayo', 'au.com.kayosports.tv'],
+  binge: ['Binge', 'au.com.streamotion.ares.tv'],
+  stan: ['Stan', 'au.com.stan.and'],
+  iview: ['ABC iview', 'au.net.abc.iview'],
+  spotify: ['Spotify', 'com.spotify.tv.android'],
+  appletv: ['Apple TV', 'com.apple.atve.androidtv.appletv'],
+};
+const knownKey = (name) => String(name).toLowerCase().replace(/[^a-z]/g, '').replace(/^(disneyplus|disney)$/, 'disney').replace(/^primevideo$/, 'prime');
+
+/** "Name = package" lines, or just a known name per line or comma ("Jellyfin, Disney+, Kayo, Binge"). */
 export function parseApps(text) {
-  return String(text || '').split('\n').map((line) => {
+  return String(text || '').split(/\n|,(?![^=\n]*\.)/).map((line) => {
     const m = line.match(/^\s*(.+?)\s*=\s*([\w.]+)\s*$/);
-    return m ? { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || null } : null;
+    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || null };
+    const known = line.trim() && KNOWN_APPS[knownKey(line)];
+    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || null } : null;
   }).filter(Boolean);
 }
 
