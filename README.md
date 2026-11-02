@@ -158,6 +158,19 @@ Using it with the remote:
 
 **App logos:** the app cards show each app's name in its colours. To show the real logo instead, put a picture of it in Home Assistant at `config/www/dashboard/logos/<app>.png`, using the app's short name in lower case: `jellyfin.png`, `disney.png`, `kayo.png`, `binge.png`, `netflix.png`, `youtube.png`, `prime.png` and so on (an app you named yourself uses its name without spaces or symbols, so "My App" is `myapp.png`). A wide picture (about 16:9, like a Google TV banner) fills the whole card. A square icon sits in the middle on the app's colours. No logos come with the dashboard, so use pictures you have saved yourself. A good source is the app's icon from its Play Store page.
 
+Add `&v=<number>` to the TV's address and raise the number after you change a logo picture, so the TV fetches it again instead of keeping the old one.
+
+### More on the TV screen
+
+- **The room the TV is in:** the room gets its own tab (named after the room) with every light, blind and thermostat there, the room's readings, and what's playing. Home shows a small card with quick buttons for them. By default the room is the area of the TV's own device in Home Assistant (the Home Assistant app on the TV, named by `&open=notify.mobile_app_<tv>`), so when you move the TV to another room, change that device's area in **Settings → Devices** and the screen follows. You can also pick a room in **Settings → TV**, or add `&room=living room` to the address. Only devices exposed to your voice assistant show.
+- **Up next:** today's remaining events (then tomorrow's) from the family calendar, with who they're for, and how many things are on the shopping list.
+- **Solar at a glance:** battery level, solar power right now, buying or selling, and whether it's peak or off-peak. Peak and off-peak come from a utility meter's tariff `select` (one with a "peak" option).
+- **Now playing:** when something's playing in the TV's room (or, failing that, anywhere in the house), a strip with previous, play/pause, next and volume.
+- **Doorbell pop-up:** when a camera sees a person, or the doorbell rings, that camera pops up in the corner for 30 seconds. **OK** shows it big and **Back** closes it. **Settings → TV → Camera pop-up** can switch to any motion, or off. This works while the TV screen is showing. To pop the camera up over Jellyfin or any other app too, see `homeassistant/tv_doorbell.yaml`.
+- **Screensaver:** after 5 minutes without the remote (change it in Settings → TV), a big clock, the date, the weather and the next event over a slow show of your cameras. Any button wakes it, and that press does nothing else.
+- **Jellyfin "Continue watching":** press down from the apps for what you're part-way through. OK opens Jellyfin and starts it where you left off. Make an API key in Jellyfin (**Dashboard → API keys**) and add `&jellyfin=http://<jellyfin>:8096&jfkey=<key>` to the TV's address, plus `&jfuser=<name>` if it isn't the first administrator's list. You can also type these in Settings → TV. If Home Assistant is on https, Jellyfin has to be on https too, or the browser blocks it. If the show doesn't start by itself, Jellyfin is open and it's first in its own Continue watching row.
+- **Background:** a slow, soft glow in the colours of the app you're on.
+
 Inside the Home Assistant app on the TV, add it as a **Webpage** dashboard (no token needed). There it hides Home Assistant's sidebar and title bar, `&open=notify.mobile_app_<tv>` opens apps through the app, and `&home` makes that dashboard the TV login's start page.
 
 ## Time and weather tint
