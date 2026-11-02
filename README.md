@@ -156,6 +156,8 @@ Using it with the remote:
 
 **Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`, where the package is the `id=` in the app's Play Store address, or just the name for common ones such as Netflix, Disney+, Jellyfin, Kayo or Binge). Typing on a TV is slow, so you can also add `&apps=jellyfin,disney,kayo,binge` to the TV's address instead. The TV screen is dark unless you choose Light under Theme.
 
+**App logos:** the app cards show each app's name in its colours. To show the real logo instead, put a picture of it in Home Assistant at `config/www/dashboard/logos/<app>.png`, using the app's short name in lower case: `jellyfin.png`, `disney.png`, `kayo.png`, `binge.png`, `netflix.png`, `youtube.png`, `prime.png` and so on (an app you named yourself uses its name without spaces or symbols, so "My App" is `myapp.png`). A wide picture (about 16:9, like a Google TV banner) fills the whole card. A square icon sits in the middle on the app's colours. No logos come with the dashboard, so use pictures you have saved yourself. A good source is the app's icon from its Play Store page.
+
 Inside the Home Assistant app on the TV, add it as a **Webpage** dashboard (no token needed). There it hides Home Assistant's sidebar and title bar, `&open=notify.mobile_app_<tv>` opens apps through the app, and `&home` makes that dashboard the TV login's start page.
 
 ## Time and weather tint
