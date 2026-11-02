@@ -1864,35 +1864,84 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 .tv-readings li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv-readings li b { font-size: 1.1em; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* App row: wide banner cards like Google TV's home screen. The focused card grows, gets a white ring and a
+   glow in the app's colour, and shows its name underneath. */
 .tv-apps {
   display: flex;
-  gap: 1.1em;
-  padding: 0.9em;
-  margin: -0.9em;
+  gap: 1.3em;
+  padding: 2em 1.6em 2.4em;
+  margin: -2em -1.6em -1.9em;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .tv-apps::-webkit-scrollbar { display: none; }
 .tv-app {
+  position: relative;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 12.5em;
-  height: 6.6em;
-  padding: 0 0.8em;
+  width: 11.6em;
+  aspect-ratio: 16 / 9;
+  padding: 0 0.9em;
   border: 0;
-  border-radius: 0.8em;
-  background: var(--app-bg, var(--surface-2));
+  border-radius: 0.75em;
+  background:
+    radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--app-glow-2, var(--app-glow, #888)) 70%, transparent), transparent 70%),
+    radial-gradient(110% 140% at 0% 0%, color-mix(in srgb, var(--app-glow, #888) 55%, transparent), transparent 65%),
+    var(--app-bg, var(--surface-2));
   color: var(--app-fg, var(--text));
   font: inherit;
-  font-size: 1.15em;
   font-weight: 800;
-  letter-spacing: -0.01em;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
-  transition: transform 0.15s;
+  letter-spacing: -0.02em;
+  box-shadow: 0 0.3em 0.8em rgb(0 0 0 / 0.35);
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s;
 }
-.tv-app span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-size: 1.35em; }
-.tv-app:focus { transform: scale(1.06); }
+/* a soft light from the top edge, the "glass" on the artwork */
+.tv-app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.14), transparent 45%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  pointer-events: none;
+}
+.tv-app span {
+  position: relative;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  font-size: 1.55em;
+  text-shadow: 0 0.06em 0.3em rgb(0 0 0 / 0.35);
+}
+/* the name under the focused card */
+.tv-app::after {
+  content: attr(data-name);
+  position: absolute;
+  top: calc(100% + 0.6em);
+  left: -1em;
+  right: -1em;
+  color: var(--text);
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-0.3em);
+  transition: opacity 0.18s, transform 0.18s;
+}
+.tv-mode .tv-app:focus, .tv-mode .tv-app:focus-visible, .tv-app:focus, .tv-app:hover {
+  z-index: 1;
+  outline: none;
+  transform: scale(1.1);
+  box-shadow:
+    0 0 0 0.16em #fff,
+    0 0 1.6em 0.25em color-mix(in srgb, var(--app-glow, #fff) 55%, transparent),
+    0 0.8em 1.8em rgb(0 0 0 / 0.55);
+}
+.tv-app:focus::after, .tv-app:hover::after { opacity: 1; transform: none; }
 
 /* Cameras tab */
 .tv-camgrid-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18em); gap: var(--tv-gap); min-height: 0; }
@@ -8358,22 +8407,33 @@ const TV_APPS_DEFAULT = [
   'Plex = com.plexapp.android',
 ].join('\n');
 
-// Tile colours for apps people often add; anything else gets the plain card colour.
+// Banner colours for apps people often add: [background, wordmark, glow]. Our own simple artwork in each
+// brand's colours (no logos), like the wide app cards on Google TV's home screen. Anything else gets
+// colours made from its name, so every app still looks like a banner.
 const APP_COLORS = {
-  'com.google.android.youtube.tv': ['#ffffff', '#e62117'],
-  'com.netflix.ninja': ['#141414', '#e50914'],
-  'com.amazon.amazonvideo.livingroom': ['#1a98ff', '#ffffff'],
-  'com.disney.disneyplus': ['#0b1a4a', '#ffffff'],
-  'com.plexapp.android': ['#1f1f1f', '#e5a00d'],
-  'org.jellyfin.androidtv': ['#101322', '#aa5cc3'],
-  'com.wbd.stream': ['#002be7', '#ffffff'],
-  'com.hbo.hbonow': ['#000000', '#ffffff'],
-  'com.apple.atve.androidtv.appletv': ['#000000', '#ffffff'],
-  'com.spotify.tv.android': ['#121212', '#1ed760'],
-  'au.com.stan.and': ['#0a0a0a', '#00a8e1'],
-  'au.net.abc.iview': ['#000000', '#ffffff'],
-  'com.google.android.apps.youtube.unplugged': ['#ffffff', '#e62117'],
+  'com.google.android.youtube.tv': ['#1a1a1a', '#ffffff', '#ff0033'],
+  'com.netflix.ninja': ['#0b0b0b', '#e50914', '#b20710'],
+  'com.amazon.amazonvideo.livingroom': ['#0f1f33', '#ffffff', '#1a98ff'],
+  'com.disney.disneyplus': ['#0b1640', '#ffffff', '#2fb6ff'],
+  'com.plexapp.android': ['#1c1c1c', '#ffffff', '#e5a00d'],
+  'org.jellyfin.androidtv': ['#0f1126', '#ffffff', '#aa5cc3', '#00a4dc'],
+  'au.com.kayosports.tv': ['#071a14', '#ffffff', '#00d27a'],
+  'au.com.streamotion.ares.tv': ['#16061f', '#ffffff', '#f23d8a', '#7b2ff7'],
+  'com.wbd.stream': ['#001a8c', '#ffffff', '#3a5bff'],
+  'com.hbo.hbonow': ['#0b0b0b', '#ffffff', '#5b2bc2'],
+  'com.apple.atve.androidtv.appletv': ['#0b0b0b', '#ffffff', '#6e6e73'],
+  'com.spotify.tv.android': ['#121212', '#ffffff', '#1ed760'],
+  'au.com.stan.and': ['#060a10', '#ffffff', '#00a8e1'],
+  'au.net.abc.iview': ['#0b0b0b', '#ffffff', '#00c2b4'],
+  'com.google.android.apps.youtube.unplugged': ['#1a1a1a', '#ffffff', '#ff0033'],
 };
+
+/** Colours for an app we don't know, picked from its name so they stay the same. */
+function colorsFor(name) {
+  let h = 0;
+  for (const c of String(name)) h = (h * 31 + c.codePointAt(0)) % 360;
+  return [`hsl(${h} 40% 14%)`, '#ffffff', `hsl(${h} 75% 52%)`, `hsl(${(h + 40) % 360} 70% 45%)`];
+}
 
 // Apps that can be named on their own ("kayo", or ?apps=jellyfin,kayo in the address) without the package.
 const KNOWN_APPS = {
@@ -8396,9 +8456,9 @@ const knownKey = (name) => String(name).toLowerCase().replace(/[^a-z]/g, '').rep
 function parseApps(text) {
   return String(text || '').split(/\n|,(?![^=\n]*\.)/).map((line) => {
     const m = line.match(/^\s*(.+?)\s*=\s*([\w.]+)\s*$/);
-    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || null };
+    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || colorsFor(m[1]) };
     const known = line.trim() && KNOWN_APPS[knownKey(line)];
-    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || null } : null;
+    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || colorsFor(known[0]) } : null;
   }).filter(Boolean);
 }
 
@@ -8497,7 +8557,7 @@ const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === '
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '2 Nov 2026, 13:45 (4c6a9c7)';
+const DASH_BUILD = '2 Nov 2026, 14:00 (d398b7c)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -10202,7 +10262,7 @@ function tvAppsHtml() {
   const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
   if (!apps.length) return '';
   return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
-      ${a.colors ? `style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]}"` : ''}><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
+      data-name="${esc(a.name)}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
 }
 
 /** Motion, person and similar sensors on each camera, newest first: a simple alerts list. */
