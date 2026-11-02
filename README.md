@@ -156,6 +156,8 @@ Using it with the remote:
 
 **Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`, where the package is the `id=` in the app's Play Store address, or just the name for common ones such as Netflix, Disney+, Jellyfin, Kayo or Binge). Typing on a TV is slow, so you can also add `&apps=jellyfin,disney,kayo,binge` to the TV's address instead. The TV screen is dark unless you choose Light under Theme.
 
+Inside the Home Assistant app on the TV, add it as a **Webpage** dashboard (no token needed). There it hides Home Assistant's sidebar and title bar, `&open=notify.mobile_app_<tv>` opens apps through the app, and `&home` makes that dashboard the TV login's start page.
+
 ## Time and weather tint
 
 Today has a soft wash of colour behind it that follows the sun (`sun.sun`) and the weather: gold in the morning, blue at midday, rose at sunset, indigo at night, and greyer or bluer when it's cloudy or raining. The colours drift slowly as things change, and the other pages stay plain. Turn it off under **Settings → Look → Time and weather tint on Today**. It steps aside while the live sky is on.
