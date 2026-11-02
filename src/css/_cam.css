@@ -38,3 +38,4 @@
 .cam-status .btn .icon { width: 18px; height: 18px; }
 .cam-stage[data-phase="playing"] .cam-status { display: none; }
 .cam-stage[data-phase="failed"] .spinner { display: none; }
+.cam-stage[data-phase="still"] .cam-status { display: none; }
