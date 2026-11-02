@@ -212,7 +212,19 @@ const urlWall = kiosk || urlParams.has('wall');
 // ?tv: the TV home screen (Google TV / Android TV in Fully Kiosk Browser), worked with the remote.
 const tvMode = urlParams.has('tv');
 if (kiosk || tvMode) document.documentElement.classList.add('kiosk');
-if (tvMode) document.documentElement.classList.add('tv-mode');
+if (tvMode) {
+  document.documentElement.classList.add('tv-mode');
+  // Shown as a Home Assistant dashboard (in the app on the TV): hide HA's sidebar and title bar, which a remote can't work.
+  // Same as Profile → "Always hide the sidebar", and only on this device.
+  try {
+    const haRoot = window.parent !== window && window.parent.document.querySelector('home-assistant');
+    if (haRoot) {
+      haRoot.dispatchEvent(new CustomEvent('hass-dock-sidebar', { detail: { dock: 'always_hidden' }, bubbles: true, composed: true }));
+      // Newer Home Assistant also has a kiosk mode that hides its title bar; it lasts until the app reloads.
+      window.parent.dispatchEvent(new CustomEvent('hass-kiosk-mode', { detail: { enable: true } }));
+    }
+  } catch { /* not inside Home Assistant */ }
+}
 
 /** Pages turned off in Settings drop out of the menu. */
 function viewOn(v) {
