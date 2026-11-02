@@ -172,7 +172,7 @@ Add `&v=<number>` to the TV's address and raise the number after you change a lo
 - **Jellyfin "Continue watching":** press down from the apps for what you're part-way through. OK opens Jellyfin and starts it where you left off. Make an API key in Jellyfin (**Dashboard → API keys**) and add `&jellyfin=http://<jellyfin>:8096&jfkey=<key>` to the TV's address, plus `&jfuser=<name>` if it isn't the first administrator's list. You can also type these in Settings → TV. If Home Assistant is on https, Jellyfin has to be on https too, or the browser blocks it. If the show doesn't start by itself, Jellyfin is open and it's first in its own Continue watching row.
 - **Background:** a slow, soft glow in the colours of the app you're on.
 
-Inside the Home Assistant app on the TV, add it as a **Webpage** dashboard (no token needed). There it hides Home Assistant's sidebar and title bar, `&open=notify.mobile_app_<tv>` opens apps through the app, and `&home` makes that dashboard the TV login's start page.
+Inside the Home Assistant app on the TV, add it as a **Webpage** dashboard (no token needed). There it hides Home Assistant's sidebar and title bar, `&open=notify.mobile_app_<tv>` opens apps through the app, and `&home` makes that dashboard the TV login's start page. `&home` only does this for a non-administrator login on the TV itself, so opening the TV dashboard on your phone or computer changes nothing there.
 
 ## Time and weather tint
 
