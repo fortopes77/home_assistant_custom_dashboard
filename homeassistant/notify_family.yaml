@@ -22,8 +22,10 @@ sequence:
           entity_id: ai_task.google_ai_task   # your AI task entity
           task_name: Friendly notification
           instructions: >-
-            Rewrite this smart-home phone notification so it sounds friendly and natural, like a helpful
-            housemate. Keep every fact, name and number. Under 110 characters, at most one emoji.
+            Rewrite this smart-home phone notification so it reads friendly, warm and clear, in plain
+            everyday language. Keep every fact, name and number. Use Australian spelling but no slang,
+            regional expressions or greetings: never say g'day, mate, arvo, no worries, reckon, ripper or
+            similar. Don't start with a greeting. Under 110 characters, at most one emoji.
             Reply with the new message only.
 
             Title: {{ title | default('') }}
