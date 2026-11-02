@@ -8497,7 +8497,7 @@ const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === '
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '2 Nov 2026, 10:47 (1bda2fe)';
+const DASH_BUILD = '2 Nov 2026, 11:26 (e12e41a)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8544,7 +8544,7 @@ const DEFAULT_PREFS = {
   tvReadings: [],        // TV screen: sensors on the right; empty = a few temperature / air readings
   tvButtons: [],         // TV screen: scenes and scripts in the top bar; empty = the first two
   tvApps: TV_APPS_DEFAULT, // TV screen: "Name = package" per line
-  tvRemote: '',          // remote.* that opens apps when this isn't Fully Kiosk; '' = the first, 'none' = never
+  tvRemote: '',          // how app tiles open apps: '' = automatic (intent link on the TV, else the first remote.*), 'intent', a remote.* id, or 'none'
 };
 
 function readPrefs() {
@@ -10296,11 +10296,20 @@ function tvSetTab(tab) {
   $(`[data-tv-key="tab-${tab}"]`)?.focus();
 }
 
-/** Opens an Android TV app: through Fully Kiosk Browser if that's what shows this page, else HA's remote. */
+/**
+ * Opens an Android TV app. In Fully Kiosk Browser: its JavaScript interface (Plus) if turned on, else an
+ * intent: link, which the free version hands to Android. Elsewhere: Home Assistant's Android TV Remote.
+ */
 function tvLaunch(pkg, name) {
   if (window.fully?.startApplication) { window.fully.startApplication(pkg); return; }
-  const remotes = [...store.states.keys()].filter((id) => domainOf(id) === 'remote' && !isUnavailable(store.states.get(id)));
   const pick = store.prefs.tvRemote;
+  const onTv = /Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent);
+  if (pick === 'intent' || (pick === '' && onTv)) {
+    const url = `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LEANBACK_LAUNCHER;package=${pkg};end`;
+    if (window.__tvIntent) window.__tvIntent(url); else location.href = url;
+    return;
+  }
+  const remotes = [...store.states.keys()].filter((id) => domainOf(id) === 'remote' && !isUnavailable(store.states.get(id)));
   const remote = pick === 'none' ? '' : remotes.includes(pick) ? pick : remotes[0];
   if (!remote) { toast(`To open ${name}, show this page in Fully Kiosk Browser on the TV, or add the Android TV Remote integration.`); return; }
   call('remote', 'turn_on', { activity: pkg }, remote);
@@ -10360,11 +10369,12 @@ function tvSettingsHtml() {
     <details><summary>Buttons in the top bar${auto('tvButtons')}</summary>${pickList('tvButtons', buttons, 'No scenes or scripts in Home Assistant.')}</details>
     <label class="row tv-apps-edit"><span><b>Apps</b><small class="muted">One per line: <code>Name = Android package</code> (the package is in the app's Play Store address after <code>id=</code>), or just the name for ${esc(parseApps('youtube,netflix,prime,disney,plex,jellyfin,kayo,binge,stan,iview,spotify,appletv').map((a) => a.name).join(', '))}. Typing on a TV is slow, so you can also put <code>&amp;apps=jellyfin,disney,kayo,binge</code> in the TV's address instead.${urlParams.get('apps') ? ' <b>This screen\'s address sets its apps, so this list is not used here.</b>' : ''}</small></span></label>
     <textarea data-pref="tvApps" rows="6" spellcheck="false">${esc(p.tvApps)}</textarea>
-    <label class="row"><span><b>Open apps with</b><small class="muted">Inside Fully Kiosk Browser apps open directly. Anywhere else this needs Home Assistant's Android TV Remote integration.</small></span>
+    <label class="row"><span><b>Open apps with</b><small class="muted">Automatic: on the TV itself, Android opens the app (in Fully Kiosk Browser, free or Plus). In other browsers, Home Assistant's Android TV Remote integration, which can't open some apps by name.</small></span>
       <select data-pref="tvRemote">
-        <option value=""${p.tvRemote === '' ? ' selected' : ''}>${esc(remotes[0] ? `Automatic (${nameOf(remotes[0])})` : 'Automatic (no remote found)')}</option>
+        <option value=""${p.tvRemote === '' ? ' selected' : ''}>${esc(`Automatic (${/Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent) ? 'on the TV' : remotes[0] ? nameOf(remotes[0]) : 'no remote found'})`)}</option>
+        <option value="intent"${p.tvRemote === 'intent' ? ' selected' : ''}>The TV (Fully Kiosk Browser)</option>
         ${remotes.map((s) => `<option value="${esc(s.entity_id)}"${p.tvRemote === s.entity_id ? ' selected' : ''}>${esc(nameOf(s))}</option>`).join('')}
-        <option value="none"${p.tvRemote === 'none' ? ' selected' : ''}>Only Fully Kiosk</option>
+        <option value="none"${p.tvRemote === 'none' ? ' selected' : ''}>Only Fully Kiosk's JavaScript interface</option>
       </select></label>
   </section>`;
 }
