@@ -57,13 +57,16 @@ const KNOWN_APPS = {
 };
 const knownKey = (name) => String(name).toLowerCase().replace(/[^a-z]/g, '').replace(/^(disneyplus|disney)$/, 'disney').replace(/^primevideo$/, 'prime');
 
+/** The logo file an app looks for next to the page: logos/<key>.png, e.g. logos/disney.png, logos/myapp.png. */
+const logoKey = (name) => { const k = knownKey(name); return KNOWN_APPS[k] ? k : String(name).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+
 /** "Name = package" lines, or just a known name per line or comma ("Jellyfin, Disney+, Kayo, Binge"). */
 export function parseApps(text) {
   return String(text || '').split(/\n|,(?![^=\n]*\.)/).map((line) => {
     const m = line.match(/^\s*(.+?)\s*=\s*([\w.]+)\s*$/);
-    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || colorsFor(m[1]) };
+    if (m) return { name: m[1], pkg: m[2], key: logoKey(m[1]), colors: APP_COLORS[m[2]] || colorsFor(m[1]) };
     const known = line.trim() && KNOWN_APPS[knownKey(line)];
-    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || colorsFor(known[0]) } : null;
+    return known ? { name: known[0], pkg: known[1], key: knownKey(line), colors: APP_COLORS[known[1]] || colorsFor(known[0]) } : null;
   }).filter(Boolean);
 }
 

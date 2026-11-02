@@ -195,6 +195,13 @@
   font-size: 1.55em;
   text-shadow: 0 0.06em 0.3em rgb(0 0 0 / 0.35);
 }
+/* the app's own logo, when its picture is in logos/ */
+.tv-app-logo { display: none; position: absolute; pointer-events: none; }
+.tv-app[data-logo="wide"] .tv-app-logo { display: block; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.tv-app[data-logo="icon"] .tv-app-logo { display: block; inset: 18% 0; width: 100%; height: 64%; object-fit: contain; }
+.tv-app[data-logo="wide"] > span, .tv-app[data-logo="icon"] > span { visibility: hidden; }
+.tv-app[data-logo="wide"]::before { z-index: 1; }
+
 /* the name under the focused card */
 .tv-app::after {
   content: attr(data-name);

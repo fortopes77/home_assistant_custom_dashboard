@@ -1744,8 +1744,26 @@ function tvAppsHtml() {
   const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
   if (!apps.length) return '';
   return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
-      data-name="${esc(a.name)}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
+      data-name="${esc(a.name)}" data-logo="${tvLogos.get(a.key) || ''}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span>${tvLogos.get(a.key) === 'none' ? '' : `<img class="tv-app-logo" src="logos/${esc(a.key)}.png" data-logo-key="${esc(a.key)}" alt="" decoding="async">`}</button>`).join('')}</nav>`;
 }
+
+// App logos are the user's own image files in Home Assistant (config/www/dashboard/logos/<app>.png), so none
+// ship with the dashboard. Each is checked once: a wide picture fills the card like a Google TV banner, a square
+// icon sits in the middle, and a missing one leaves the name on the card.
+const tvLogos = new Map(); // key -> 'wide' | 'icon' | 'none'
+document.addEventListener('load', (e) => {
+  const img = e.target;
+  if (!img.matches?.('img.tv-app-logo')) return;
+  const kind = img.naturalWidth / img.naturalHeight > 1.4 ? 'wide' : 'icon';
+  tvLogos.set(img.dataset.logoKey, kind);
+  img.closest('.tv-app').dataset.logo = kind;
+}, true);
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!img.matches?.('img.tv-app-logo')) return;
+  tvLogos.set(img.dataset.logoKey, 'none');
+  img.remove();
+}, true);
 
 /** Motion, person and similar sensors on each camera, newest first: a simple alerts list. */
 function tvAlerts(cams) {
