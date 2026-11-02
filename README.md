@@ -162,6 +162,7 @@ Add `&v=<number>` to the TV's address and raise the number after you change a lo
 
 ### More on the TV screen
 
+- **Light mode for slow TVs:** add `&lite` to the address (or turn on **Settings → TV → Light mode**). The background stays still, focus is a plain white ring with no glow or zoom, and the camera shows a fresh picture every 10 seconds instead of live video; press OK on it for live, full screen.
 - **The room the TV is in:** the room gets its own tab (named after the room) with every light, blind and thermostat there, the room's readings, and what's playing. Home shows a small card with quick buttons for them. By default the room is the area of the TV's own device in Home Assistant (the Home Assistant app on the TV, named by `&open=notify.mobile_app_<tv>`), so when you move the TV to another room, change that device's area in **Settings → Devices** and the screen follows. You can also pick a room in **Settings → TV**, or add `&room=living room` to the address. Only devices exposed to your voice assistant show.
 - **Up next:** today's remaining events (then tomorrow's) from the family calendar, with who they're for, and how many things are on the shopping list.
 - **Solar at a glance:** battery level, solar power right now, buying or selling, and whether it's peak or off-peak. Peak and off-peak come from a utility meter's tariff `select` (one with a "peak" option).

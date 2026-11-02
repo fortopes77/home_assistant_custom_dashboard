@@ -90,6 +90,7 @@ const DEFAULT_PREFS = {
   tvRoom: '',            // TV screen: the room it's in (area id); empty = the TV device's area in Home Assistant
   tvSaver: 5,            // TV screen: minutes before the screensaver; 0 = never
   tvPopup: 'person',     // TV screen: pop a camera up for 'person' (and doorbells), 'motion' or 'off'
+  tvLite: false,         // TV screen: light mode for slow TVs (also ?lite in the address)
   jfUrl: '',             // Jellyfin server for "Continue watching", e.g. http://192.168.1.20:8096
   jfKey: '',             // Jellyfin API key
   jfUser: '',            // Jellyfin user name; empty = the first administrator
@@ -221,6 +222,12 @@ const tvMode = urlParams.has('tv');
 if (kiosk || tvMode) document.documentElement.classList.add('kiosk');
 if (tvMode) {
   document.documentElement.classList.add('tv-mode');
+  // The moving colour behind the screen, in its own element so changing its colour doesn't restyle the page.
+  const aurora = document.createElement('div');
+  aurora.className = 'tv-aurora';
+  aurora.setAttribute('aria-hidden', 'true');
+  const addAurora = () => document.body.prepend(aurora);
+  if (document.body) addAurora(); else document.addEventListener('DOMContentLoaded', addAurora);
   // Shown as a Home Assistant dashboard (in the app on the TV): hide HA's sidebar and title bar, which a remote can't work.
   // Same as Profile → "Always hide the sidebar", and only on this device.
   try {
@@ -2228,6 +2235,23 @@ function tvPlay() {
   const cam = tv.stage?.dataset.cam;
   if (!cam || tv.player || document.hidden || !store.client) return;
   const stage = tv.stage;
+  if (tvLite() && !tv.full) {
+    // A still every 10 seconds instead of live video, which a slow TV struggles to decode while you move around.
+    stage.dataset.phase = 'still';
+    $('.cam-kind', stage).textContent = 'OK for live';
+    const still = () => {
+      const url = cameraStillUrl(base(), store.states.get(cam), 1280);
+      const img = $('.cam-poster', stage);
+      if (!url || !img) return;
+      const pre = new Image();
+      pre.onload = () => { img.src = url; stage.classList.add('has-pic'); };
+      pre.src = url;
+    };
+    still();
+    const timer = setInterval(still, 10_000);
+    tv.player = { stop: () => clearInterval(timer) };
+    return;
+  }
   tv.player = new CameraPlayer({
     client: store.client, entityId: cam, getState: () => store.states.get(cam), stage,
     onState: ({ phase, kind, message }) => {
@@ -2254,6 +2278,15 @@ function tvLeave() {
 function tvSetFull(on) {
   tv.full = on;
   document.documentElement.classList.toggle('tv-full', on);
+  // Light mode shows a still that refreshes; the live video only plays full screen.
+  if (tvLite()) { tvStop(); tvPlay(); }
+}
+
+/** Light mode for slow TVs: ?lite in the address, or Settings → TV. */
+function tvLite() {
+  const on = urlParams.has('lite') || !!store.prefs.tvLite;
+  document.documentElement.classList.toggle('tv-lite', on);
+  return on;
 }
 
 function tvSwitchCam(step) {
@@ -2347,9 +2380,9 @@ document.addEventListener('focusin', (e) => {
   // The background takes the focused app's colours, like Google TV's home screen.
   const app = e.target.closest?.('.tv-app');
   if (app) {
-    const root = document.documentElement.style;
-    root.setProperty('--tv-amb', app.style.getPropertyValue('--app-glow'));
-    root.setProperty('--tv-amb-2', app.style.getPropertyValue('--app-glow-2'));
+    const amb = document.querySelector('.tv-aurora')?.style;
+    amb?.setProperty('--tv-amb', app.style.getPropertyValue('--app-glow'));
+    amb?.setProperty('--tv-amb-2', app.style.getPropertyValue('--app-glow-2'));
   }
   const v = e.target.closest?.('.v-tv');
   if (!v || !tvMode) return;
@@ -2395,6 +2428,8 @@ function tvSettingsHtml() {
     })()}
     <label class="row"><span><b>Screensaver</b><small class="muted">A big clock, the weather and your cameras when the remote hasn't been touched for a while. Any button wakes it.</small></span>
       <select data-pref="tvSaver">${SAVER_CHOICES.map(([v, l]) => `<option value="${v}"${Number(p.tvSaver) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="row"><span><b>Light mode</b><small class="muted">For a slow TV: a still background, no glows, and the camera shows a picture every 10 seconds until you press OK for live.${urlParams.has('lite') ? ' <b>This screen\'s address turns it on (lite).</b>' : ''}</small></span>
+      <input type="checkbox" data-pref="tvLite"${tvLite() ? ' checked' : ''}${urlParams.has('lite') ? ' disabled' : ''}></label>
     <label class="row"><span><b>Camera pop-up</b><small class="muted">When someone's at the door, their camera pops up in the corner for 30 seconds. OK shows it big, Back closes it. This works while the TV screen is showing; for a pop-up over other apps, see the README.</small></span>
       <select data-pref="tvPopup">${POPUP_CHOICES.map(([v, l]) => `<option value="${v}"${(p.tvPopup || 'person') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
     <details><summary>Jellyfin: continue watching${tvJellyfin().ok ? '' : ' <small class="muted">(off)</small>'}</summary>
@@ -2733,6 +2768,7 @@ const VIEWS = {
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
   tv(view) {
+    tvLite();
     const slot = $('.tv-cam-slot', view);
     if (slot && tv.tab === 'home' && tv.cam) { slot.append(tvStage(tv.cam)); tvPlay(); } else { tvStop(); tv.stage = null; }
     if (!view.contains(document.activeElement) || document.activeElement === view) $('[data-tv-start]', view)?.focus({ preventScroll: true });

@@ -467,25 +467,23 @@
 /* ---------- the background: slow aurora in the focused app's colours ---------- */
 @property --tv-amb { syntax: "<color>"; inherits: true; initial-value: #7b4dff; }
 @property --tv-amb-2 { syntax: "<color>"; inherits: true; initial-value: #00a4dc; }
-:root.tv-mode { transition: --tv-amb 1.6s ease, --tv-amb-2 1.6s ease; }
+/* The aurora sits in its own element so a colour change only restyles it, not the whole page (slow TV chips). */
+.tv-aurora { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; transition: --tv-amb 1.6s ease, --tv-amb-2 1.6s ease; }
+:root:not(.tv-mode) .tv-aurora { display: none; }
 :root.tv-mode body { background: #090b10; }
-:root.tv-mode body::before, :root.tv-mode body::after {
+.tv-aurora::before, .tv-aurora::after {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: -25%;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 1;
-  transition: none;
   will-change: transform;
 }
-:root.tv-mode body::before {
+.tv-aurora::before {
   background:
     radial-gradient(30% 38% at 22% 78%, color-mix(in srgb, var(--tv-amb) 42%, transparent), transparent 70%),
     radial-gradient(34% 40% at 80% 24%, color-mix(in srgb, var(--tv-amb-2) 34%, transparent), transparent 70%);
   animation: tv-aurora-a 70s ease-in-out infinite alternate;
 }
-:root.tv-mode body::after {
+.tv-aurora::after {
   background:
     radial-gradient(26% 30% at 62% 70%, color-mix(in srgb, var(--tv-amb-2) 22%, transparent), transparent 70%),
     radial-gradient(24% 30% at 35% 30%, color-mix(in srgb, var(--tv-amb) 18%, transparent), transparent 70%);
@@ -494,8 +492,8 @@
 @keyframes tv-aurora-a { from { transform: translate(-4%, 3%) rotate(0deg); } to { transform: translate(5%, -4%) rotate(12deg); } }
 @keyframes tv-aurora-b { from { transform: translate(5%, -2%) rotate(0deg) scale(1.05); } to { transform: translate(-5%, 4%) rotate(-10deg) scale(0.95); } }
 :root.tv-mode[data-theme="light"] body { background: var(--bg); }
-:root.tv-mode[data-theme="light"] body::before, :root.tv-mode[data-theme="light"] body::after { opacity: 0.45; }
-@media (prefers-reduced-motion: reduce) { :root.tv-mode body::before, :root.tv-mode body::after { animation: none; } }
+:root.tv-mode[data-theme="light"] .tv-aurora { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) { .tv-aurora::before, .tv-aurora::after { animation: none; } }
 
 /* cards let the colour through a little */
 .tv-mode .v-tv .tv-card, .tv-mode .tv-np { background: color-mix(in srgb, var(--surface) 74%, transparent); border-color: rgb(255 255 255 / 0.07); }
@@ -508,3 +506,15 @@
 .tv-weather .tv-solar { grid-column: 1 / -1; }
 .tv-weather .tv-wx-big { width: 2.2em; height: 2.2em; }
 .tv-weather .tv-wx-now > b { font-size: 2.2em; }
+
+/* Light mode (?lite, or Settings → TV): for slow TVs. A still background, no glows or easing, plain focus ring. */
+:root.tv-lite .tv-aurora { transition: none; }
+:root.tv-lite .tv-aurora::before, :root.tv-lite .tv-aurora::after { animation: none; will-change: auto; inset: 0; }
+:root.tv-lite .tv-aurora::after { display: none; }
+:root.tv-lite.tv-mode *:not(.spinner), :root.tv-lite.tv-mode *::before, :root.tv-lite.tv-mode *::after { transition: none !important; animation: none !important; }
+:root.tv-lite .tv-app, :root.tv-lite .tv-show-art { box-shadow: none; }
+:root.tv-lite .tv-mode .tv-app:focus, :root.tv-lite.tv-mode .tv-app:focus, :root.tv-lite.tv-mode .tv-app:focus-visible, :root.tv-lite .tv-app:hover,
+:root.tv-lite.tv-mode .tv-show:focus .tv-show-art { transform: none; box-shadow: 0 0 0 0.18em #fff; }
+:root.tv-lite.tv-mode .tv-tabs button:focus-visible, :root.tv-lite.tv-mode .tv-tabs button:hover { text-shadow: none; }
+:root.tv-lite.tv-mode .tv-tabs button::after { box-shadow: none; }
+:root.tv-lite.tv-mode .v-tv .tv-card, :root.tv-lite.tv-mode .tv-np { background: var(--surface); }
