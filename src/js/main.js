@@ -229,9 +229,10 @@ if (tvMode) {
   const addAurora = () => document.body.prepend(aurora);
   if (document.body) addAurora(); else document.addEventListener('DOMContentLoaded', addAurora);
   // Shown as a Home Assistant dashboard (in the app on the TV): hide HA's sidebar and title bar, which a remote can't work.
-  // Same as Profile → "Always hide the sidebar", and only on this device.
+  // Same as Profile → "Always hide the sidebar", and only on this device. Only on the TV itself: a phone or computer
+  // that opens the TV dashboard keeps its sidebar.
   try {
-    const haRoot = window.parent !== window && window.parent.document.querySelector('home-assistant');
+    const haRoot = tvOnDevice() && window.parent !== window && window.parent.document.querySelector('home-assistant');
     if (haRoot) {
       haRoot.dispatchEvent(new CustomEvent('hass-dock-sidebar', { detail: { dock: 'always_hidden' }, bubbles: true, composed: true }));
       // Newer Home Assistant also has a kiosk mode that hides its title bar; it lasts until the app reloads.
@@ -2342,6 +2343,11 @@ function tvLaunch(pkg, name) {
  */
 async function tvClaimHome(client) {
   if (!tvMode || !urlParams.has('home') || store.authMode !== 'embedded') return;
+  // Only the TV's own login, on the TV: an administrator (or anyone on a phone or computer) opening the TV dashboard
+  // to look at it must not have every one of their devices start on it.
+  if (!tvOnDevice()) return;
+  const user = await client.send({ type: 'auth/current_user' }).catch(() => null);
+  if (!user || user.is_admin) return;
   let panel = '';
   try { panel = window.parent.location.pathname.split('/')[1] || ''; } catch { return; }
   if (!panel) return;
