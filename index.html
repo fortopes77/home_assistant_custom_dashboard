@@ -8497,7 +8497,7 @@ const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === '
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '2 Nov 2026, 11:26 (e12e41a)';
+const DASH_BUILD = '2 Nov 2026, 12:07 (b64f8ad)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -10300,11 +10300,17 @@ function tvSetTab(tab) {
  * Opens an Android TV app. In Fully Kiosk Browser: its JavaScript interface (Plus) if turned on, else an
  * intent: link, which the free version hands to Android. Elsewhere: Home Assistant's Android TV Remote.
  */
+/** Showing on the TV itself (or another Android box), not a phone or computer. Fully's user agent can be changed, so only rule out what is clearly not a TV. */
+function tvOnDevice() {
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return !/Mobile/i.test(ua) || /\b(TV|AFT\w*|BRAVIA|Streamer|Chromecast)\b/i.test(ua);
+  return tvMode && !/Windows|Macintosh|X11|CrOS|iPhone|iPad/i.test(ua);
+}
+
 function tvLaunch(pkg, name) {
   if (window.fully?.startApplication) { window.fully.startApplication(pkg); return; }
-  const pick = store.prefs.tvRemote;
-  const onTv = /Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent);
-  if (pick === 'intent' || (pick === '' && onTv)) {
+  const pick = urlParams.get('open') || store.prefs.tvRemote; // ?open=intent or ?open=remote.xxx in the address wins
+  if (pick === 'intent' || (pick === '' && tvOnDevice())) {
     const url = `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LEANBACK_LAUNCHER;package=${pkg};end`;
     if (window.__tvIntent) window.__tvIntent(url); else location.href = url;
     return;
@@ -10371,7 +10377,7 @@ function tvSettingsHtml() {
     <textarea data-pref="tvApps" rows="6" spellcheck="false">${esc(p.tvApps)}</textarea>
     <label class="row"><span><b>Open apps with</b><small class="muted">Automatic: on the TV itself, Android opens the app (in Fully Kiosk Browser, free or Plus). In other browsers, Home Assistant's Android TV Remote integration, which can't open some apps by name.</small></span>
       <select data-pref="tvRemote">
-        <option value=""${p.tvRemote === '' ? ' selected' : ''}>${esc(`Automatic (${/Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent) ? 'on the TV' : remotes[0] ? nameOf(remotes[0]) : 'no remote found'})`)}</option>
+        <option value=""${p.tvRemote === '' ? ' selected' : ''}>${esc(`Automatic (${tvOnDevice() ? 'on the TV' : remotes[0] ? nameOf(remotes[0]) : 'no remote found'})`)}</option>
         <option value="intent"${p.tvRemote === 'intent' ? ' selected' : ''}>The TV (Fully Kiosk Browser)</option>
         ${remotes.map((s) => `<option value="${esc(s.entity_id)}"${p.tvRemote === s.entity_id ? ' selected' : ''}>${esc(nameOf(s))}</option>`).join('')}
         <option value="none"${p.tvRemote === 'none' ? ' selected' : ''}>Only Fully Kiosk's JavaScript interface</option>
