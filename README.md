@@ -152,7 +152,7 @@ Using it with the remote:
 - The arrows move between buttons, and focus starts on the first app.
 - On the camera, **left** and **right** change camera and **OK** fills the screen. **Back** leaves full screen and the Cameras tab.
 - The Cameras tab shows every camera and recent motion and person detections; pick one to watch it big.
-- App tiles open apps through Fully Kiosk. In any other browser they use Home Assistant's **Android TV Remote** integration (`remote.turn_on` with the app's package), if you have it.
+- App tiles open apps through Android on the TV: in Fully Kiosk Browser (the free version is enough) they open an `intent:` link, or use Fully's JavaScript interface if you have Plus and turned it on. In other browsers they use Home Assistant's **Android TV Remote** integration (`remote.turn_on` with the app's package), which can't open some apps by name since a Play Store change.
 
 **Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`, where the package is the `id=` in the app's Play Store address, or just the name for common ones such as Netflix, Disney+, Jellyfin, Kayo or Binge). Typing on a TV is slow, so you can also add `&apps=jellyfin,disney,kayo,binge` to the TV's address instead. The TV screen is dark unless you choose Light under Theme.
 
