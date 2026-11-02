@@ -8497,7 +8497,7 @@ const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === '
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '2 Nov 2026, 13:41 (0644012)';
+const DASH_BUILD = '2 Nov 2026, 13:45 (4c6a9c7)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -10340,6 +10340,22 @@ function tvLaunch(pkg, name) {
   toast(`Opening ${name}…`);
 }
 
+/**
+ * ?tv&home inside a Home Assistant dashboard: make that dashboard this login's start page, so the Home Assistant
+ * app on the TV always opens on it (a remote can't reach Profile → Dashboard). Only for the login showing it.
+ */
+async function tvClaimHome(client) {
+  if (!tvMode || !urlParams.has('home') || store.authMode !== 'embedded') return;
+  let panel = '';
+  try { panel = window.parent.location.pathname.split('/')[1] || ''; } catch { return; }
+  if (!panel) return;
+  try {
+    const cur = (await client.send({ type: 'frontend/get_user_data', key: 'core' }))?.value || {};
+    if (cur.default_panel === panel) return;
+    await client.send({ type: 'frontend/set_user_data', key: 'core', value: { ...cur, default_panel: panel } });
+  } catch { /* older Home Assistant: set it in Profile instead */ }
+}
+
 function tvKeydown(e) {
   if (!(tvMode || ui.view === 'tv') || e.defaultPrevented) return;
   const t = e.target;
@@ -11591,6 +11607,7 @@ async function start() {
     render();
     client.send({ type: 'auth/current_user' }).then((u) => { store.user = u; queueRefresh(); }).catch(() => {});
     loadExposed();
+    tvClaimHome(client);
     planStore.areas = store.areas;
     loadFloorPlan(client);
     updateSky({ instant: true });
