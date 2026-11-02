@@ -1723,17 +1723,23 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 
 .v-tv {
   --tv-gap: 1.4em;
+  font-size: clamp(12px, 1.5vw, 34px);
+}
+/* the screen itself; Jellyfin's "Continue watching" sits below it, reached by pressing down */
+.tv-screen {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: var(--tv-gap);
   min-height: calc(100dvh - 90px);
-  font-size: clamp(12px, 1.5vw, 34px);
 }
 .tv-mode .topbar { display: none; }
 .tv-mode .main { padding: 0; min-height: 100dvh; }
 .tv-mode .view { padding: 0; }
 .tv-mode .view, :root[data-view="tv"] .view { max-width: none; }
-.tv-mode .v-tv { height: 100dvh; min-height: 0; padding: 2.2em 3em 2em; overflow: hidden; }
+.tv-mode .v-tv { height: 100dvh; overflow: hidden auto; scrollbar-width: none; scroll-behavior: smooth; }
+.tv-mode .v-tv::-webkit-scrollbar { display: none; }
+.tv-mode .tv-screen { height: 100dvh; min-height: 0; padding: 2.2em 3em 2em; overflow: hidden; }
 .tv-mode body { overflow: hidden; }
 .tv-mode .v-settings { font-size: 1.15rem; padding: 24px 5vw; }
 .tv-back { margin-bottom: 14px; }
@@ -1747,7 +1753,12 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 }
 
 .tv-top { display: flex; align-items: center; justify-content: space-between; gap: 1em; }
-.tv-tabs { display: flex; gap: 0.6em; }
+.tv-tabs { display: flex; gap: 0.6em; flex: none; }
+.tv-tabs button { white-space: nowrap; }
+.tv-actions { justify-content: flex-end; }
+.tv-actions .tv-pill:not(.tv-gear) { min-width: 0; max-width: 17em; flex-shrink: 1; font-size: 0.88em; height: 2.95em; }
+.tv-actions .tv-pill:not(.tv-gear) > :not(.icon) { overflow: hidden; text-overflow: ellipsis; }
+.tv-clock { white-space: nowrap; }
 .tv-tabs button {
   padding: 0.35em 0.6em;
   border: 0;
@@ -1835,7 +1846,11 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 .tv-full .tv-cam { position: fixed; inset: 0; z-index: 90; border-radius: 0; outline: none !important; }
 .tv-full .tv-cam-arrow { opacity: 1; }
 
-.tv-side { display: flex; flex-direction: column; gap: var(--tv-gap); min-height: 0; }
+.tv-side { display: flex; flex-direction: column; gap: 0.9em; min-height: 0; overflow: hidden; }
+.tv-main { display: flex; flex-direction: column; gap: 0.9em; min-height: 0; }
+.tv-main .tv-cam-wrap { flex: 1; }
+.tv-side > .tv-card { flex: none; padding: 0.8em 1.1em; }
+.tv-side > .tv-next { flex: 1 1 0; min-height: 2.6em; }
 .tv-card {
   padding: 1.1em 1.3em;
   border-radius: 0.9em;
@@ -1849,10 +1864,11 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 .tv-wx-now > span { display: grid; gap: 0.1em; }
 .tv-wx-word { font-size: 1.15em; font-weight: 600; }
 .tv-wx-now small { color: var(--muted); }
-.tv-wx-hours { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3em; margin: 0.9em 0 0; padding: 0; list-style: none; text-align: center; }
+.tv-wx-hours { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.2em; margin: 0; padding: 0; list-style: none; text-align: center; }
 .tv-wx-hours li { display: grid; justify-items: center; gap: 0.2em; }
 .tv-wx-hours small { color: var(--muted); font-size: 0.8em; white-space: nowrap; }
-.tv-wx-hours .icon { width: 1.6em; height: 1.6em; }
+.tv-wx-hours .icon { width: 1.35em; height: 1.35em; }
+.tv-wx-hours li { font-size: 0.82em; }
 .tv-wx-hours b { font-weight: 600; }
 
 .tv-readings { flex: 1; overflow: hidden; }
@@ -1880,7 +1896,7 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 11.6em;
+  width: 10.4em;
   aspect-ratio: 16 / 9;
   padding: 0 0.9em;
   border: 0;
@@ -1990,7 +2006,7 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 .tv-alerts button.on small { color: var(--danger); font-weight: 700; }
 
 /* a TV page opened in an ordinary browser (#/tv without ?tv) */
-:root:not(.tv-mode)[data-view="tv"] .v-tv { aspect-ratio: 16 / 9; min-height: 0; max-height: calc(100dvh - 90px); }
+:root:not(.tv-mode)[data-view="tv"] .tv-screen { aspect-ratio: 16 / 9; min-height: 0; max-height: calc(100dvh - 90px); }
 
 /* Settings → TV */
 #tv textarea {
@@ -2005,6 +2021,190 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
   resize: vertical;
 }
 #tv summary .btn { min-height: 30px; margin-left: 8px; padding: 0 10px; font-size: 0.8rem; }
+
+/* ---------- side cards: up next, the room ---------- */
+.tv-h, .tv-next h3, .tv-room h3, .tv-ctl h3, .tv-shelf h3 { margin: 0 0 0.45em; font-size: 0.85em; font-weight: 600; color: var(--muted); }
+.tv-readings .tv-h { color: var(--text); font-size: 0.95em; }
+.tv-next { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.tv-next h3 { display: flex; justify-content: space-between; gap: 0.6em; }
+.tv-next h3 .tv-shop-count { display: inline-flex; align-items: center; gap: 0.3em; color: var(--text); }
+.tv-next h3 .icon { width: 1.1em; height: 1.1em; }
+.tv-next ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.35em; }
+.tv-next li { display: grid; grid-template-columns: 0.25em auto minmax(0, 1fr) auto; align-items: baseline; gap: 0.55em; }
+.tv-next li::before { content: ''; align-self: stretch; border-radius: 1em; background: var(--cal, var(--accent)); }
+.tv-next li.quiet { grid-template-columns: 1fr; color: var(--muted); }
+.tv-next li.quiet::before { display: none; }
+.tv-next small { color: var(--muted); font-size: 0.8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-next span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.tv-next i { font-style: normal; font-size: 0.72em; padding: 0.1em 0.5em; border-radius: 1em; background: color-mix(in srgb, var(--cal, var(--accent)) 30%, transparent); }
+.tv-shop { display: flex; align-items: flex-start; gap: 0.5em; margin: 0.6em 0 0; font-size: 0.9em; color: var(--muted); }
+.tv-shop .icon { flex: none; width: 1.2em; height: 1.2em; }
+.tv-shop span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tv-shop b { color: var(--text); font-weight: 600; }
+
+.tv-room { flex: none; }
+.tv-room h3 { margin-bottom: 0.35em; display: flex; justify-content: space-between; align-items: baseline; color: var(--text); font-size: 0.95em; }
+.tv-room h3 b { font-size: 1.1em; font-variant-numeric: tabular-nums; }
+.tv-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; gap: 0.5em; }
+.tv-chip {
+  display: flex; align-items: center; gap: 0.4em; min-width: 0;
+  padding: 0.4em 0.5em; border: 0; border-radius: 0.6em;
+  background: var(--surface-2); color: var(--text); font: inherit; text-align: left;
+}
+.tv-chip .icon { flex: none; width: 1.3em; height: 1.3em; color: var(--muted); }
+.tv-chip.on .icon { color: var(--accent); }
+.tv-chip span { display: grid; min-width: 0; font-size: 0.85em; font-weight: 600; }
+.tv-chip span, .tv-chip small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-chip small { color: var(--muted); font-weight: 500; font-size: 0.9em; }
+
+/* ---------- solar in the top bar ---------- */
+.tv-solar { display: flex; align-items: center; gap: 0.9em; margin-top: 0.6em; padding-top: 0.55em; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85em; white-space: nowrap; overflow: hidden; }
+.tv-solar .icon { width: 1.2em; height: 1.2em; margin-right: 0.25em; vertical-align: -0.2em; }
+.tv-solar b { color: var(--text); font-weight: 600; margin-right: 0.2em; }
+.tv-solar .pos { color: var(--positive); font-weight: 600; }
+.tv-solar .neg { color: var(--danger); font-weight: 600; }
+.tv-tariff { padding: 0.15em 0.6em; border-radius: 1em; background: color-mix(in srgb, var(--positive) 22%, transparent); color: var(--text); font-weight: 600; }
+.tv-tariff.peak { background: color-mix(in srgb, var(--danger) 28%, transparent); }
+
+/* ---------- now playing ---------- */
+.tv-np {
+  flex: none;
+  display: flex; align-items: center; gap: 1em; min-width: 0;
+  padding: 0.6em 0.8em; border-radius: 0.9em; background: var(--surface); border: 1px solid var(--border);
+}
+.tv-np-art { flex: none; display: grid; place-items: center; width: 2.6em; height: 2.6em; border-radius: 0.5em; object-fit: cover; background: var(--surface-2); }
+.tv-np-art .icon { width: 1.6em; height: 1.6em; color: var(--muted); }
+.tv-np-text { flex: 1; display: grid; min-width: 0; }
+.tv-np-text b, .tv-np-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-np-text b { font-size: 1.05em; }
+.tv-np-text small { color: var(--muted); }
+.tv-btns { display: flex; align-items: center; gap: 0.5em; flex: none; }
+.tv-round {
+  display: grid; place-items: center; width: 2.3em; height: 2.3em; padding: 0;
+  border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text); font: inherit;
+}
+.tv-round .icon { width: 1.35em; height: 1.35em; }
+.tv-round.big { width: 2.7em; height: 2.7em; background: var(--text); color: var(--bg); }
+
+/* ---------- the room tab ---------- */
+.tv-roomtab { display: flex; flex-direction: column; gap: var(--tv-gap); min-height: 0; overflow: hidden; padding: 0.3em; margin: -0.3em; }
+.tv-ctl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16em, 1fr)); gap: var(--tv-gap); align-items: start; min-height: 0; }
+.tv-ctl-col { display: flex; flex-direction: column; gap: var(--tv-gap); min-width: 0; }
+.tv-ctl h3 { display: flex; align-items: center; justify-content: space-between; gap: 0.6em; color: var(--text); font-size: 1em; }
+.tv-ctl h3 small { color: var(--muted); font-weight: 500; font-size: 0.85em; text-transform: capitalize; }
+.tv-ctl ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.45em; }
+.tv-row-btn {
+  display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; align-items: center; gap: 0.7em; width: 100%;
+  padding: 0.55em 0.75em; border: 0; border-radius: 0.6em; background: var(--surface-2); color: var(--text); font: inherit; text-align: left;
+}
+.tv-row-btn .icon { width: 1.4em; height: 1.4em; color: var(--muted); }
+.tv-row-btn.on .icon { color: var(--accent); }
+.tv-row-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.tv-row-btn b { color: var(--muted); font-weight: 500; font-size: 0.9em; }
+.tv-mini { padding: 0.25em 0.8em; border: 0; border-radius: 1em; background: var(--surface-2); color: var(--text); font: inherit; font-size: 0.8em; font-weight: 600; }
+.tv-blind { display: flex; align-items: center; justify-content: space-between; gap: 0.8em; }
+.tv-blind > span:first-child { display: grid; min-width: 0; }
+.tv-blind b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-blind small { color: var(--muted); }
+.tv-clim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8em; }
+.tv-clim-set { min-width: 3.2em; text-align: center; font-size: 2em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tv-clim-row .tv-pill { margin-left: auto; }
+.tv-pill.on { background: color-mix(in srgb, var(--accent) 35%, var(--surface-2)); }
+.tv-empty { display: grid; place-items: center; text-align: center; color: var(--muted); }
+.tab-room .tv-readings { flex: none; }
+
+/* ---------- Jellyfin: continue watching ---------- */
+.tv-shelf { padding: 0 3em 2.5em; }
+.tv-shelf h3 { color: var(--text); font-size: 1.05em; margin-bottom: 0.2em; }
+.tv-resume { display: flex; gap: 1.3em; padding: 1.4em 1.6em 0.6em; margin: -0.8em -1.6em 0; overflow-x: auto; scrollbar-width: none; }
+.tv-resume::-webkit-scrollbar { display: none; }
+.tv-show {
+  flex: 0 0 auto; display: grid; gap: 0.15em; width: 15em; padding: 0; border: 0;
+  background: none; color: var(--text); font: inherit; text-align: left;
+}
+.tv-mode .tv-show:focus-visible, .tv-show:focus { outline: none; }
+.tv-show-art {
+  position: relative; display: block; aspect-ratio: 16 / 9; margin-bottom: 0.45em; overflow: hidden;
+  border-radius: 0.75em; background: var(--surface-2); box-shadow: 0 0.3em 0.8em rgb(0 0 0 / 0.35);
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s;
+}
+.tv-show-art img { width: 100%; height: 100%; object-fit: cover; }
+.tv-show-art i { position: absolute; left: 0; bottom: 0; height: 0.28em; background: #fff; }
+.tv-show:focus .tv-show-art, .tv-show:hover .tv-show-art { transform: scale(1.06); box-shadow: 0 0 0 0.16em #fff, 0 0.8em 1.8em rgb(0 0 0 / 0.55); }
+.tv-show b, .tv-show small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-show small { color: var(--muted); font-size: 0.85em; }
+
+/* ---------- camera pop-up ---------- */
+.tv-pop {
+  position: fixed; right: 2.5vw; bottom: 4vh; z-index: 120; width: 30vw; min-width: 280px;
+  border-radius: 1vw; overflow: hidden; background: #000; color: #fff;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85), 0 1.5vw 4vw rgb(0 0 0 / 0.6);
+  font-size: clamp(12px, 1.3vw, 30px);
+  transform: translateY(130%); transition: transform 0.35s cubic-bezier(0.2, 0, 0, 1);
+}
+.tv-pop.show { transform: none; }
+.tv-pop:empty { display: none; }
+.tv-pop-stage { position: relative; aspect-ratio: 16 / 9; max-height: none; border-radius: 0; }
+.tv-pop-stage > img, .tv-pop-stage > video { width: 100%; height: 100%; object-fit: cover; }
+.tv-pop-text { display: grid; gap: 0.1em; margin: 0; padding: 0.6em 0.9em 0.7em; background: #111; }
+.tv-pop-text small { color: rgb(255 255 255 / 0.65); }
+
+/* ---------- screensaver ---------- */
+.tv-saver { position: fixed; inset: 0; z-index: 110; background: #000; color: #fff; opacity: 0; pointer-events: none; transition: opacity 1.2s; }
+.tv-saver.show { opacity: 1; pointer-events: auto; cursor: none; }
+.tv-saver-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 2.5s; filter: brightness(0.55) saturate(0.9); }
+.tv-saver-bg.on { opacity: 1; animation: tv-drift 40s ease-in-out infinite alternate; }
+@keyframes tv-drift { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.12) translate(-2%, -1.5%); } }
+.tv-saver-info { position: absolute; left: 5vw; bottom: 7vh; text-shadow: 0 0.1em 0.6em rgb(0 0 0 / 0.6); font-size: clamp(14px, 1.8vw, 40px); }
+.tv-saver-info time { display: block; font-size: 4.5em; font-weight: 600; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.tv-saver-info p { margin: 0.35em 0 0; font-size: 1.2em; }
+.tv-saver-info .icon { width: 1.2em; height: 1.2em; margin-right: 0.4em; vertical-align: -0.2em; }
+.tv-saver-next { opacity: 0.85; }
+
+/* ---------- the background: slow aurora in the focused app's colours ---------- */
+@property --tv-amb { syntax: "<color>"; inherits: true; initial-value: #7b4dff; }
+@property --tv-amb-2 { syntax: "<color>"; inherits: true; initial-value: #00a4dc; }
+:root.tv-mode { transition: --tv-amb 1.6s ease, --tv-amb-2 1.6s ease; }
+:root.tv-mode body { background: #090b10; }
+:root.tv-mode body::before, :root.tv-mode body::after {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 1;
+  transition: none;
+  will-change: transform;
+}
+:root.tv-mode body::before {
+  background:
+    radial-gradient(30% 38% at 22% 78%, color-mix(in srgb, var(--tv-amb) 42%, transparent), transparent 70%),
+    radial-gradient(34% 40% at 80% 24%, color-mix(in srgb, var(--tv-amb-2) 34%, transparent), transparent 70%);
+  animation: tv-aurora-a 70s ease-in-out infinite alternate;
+}
+:root.tv-mode body::after {
+  background:
+    radial-gradient(26% 30% at 62% 70%, color-mix(in srgb, var(--tv-amb-2) 22%, transparent), transparent 70%),
+    radial-gradient(24% 30% at 35% 30%, color-mix(in srgb, var(--tv-amb) 18%, transparent), transparent 70%);
+  animation: tv-aurora-b 95s ease-in-out infinite alternate;
+}
+@keyframes tv-aurora-a { from { transform: translate(-4%, 3%) rotate(0deg); } to { transform: translate(5%, -4%) rotate(12deg); } }
+@keyframes tv-aurora-b { from { transform: translate(5%, -2%) rotate(0deg) scale(1.05); } to { transform: translate(-5%, 4%) rotate(-10deg) scale(0.95); } }
+:root.tv-mode[data-theme="light"] body { background: var(--bg); }
+:root.tv-mode[data-theme="light"] body::before, :root.tv-mode[data-theme="light"] body::after { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) { :root.tv-mode body::before, :root.tv-mode body::after { animation: none; } }
+
+/* cards let the colour through a little */
+.tv-mode .v-tv .tv-card, .tv-mode .tv-np { background: color-mix(in srgb, var(--surface) 74%, transparent); border-color: rgb(255 255 255 / 0.07); }
+.tv-mode .tv-pill, .tv-mode .tv-chip, .tv-mode .tv-round:not(.big), .tv-mode .tv-row-btn, .tv-mode .tv-mini {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+/* weather: now on the left, the next few hours beside it, solar underneath */
+.tv-weather { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 1em; }
+.tv-weather .tv-solar { grid-column: 1 / -1; }
+.tv-weather .tv-wx-big { width: 2.2em; height: 2.2em; }
+.tv-weather .tv-wx-now > b { font-size: 2.2em; }
 </style>
   <script type="module">
 // ---- icons.js ----
@@ -2082,6 +2282,10 @@ const ICONS = {
   sunSnowflake: 'M12.92 1.58L11.18 2.58L12.39 4.67L11.8 6.85L9 7.6L7.38 6L7.42 3.59L5.43 3.59L5.43 5.42L3.59 5.42L3.6 7.42L6 7.42L7.65 9.03L6.9 11.82L4.68 12.4L2.59 11.2L1.59 12.93L3.17 13.84L2.26 15.42L4 16.42L5.19 14.33L7.42 13.75L7.92 14.26L9.32 12.86L8.78 12.32L9.53 9.54L12.32 8.78L12.85 9.32L14.26 7.91L13.73 7.37L14.32 5.19L16.41 4L15.41 2.25L13.83 3.16L12.92 1.58M20.72 4L4 20.72L5.27 22L10.16 17.11C10.63 17.43 11.15 17.68 11.71 17.83C14.38 18.55 17.12 16.96 17.83 14.29C18.22 12.86 17.93 11.36 17.11 10.16L22 5.27L20.72 4M18.74 9C19.18 9.63 19.53 10.38 19.75 11.19C19.97 12 20.03 12.81 19.96 13.61L22.65 10.41L18.74 9M19.32 15.95C19 16.67 18.5 17.35 17.93 17.94C17.34 18.53 16.66 19 15.96 19.34L20.05 20.06L19.32 15.95M9 18.71L10.41 22.66L13.59 19.95C12.81 20 12 19.97 11.19 19.76C10.36 19.54 9.62 19.17 9 18.71Z',
   waterPercent: 'M12,3.25C12,3.25 6,10 6,14C6,17.32 8.69,20 12,20A6,6 0 0,0 18,14C18,10 12,3.25 12,3.25M14.47,9.97L15.53,11.03L9.53,17.03L8.47,15.97M9.75,10A1.25,1.25 0 0,1 11,11.25A1.25,1.25 0 0,1 9.75,12.5A1.25,1.25 0 0,1 8.5,11.25A1.25,1.25 0 0,1 9.75,10M14.25,14.5A1.25,1.25 0 0,1 15.5,15.75A1.25,1.25 0 0,1 14.25,17A1.25,1.25 0 0,1 13,15.75A1.25,1.25 0 0,1 14.25,14.5Z',
   play: 'M8,5.14V19.14L19,12.14L8,5.14Z',
+  pause: 'M14,19H18V5H14M6,19H10V5H6V19Z',
+  skipNext: 'M16,18H18V6H16M6,18L14.5,12L6,6V18Z',
+  skipPrev: 'M6,18V6H8V18H6M9.5,12L18,6V18L9.5,12Z',
+  volumeLow: 'M5,9V15H9L14,20V4L9,9H5M18.5,12C18.5,10.23 17.5,8.71 16,7.97V16C17.5,15.29 18.5,13.76 18.5,12Z',
   volumeHigh: 'M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z',
   volumeOff: 'M12,4L9.91,6.09L12,8.18M4.27,3L3,4.27L7.73,9H3V15H7L12,20V13.27L16.25,17.53C15.58,18.04 14.83,18.46 14,18.7V20.77C15.38,20.45 16.63,19.82 17.68,18.96L19.73,21L21,19.73L12,10.73M19,12C19,12.94 18.8,13.82 18.46,14.64L19.97,16.15C20.62,14.91 21,13.5 21,12C21,7.72 18,4.14 14,3.23V5.29C16.89,6.15 19,8.83 19,12M16.5,12C16.5,10.23 15.5,8.71 14,7.97V10.18L16.45,12.63C16.5,12.43 16.5,12.21 16.5,12Z',
   fullscreen: 'M5,5H10V7H7V10H5V5M14,5H19V10H17V7H14V5M17,14H19V19H14V17H17V14M10,17V19H5V14H7V17H10Z',
@@ -8560,6 +8764,144 @@ const TV_KEYS = {
 };
 const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 4;
 
+// ---- tvplus.js ----
+// TV home screen extras: which room the TV is in, the doorbell pop-up's sensors, the peak / off-peak tariff,
+// and Jellyfin's "continue watching" list. Drawn in main.js.
+
+
+const SAVER_CHOICES = [[0, 'Never'], [2, 'After 2 min'], [5, 'After 5 min'], [10, 'After 10 min'], [20, 'After 20 min']];
+const POPUP_CHOICES = [['person', 'People and the doorbell'], ['motion', 'Any motion'], ['off', 'Off']];
+
+const slug = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * The area the TV is in. A pick (?room= in the address, or Settings) can be an area id or its name; otherwise
+ * it's the area of the TV's own device in Home Assistant (the Home Assistant app on the TV, named by ?open=).
+ */
+function pickRoom({ pick, areas, states, areaOf, tvDevice }) {
+  if (pick) {
+    if (areas.has(pick)) return pick;
+    const want = slug(pick);
+    for (const [id, name] of areas) if (slug(id) === want || slug(name) === want) return id;
+  }
+  if (tvDevice) {
+    for (const id of states.keys()) {
+      const obj = id.slice(id.indexOf('.') + 1);
+      if (obj !== tvDevice && !obj.startsWith(`${tvDevice}_`)) continue;
+      const area = areaOf(id);
+      if (area) return area;
+    }
+  }
+  return '';
+}
+
+const DOORBELL_ID = /_(person|visitor|doorbell|ding|ring|ringing)$/;
+
+/** A sensor that should pop the camera up: people and doorbells, or (mode 'motion') any movement. */
+function popupSensor(s, mode) {
+  if (mode === 'off' || isUnavailable(s)) return false;
+  const d = domainOf(s.entity_id);
+  if (d === 'event') return s.attributes?.device_class === 'doorbell';
+  if (d !== 'binary_sensor') return false;
+  if (DOORBELL_ID.test(s.entity_id) || /\b(person|visitor|doorbell)\b/i.test(s.attributes?.friendly_name || '')) return true;
+  return mode === 'motion' && (MOTION_CLASSES.has(s.attributes?.device_class) || /_(motion|vehicle|animal|pet)$/.test(s.entity_id));
+}
+
+/** "Peak", "Off-peak" or "Shoulder" from a utility meter's tariff select, or '' when there isn't one. */
+function tariffNow(states) {
+  for (const s of states.values()) {
+    if (domainOf(s.entity_id) !== 'select' || isUnavailable(s)) continue;
+    const opts = (s.attributes?.options || []).map((o) => String(o).toLowerCase());
+    if (!opts.some((o) => /peak/.test(o))) continue;
+    const v = String(s.state).toLowerCase();
+    if (/off.?peak/.test(v)) return 'Off-peak';
+    if (/peak/.test(v)) return 'Peak';
+    return v.replace(/^\w/, (c) => c.toUpperCase());
+  }
+  return '';
+}
+
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+/** Jellyfin's own API, with an API key (Jellyfin → Dashboard → API keys). */
+class Jellyfin {
+  constructor({ url, key, user }) {
+    this.url = String(url || '').replace(/\/+$/, '');
+    this.key = key;
+    this.user = user;
+    this.uid = '';
+  }
+
+  get ok() { return !!(this.url && this.key); }
+
+  headers() {
+    return { Authorization: `MediaBrowser Client="Home dashboard", Device="TV", DeviceId="ha-dash-tv", Version="1", Token="${this.key}"` };
+  }
+
+  async req(path, opts = {}) {
+    const r = await fetch(this.url + path, { ...opts, headers: this.headers() });
+    if (!r.ok) throw new Error(`Jellyfin said ${r.status}`);
+    return r.status === 204 ? null : r.json().catch(() => null);
+  }
+
+  async userId() {
+    if (this.uid) return this.uid;
+    const users = await this.req('/Users');
+    const want = slug(this.user);
+    const u = (want && users.find((x) => slug(x.Name) === want)) || users.find((x) => x.Policy?.IsAdministrator) || users[0];
+    if (!u) throw new Error('No Jellyfin users');
+    this.uid = u.Id;
+    return this.uid;
+  }
+
+  image(it) {
+    const at = (id, kind) => `${this.url}/Items/${id}/Images/${kind}?maxWidth=560&quality=85`;
+    if (it.ImageTags?.Thumb) return at(it.Id, 'Thumb');
+    if (it.ParentThumbItemId) return at(it.ParentThumbItemId, 'Thumb');
+    if (it.BackdropImageTags?.length) return at(it.Id, 'Backdrop');
+    if (it.ParentBackdropItemId) return at(it.ParentBackdropItemId, 'Backdrop');
+    return at(it.Id, 'Primary');
+  }
+
+  /** What's part-watched, most recent first. */
+  async resume(limit = 12) {
+    const uid = await this.userId();
+    const q = `Limit=${limit}&MediaTypes=Video&EnableImageTypes=Thumb,Backdrop,Primary&ImageTypeLimit=1&Fields=ParentId`;
+    let res;
+    try { res = await this.req(`/UserItems/Resume?userId=${uid}&${q}`); } catch { res = await this.req(`/Users/${uid}/Items/Resume?${q}`); }
+    return (res?.Items || []).map((it) => ({
+      id: it.Id,
+      title: it.SeriesName || it.Name,
+      sub: it.SeriesName ? `${it.ParentIndexNumber != null && it.IndexNumber != null ? `S${it.ParentIndexNumber} E${it.IndexNumber} · ` : ''}${it.Name}` : String(it.ProductionYear || ''),
+      progress: Math.round(it.UserData?.PlayedPercentage || 0),
+      ticks: it.UserData?.PlaybackPositionTicks || 0,
+      image: this.image(it),
+    }));
+  }
+
+  /**
+   * Plays an item on the Jellyfin app on the TV once it shows up as a session (call after opening the app).
+   * Returns false if no TV session appears in time; the app is open anyway.
+   */
+  async playOnTv(itemId, ticks, { since = Date.now(), wait = 15_000 } = {}) {
+    const uid = await this.userId();
+    const end = Date.now() + wait;
+    while (Date.now() < end) {
+      const sessions = await this.req(`/Sessions?controllableByUserId=${uid}`).catch(() => []);
+      const tv = (sessions || [])
+        .filter((s) => s.SupportsRemoteControl && /android ?tv|google ?tv/i.test(`${s.Client} ${s.DeviceName}`)
+          && new Date(s.LastActivityDate).getTime() >= since - 5000)
+        .sort((a, b) => String(b.LastActivityDate).localeCompare(String(a.LastActivityDate)))[0];
+      if (tv) {
+        await this.req(`/Sessions/${tv.Id}/Playing?playCommand=PlayNow&itemIds=${itemId}&startPositionTicks=${ticks || 0}`, { method: 'POST' });
+        return true;
+      }
+      await sleep(1000);
+    }
+    return false;
+  }
+}
+
 // ---- main.js ----
 // The dashboard: Today (the day at a glance, notifications, news), Energy (solar, battery, selling to
 // the grid), Places (where everyone is) and Home (floor plan and rooms). Devices are the ones exposed
@@ -8567,7 +8909,7 @@ const isBackKey = (e) => e.key === 'Escape' || e.key === 'GoBack' || e.key === '
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '2 Nov 2026, 14:04 (566f68b)';
+const DASH_BUILD = '2 Nov 2026, 15:00 (89d55c0)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8614,6 +8956,12 @@ const DEFAULT_PREFS = {
   tvReadings: [],        // TV screen: sensors on the right; empty = a few temperature / air readings
   tvButtons: [],         // TV screen: scenes and scripts in the top bar; empty = the first two
   tvApps: TV_APPS_DEFAULT, // TV screen: "Name = package" per line
+  tvRoom: '',            // TV screen: the room it's in (area id); empty = the TV device's area in Home Assistant
+  tvSaver: 5,            // TV screen: minutes before the screensaver; 0 = never
+  tvPopup: 'person',     // TV screen: pop a camera up for 'person' (and doorbells), 'motion' or 'off'
+  jfUrl: '',             // Jellyfin server for "Continue watching", e.g. http://192.168.1.20:8096
+  jfKey: '',             // Jellyfin API key
+  jfUser: '',            // Jellyfin user name; empty = the first administrator
   tvRemote: '',          // how app tiles open apps: '' = automatic (intent link on the TV, else the first remote.*), 'intent', a remote.* id, or 'none'
 };
 
@@ -10164,6 +10512,17 @@ const tv = {
   hourlyAt: 0,
   player: null,
   stage: null,        // kept between redraws so the video keeps playing
+  seen: new Map(),    // pop-up sensors: entity_id -> when it last went off (so each visit pops up once)
+  seenReady: false,
+  pop: null,          // the camera popped up: { cam, player, timer }
+  resume: [],         // Jellyfin "continue watching"
+  resumeAt: 0,
+  resumeErr: '',
+  jf: null,
+  lastInput: Date.now(),
+  saver: false,
+  saverAt: 0,
+  saverCam: 0,
 };
 
 /** Effective lists: what was picked in Settings, or the automatic choice. */
@@ -10220,8 +10579,8 @@ function tvWeatherHtml() {
   const fc = forecastFor(new Date());
   const rain = fc?.precipitation_probability;
   const soon = Date.now() - 30 * 60_000;
-  const hours = tv.hourly.filter((f) => new Date(f.datetime).getTime() >= soon).slice(0, 6);
-  const days = hours.length ? [] : day.forecast.slice(1, 7);
+  const hours = tv.hourly.filter((f) => new Date(f.datetime).getTime() >= soon).slice(0, 3);
+  const days = hours.length ? [] : day.forecast.slice(1, 4);
   const word = weatherWord(w.state).replace(/^\w/, (c) => c.toUpperCase());
   return `<section class="tv-card tv-weather">
     <div class="tv-wx-now">
@@ -10235,11 +10594,15 @@ function tvWeatherHtml() {
       const label = hours.length ? d.toLocaleTimeString(undefined, { hour: 'numeric' }) : d.toLocaleDateString(undefined, { weekday: 'short' });
       return `<li><small>${esc(label)}</small>${icon(weatherIcon(f.condition, f.is_daytime === false))}<b>${deg(f.temperature)}</b></li>`;
     }).join('')}</ol>` : ''}
+    ${tvSolarHtml()}
   </section>`;
 }
 
-function tvReadingsHtml() {
-  const ids = tvList('tvReadings');
+function tvReadingsHtml(area = '') {
+  // Picked in Settings, else the TV room's own readings, else a few from around the house.
+  const picked = (store.prefs.tvReadings || []).filter((id) => store.states.has(id));
+  const inRoom = area ? autoReadings(store.states, (id) => areaOf(id) === area && (listed(id) || !store.entityInfo.get(id)?.category)) : [];
+  const ids = picked.length ? picked : inRoom.length ? inRoom : tvList('tvReadings');
   if (!ids.length) return '';
   const groups = new Map();
   for (const id of ids) {
@@ -10247,20 +10610,26 @@ function tvReadingsHtml() {
     if (!groups.has(area)) groups.set(area, []);
     groups.get(area).push(store.states.get(id));
   }
-  return `<section class="tv-card tv-readings">${[...groups].map(([area, list]) => `
+  return `<section class="tv-card tv-readings"><h3 class="tv-h">Readings</h3>${[...groups].map(([area, list]) => `
     <h3>${esc(area)}</h3>
     <ul>${list.map((s) => `<li>${icon(iconFor(s))}<span>${esc(nameOf(s))}</span><b>${esc(formatState(s))}</b></li>`).join('')}</ul>`).join('')}
   </section>`;
+}
+
+/** Home, the TV's room (by name) and Cameras. */
+function tvTabs() {
+  const area = tvRoom();
+  return [['home', 'Home'], ...(area ? [['room', store.areas.get(area) || 'Room']] : []), ['cameras', 'Cameras']];
 }
 
 function tvTopHtml() {
   const buttons = tvList('tvButtons').map((id) => store.states.get(id));
   return `<header class="tv-top">
     <nav class="tv-tabs">
-      ${[['home', 'Home'], ['cameras', 'Cameras']].map(([k, l]) => `<button type="button" data-tv-tab="${k}" data-tv-key="tab-${k}"${tv.tab === k ? ' aria-current="page"' : ''}>${l}</button>`).join('')}
+      ${tvTabs().map(([k, l]) => `<button type="button" data-tv-tab="${k}" data-tv-key="tab-${k}"${tv.tab === k ? ' aria-current="page"' : ''}>${l}</button>`).join('')}
     </nav>
     <div class="tv-actions">
-      ${buttons.map((s) => `<button type="button" class="tv-pill" data-tv-run="${esc(s.entity_id)}" data-tv-key="run-${esc(s.entity_id)}">${icon(iconFor(s))}${esc(nameOf(s))}</button>`).join('')}
+      ${buttons.map((s) => `<button type="button" class="tv-pill" data-tv-run="${esc(s.entity_id)}" data-tv-key="run-${esc(s.entity_id)}">${icon(iconFor(s))}<span>${esc(nameOf(s))}</span></button>`).join('')}
       <a class="tv-pill tv-gear" href="#/settings?section=tv" data-tv-key="settings" aria-label="Settings">${icon('settings')}</a>
       <span class="tv-status" data-status="${esc(store.status)}"></span>
       <time class="tv-clock">${esc(fmtTime(new Date()))}</time>
@@ -10272,7 +10641,7 @@ function tvAppsHtml() {
   const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
   if (!apps.length) return '';
   return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
-      data-name="${esc(a.name)}" data-logo="${tvLogos.get(a.key) || ''}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span>${tvLogos.get(a.key) === 'none' ? '' : `<img class="tv-app-logo" src="logos/${esc(a.key)}.png" data-logo-key="${esc(a.key)}" alt="" decoding="async">`}</button>`).join('')}</nav>`;
+      data-name="${esc(a.name)}" data-logo="${tvLogos.get(a.key) || ''}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span>${tvLogos.get(a.key) === 'none' ? '' : `<img class="tv-app-logo" src="logos/${esc(a.key)}.png${urlParams.get('v') ? `?v=${esc(urlParams.get('v'))}` : ''}" data-logo-key="${esc(a.key)}" alt="" decoding="async">`}</button>`).join('')}</nav>`;
 }
 
 // App logos are the user's own image files in Home Assistant (config/www/dashboard/logos/<app>.png), so none
@@ -10291,6 +10660,380 @@ document.addEventListener('error', (e) => {
   if (!img.matches?.('img.tv-app-logo')) return;
   tvLogos.set(img.dataset.logoKey, 'none');
   img.remove();
+}, true);
+
+// ---------- the TV's room: lights, blinds and climate ----------
+
+/** The Home Assistant app on the TV, from ?open=notify.mobile_app_<tv>: its device's area is the TV's room. */
+function tvDeviceSlug() {
+  const m = String(urlParams.get('open') || store.prefs.tvRemote || '').match(/^notify\.mobile_app_(\w+)$/);
+  return m ? m[1] : '';
+}
+
+function tvRoom() {
+  return pickRoom({ pick: urlParams.get('room') || store.prefs.tvRoom, areas: store.areas, states: store.states, areaOf, tvDevice: tvDeviceSlug() });
+}
+
+const TV_SWITCHES = /light|lamp|fan|heater|blanket|lights/i;
+
+/** What the TV's room has that the remote can work: lights (and light-like switches, fans), blinds, climate, players. */
+function tvRoomThings(area) {
+  const out = { lights: [], blinds: [], climate: [], players: [], ents: [] };
+  if (!area) return out;
+  out.ents = areaEntities(area).map(shown);
+  for (const s of out.ents) {
+    const d = domainOf(s.entity_id);
+    if ((d === 'light' && !isStatusLight(s)) || d === 'fan' || (d === 'switch' && TV_SWITCHES.test(nameOf(s)))) out.lights.push(s);
+    else if (d === 'cover' && !isCoverDoor(s)) out.blinds.push(s);
+    else if (d === 'climate') out.climate.push(s);
+    else if (d === 'media_player') out.players.push(s);
+  }
+  return out;
+}
+
+/** "Living Room Blind Left" in the Living Room is just "Blind Left". */
+function tvShortName(s, area) {
+  const room = store.areas.get(area) || '';
+  const n = nameOf(s);
+  const cut = room ? n.replace(new RegExp(`^${reEsc(room)}\\s*`, 'i'), '') : n;
+  return (cut || n).replace(/^\w/, (c) => c.toUpperCase());
+}
+
+const coverPos = (s) => (s.attributes?.current_position != null ? Number(s.attributes.current_position) : s.state === 'closed' ? 0 : 100);
+function coverWord(s) {
+  if (s.state === 'opening' || s.state === 'closing') return s.state.replace(/^\w/, (c) => c.toUpperCase());
+  const p = coverPos(s);
+  return p <= 0 ? 'Closed' : p >= 100 ? 'Open' : `${p}% open`;
+}
+function lightWord(s) {
+  if (s.state !== 'on') return 'Off';
+  const b = s.attributes?.brightness;
+  return b ? `On · ${Math.round((b / 255) * 100)}%` : 'On';
+}
+function climateTarget(s) {
+  const t = s.attributes?.temperature ?? s.attributes?.target_temp_high ?? null;
+  return t == null ? null : Number(t);
+}
+
+/** Home's small room card: a quick button for each light and blind, and the temperature. */
+function tvRoomCardHtml() {
+  const area = tvRoom();
+  if (!area) return '';
+  const t = tvRoomThings(area);
+  const temp = roomTemperature(t.ents) || t.climate.find((c) => c.attributes?.current_temperature != null);
+  const tempVal = temp ? (domainOf(temp.entity_id) === 'climate' ? temp.attributes.current_temperature : temp.state) : null;
+  // One of each kind first (a light, a blind, the aircon), then more lights and blinds.
+  const order = [t.lights[0], t.blinds[0], t.climate[0], ...t.lights.slice(1), ...t.blinds.slice(1)].filter(Boolean).slice(0, 3);
+  const pickT = { lights: t.lights.filter((s) => order.includes(s)), blinds: t.blinds.filter((s) => order.includes(s)), climate: t.climate.filter((s) => order.includes(s)) };
+  const chips = [
+    ...pickT.lights.map((s) => `<button type="button" class="tv-chip${s.state === 'on' ? ' on' : ''}" data-tv-toggle="${esc(s.entity_id)}" data-tv-key="chip-${esc(s.entity_id)}">${icon(s.state === 'on' ? iconFor(s) : 'lightOff')}<span>${esc(tvShortName(s, area))}<small>${esc(lightWord(s))}</small></span></button>`),
+    ...pickT.blinds.map((s) => `<button type="button" class="tv-chip${coverPos(s) > 0 ? ' on' : ''}" data-tv-cover-flip="${esc(s.entity_id)}" data-tv-key="chip-${esc(s.entity_id)}">${icon(coverPos(s) > 0 ? 'blindOpen' : 'cover')}<span>${esc(tvShortName(s, area))}<small>${esc(coverWord(s))}</small></span></button>`),
+    ...pickT.climate.map((s) => `<button type="button" class="tv-chip${s.state !== 'off' ? ' on' : ''}" data-tv-room-go data-tv-key="chip-${esc(s.entity_id)}">${icon('thermostatAuto')}<span>${esc(tvShortName(s, area))}<small>${s.state === 'off' ? 'Off' : `${esc(s.state.replace(/_/g, ' '))} · ${deg(climateTarget(s))}`}</small></span></button>`),
+  ];
+  if (!chips.length && tempVal == null) return '';
+  return `<section class="tv-card tv-room">
+    <h3><span>${esc(store.areas.get(area))}</span>${tempVal != null ? `<b>${deg(tempVal)}</b>` : ''}</h3>
+    ${chips.length ? `<div class="tv-chips">${chips.join('')}</div>` : ''}
+  </section>`;
+}
+
+/** The room tab: every light, blind and thermostat in the TV's room, its readings and what's playing there. */
+function tvRoomTabHtml() {
+  const area = tvRoom();
+  if (!area) return `<div class="tv-card tv-empty"><p>Which room is this TV in? Pick it in Settings → TV, or add <code>&amp;room=living room</code> to the TV's address.</p></div>`;
+  const t = tvRoomThings(area);
+  const key = (s, k) => `data-tv-key="${k}-${esc(s.entity_id)}"`;
+  const anyOn = t.lights.filter((s) => s.state === 'on');
+  const lights = t.lights.length ? `<section class="tv-card tv-ctl"><h3>Lights${anyOn.length > 1 ? `<button type="button" class="tv-mini" data-tv-off="${esc(anyOn.map((s) => s.entity_id).join(' '))}" data-tv-key="lights-off">All off</button>` : ''}</h3>
+    <ul>${t.lights.map((s) => `<li><button type="button" class="tv-row-btn${s.state === 'on' ? ' on' : ''}" data-tv-toggle="${esc(s.entity_id)}" ${key(s, 'tg')}>${icon(s.state === 'on' ? iconFor(s) : 'lightOff')}<span>${esc(tvShortName(s, area))}</span><b>${esc(lightWord(s))}</b></button></li>`).join('')}</ul></section>` : '';
+  const blindRow = (ids, label, word, k) => `<li class="tv-blind"><span><b>${esc(label)}</b><small>${esc(word)}</small></span>
+      <span class="tv-btns">${[['open', 'arrowUp', 'Open'], ['stop', 'stop', 'Stop'], ['close', 'arrowDown', 'Close']].map(([a, ic, l]) => `<button type="button" class="tv-round" data-tv-cover="${esc(ids)}" data-act="${a}" data-tv-key="${k}-${a}" aria-label="${l} ${esc(label)}">${icon(ic)}</button>`).join('')}</span></li>`;
+  const blinds = t.blinds.length ? `<section class="tv-card tv-ctl"><h3>Blinds</h3><ul>
+    ${t.blinds.length > 1 ? blindRow(t.blinds.map((s) => s.entity_id).join(' '), 'All blinds', t.blinds.every((s) => coverPos(s) <= 0) ? 'Closed' : t.blinds.every((s) => coverPos(s) >= 100) ? 'Open' : 'Partly open', 'blinds-all') : ''}
+    ${t.blinds.map((s) => blindRow(s.entity_id, tvShortName(s, area), coverWord(s), `bl-${s.entity_id}`)).join('')}</ul></section>` : '';
+  const climate = t.climate.map((s) => {
+    const target = climateTarget(s);
+    const cur = s.attributes?.current_temperature;
+    return `<section class="tv-card tv-ctl tv-clim"><h3>${esc(tvShortName(s, area))}<small>${s.state === 'off' ? 'Off' : esc(s.state.replace(/_/g, ' '))}${cur != null ? ` · ${deg(cur)} now` : ''}</small></h3>
+      <div class="tv-clim-row">
+        <button type="button" class="tv-round" data-tv-clim="${esc(s.entity_id)}" data-act="down" ${key(s, 'cd')} aria-label="Cooler">${icon('minus')}</button>
+        <b class="tv-clim-set">${target != null ? deg(target) : '–'}</b>
+        <button type="button" class="tv-round" data-tv-clim="${esc(s.entity_id)}" data-act="up" ${key(s, 'cu')} aria-label="Warmer">${icon('plus')}</button>
+        <button type="button" class="tv-pill${s.state !== 'off' ? ' on' : ''}" data-tv-clim="${esc(s.entity_id)}" data-act="power" ${key(s, 'cp')}>${icon('power')}${s.state === 'off' ? 'Turn on' : 'Turn off'}</button>
+      </div></section>`;
+  }).join('');
+  const readings = tvReadingsHtml(area);
+  const playing = tvNowPlayingHtml(t.players);
+  // Columns: lights with the readings under them, the blinds, the climate.
+  const cards = [lights + readings, blinds, climate].filter(Boolean).map((c) => `<div class="tv-ctl-col">${c}</div>`);
+  if (!cards.length && !playing) return `<div class="tv-card tv-empty"><p>Nothing to control in ${esc(store.areas.get(area))} yet. Only devices exposed to your voice assistant show here.</p></div>`;
+  return `<div class="tv-roomtab">${playing}<div class="tv-ctl-grid">${cards.join('')}</div></div>`;
+}
+
+// ---------- now playing ----------
+
+const PLAYING = ['playing', 'paused', 'buffering'];
+
+/** Something playing: the TV room's players first, then anything else in the house that's playing. */
+function tvPlayer(roomPlayers) {
+  const active = (list) => list.filter((s) => PLAYING.includes(s.state) && (s.attributes?.media_title || s.attributes?.app_name));
+  const room = active(roomPlayers);
+  const rank = (s) => (s.state === 'playing' ? 0 : 1);
+  if (room.length) return room.sort((a, b) => rank(a) - rank(b))[0];
+  return active([...store.states.values()].filter((s) => domainOf(s.entity_id) === 'media_player')).sort((a, b) => rank(a) - rank(b))[0] || null;
+}
+
+function tvNowPlayingHtml(roomPlayers) {
+  const s = tvPlayer(roomPlayers);
+  if (!s) return '';
+  const a = s.attributes || {};
+  const art = a.entity_picture ? (/^https?:/.test(a.entity_picture) ? a.entity_picture : `${base()}${a.entity_picture}`) : '';
+  const sub = [a.media_artist || a.media_series_title, a.app_name, nameOf(s)].filter(Boolean).filter((v, i, l) => l.indexOf(v) === i).join(' · ');
+  const id = esc(s.entity_id);
+  const b = (act, ic, label, extra = '') => `<button type="button" class="tv-round${extra}" data-tv-media="${act}" data-id="${id}" data-tv-key="np-${act}" aria-label="${label}">${icon(ic)}</button>`;
+  return `<section class="tv-np">
+    ${art ? `<img class="tv-np-art" src="${esc(art)}" alt="">` : `<span class="tv-np-art">${icon('play')}</span>`}
+    <span class="tv-np-text"><b>${esc(a.media_title || a.app_name || 'Playing')}</b><small>${esc(sub)}</small></span>
+    <span class="tv-btns">${b('prev', 'skipPrev', 'Previous')}${b('playpause', s.state === 'playing' ? 'pause' : 'play', s.state === 'playing' ? 'Pause' : 'Play', ' big')}${b('next', 'skipNext', 'Next')}${b('voldown', 'volumeLow', 'Quieter')}${b('volup', 'volumeHigh', 'Louder')}</span>
+  </section>`;
+}
+
+// ---------- up next: the calendar and the shopping list ----------
+
+function tvUpNextHtml() {
+  const lines = [];
+  if (store.prefs.calendar && shownCalendars().length) {
+    loadEvents();
+    const vw = calView();
+    const now = new Date();
+    const today = calStartOfDay(now);
+    const tomorrow = calAddDays(today, 1);
+    const todays = calOnDay(vw.events, today).filter((ev) => ev.allDay || ev.end > now);
+    const next = [...todays.map((ev) => [ev, today, '']), ...calOnDay(vw.events, tomorrow).map((ev) => [ev, tomorrow, 'Tomorrow'])].slice(0, 3);
+    for (const [ev, d, when] of next) {
+      const w = vw.info(ev);
+      const start = ev.allDay ? 'All day' : fmtTime(ev.start);
+      lines.push(`<li style="--cal:${vw.colorOf(ev)}"><small>${esc(when ? `${when}${ev.allDay ? '' : ` ${start}`}` : start)}</small><span>${esc(ev.title)}</span>${w ? `<i>${esc(w.label)}</i>` : ''}</li>`);
+    }
+    if (!next.length && day.eventsKey) lines.push('<li class="quiet"><span>Nothing else on today or tomorrow</span></li>');
+  }
+  let shopping = '';
+  let count = '';
+  if (store.prefs.shopping) {
+    watchShopList();
+    const open = (shop.items || []).filter((i) => i.status !== 'completed');
+    if (shop.id && shop.items && open.length) count = `<span class="tv-shop-count">${icon('cart')}${open.length} to buy</span>`;
+    if (shop.id && shop.items) shopping = `<p class="tv-shop">${icon('cart')}<span>${open.length ? `<b>${plural(open.length, 'thing')} to buy:</b> ${esc(open.slice(0, 4).map((i) => i.summary).join(', '))}${open.length > 4 ? '…' : ''}` : 'Nothing on the shopping list'}</span></p>`;
+  }
+  if (!lines.length && !shopping) return '';
+  return `<section class="tv-card tv-next"><h3><span>Up next</span>${count}</h3>${lines.length ? `<ul>${lines.join('')}</ul>` : ''}${shopping}</section>`;
+}
+
+// ---------- solar at a glance (top bar) ----------
+
+function tvSolarHtml() {
+  if (!store.prefs.energyTab) return '';
+  const e = energyNow();
+  const f = e.flow;
+  const tariff = tariffNow(store.states);
+  if (!f.found && !tariff) return '';
+  const bits = [];
+  if (f.found && f.soc != null) bits.push(`${icon(f.charging > 0.05 ? 'batteryCharging' : 'battery')}<b>${Math.round(f.soc)}%</b>`);
+  if (f.found && f.solar != null) bits.push(`${icon('solar')}<b>${energyPower(f.solar)}</b>`);
+  if (f.found && f.selling > 0.05) bits.push(`<span class="pos">Selling ${energyPower(f.selling)}</span>`);
+  else if (f.found && f.buying > 0.05) bits.push(`<span class="neg">Buying ${energyPower(f.buying)}</span>`);
+  if (tariff) bits.push(`<span class="tv-tariff${tariff === 'Peak' ? ' peak' : ''}">${esc(tariff)}</span>`);
+  return `<span class="tv-solar">${bits.join('')}</span>`;
+}
+
+// ---------- Jellyfin: continue watching ----------
+
+function tvJellyfin() {
+  const cfg = { url: urlParams.get('jellyfin') || store.prefs.jfUrl, key: urlParams.get('jfkey') || store.prefs.jfKey, user: urlParams.get('jfuser') || store.prefs.jfUser };
+  const sig = JSON.stringify(cfg);
+  if (tv.jf?.sig !== sig) { tv.jf = new Jellyfin(cfg); tv.jf.sig = sig; tv.resumeAt = 0; tv.resume = []; }
+  return tv.jf;
+}
+
+async function loadResume(force = false) {
+  const jf = tvJellyfin();
+  if (!jf.ok || (!force && Date.now() - tv.resumeAt < 3 * 60_000)) return;
+  tv.resumeAt = Date.now();
+  try {
+    tv.resume = await jf.resume();
+    tv.resumeErr = '';
+  } catch (err) {
+    tv.resume = [];
+    tv.resumeErr = /fetch|network/i.test(err.message) ? `Couldn't reach Jellyfin at ${jf.url}. If Home Assistant is on https, Jellyfin needs https too.` : err.message;
+  }
+  queueRefresh();
+}
+
+function tvResumeHtml() {
+  loadResume();
+  if (!tv.resume.length) return '';
+  return `<section class="tv-shelf"><h3>Continue watching</h3><div class="tv-resume">${tv.resume.map((it) => `<button type="button" class="tv-show" data-tv-resume="${esc(it.id)}" data-ticks="${it.ticks}" data-tv-key="jf-${esc(it.id)}">
+    <span class="tv-show-art"><img src="${esc(it.image)}" alt="" loading="lazy"><i style="width:${it.progress}%"></i></span>
+    <b>${esc(it.title)}</b><small>${esc(it.sub)}</small></button>`).join('')}</div></section>`;
+}
+
+async function tvResumePlay(btn) {
+  const jf = tvJellyfin();
+  const app = parseApps(urlParams.get('apps') || store.prefs.tvApps).find((a) => /jellyfin/i.test(a.pkg)) || { pkg: 'org.jellyfin.androidtv', name: 'Jellyfin' };
+  const since = Date.now();
+  tvLaunch(app.pkg, app.name);
+  try {
+    if (!(await jf.playOnTv(btn.dataset.tvResume, Number(btn.dataset.ticks), { since }))) toast('Jellyfin is open: pick it from Continue watching there.');
+  } catch (err) {
+    toast(`Jellyfin is open, but it couldn't start the show: ${err.message}`);
+  }
+}
+
+// ---------- doorbell and person pop-up ----------
+
+/** Pops a camera up when someone's at the door (or, if picked, any motion), once per visit. */
+function tvWatchAlerts() {
+  const mode = store.prefs.tvPopup || 'person';
+  const cams = tvList('tvCams');
+  const byDevice = new Map(cams.map((id) => [store.entityInfo.get(id)?.deviceId, id]).filter(([d]) => d));
+  for (const s of store.states.values()) {
+    if (!popupSensor(s, mode)) continue;
+    const stamp = domainOf(s.entity_id) === 'event' ? s.state : s.state === 'on' ? s.last_changed : '';
+    const prev = tv.seen.get(s.entity_id);
+    tv.seen.set(s.entity_id, stamp);
+    if (!tv.seenReady || !stamp || stamp === prev) continue;
+    const area = areaOf(s.entity_id);
+    const cam = byDevice.get(store.entityInfo.get(s.entity_id)?.deviceId) || (area && cams.find((c) => areaOf(c) === area));
+    if (!cam) continue;
+    const camLabel = camName(store.states.get(cam));
+    let kind = nameOf(s).replace(new RegExp(reEsc(camLabel), 'i'), '').trim() || 'Motion';
+    if (/visitor|doorbell|ding|ring/i.test(`${s.entity_id} ${kind}`) || domainOf(s.entity_id) === 'event') kind = 'Doorbell';
+    tvPopup(cam, kind);
+  }
+  tv.seenReady = true;
+}
+
+function tvPopup(cam, kind) {
+  let el = $('#tv-pop');
+  if (!el) {
+    el = document.createElement('aside');
+    el.id = 'tv-pop';
+    el.className = 'tv-pop';
+    document.body.append(el);
+  }
+  const title = kind === 'Doorbell' ? `Someone's at the ${camName(store.states.get(cam))}` : `${kind} · ${camName(store.states.get(cam))}`;
+  if (tv.pop?.cam !== cam) {
+    tv.pop?.player?.stop();
+    clearTimeout(tv.pop?.timer);
+    el.innerHTML = `<div class="cam-stage tv-pop-stage" data-phase="connecting"><img class="cam-poster" data-cam="${esc(cam)}" alt="">
+        <div class="cam-status"><div class="spinner"></div></div></div>
+      <p class="tv-pop-text"><b></b><small>OK to watch · Back to close</small></p>`;
+    paintCameras(el);
+    const stage = $('.tv-pop-stage', el);
+    const player = store.client ? new CameraPlayer({
+      client: store.client, entityId: cam, getState: () => store.states.get(cam), stage,
+      onState: ({ phase }) => { stage.dataset.phase = phase; },
+    }) : null;
+    tv.pop = { cam, player, timer: 0 };
+    if (!document.hidden) player?.start();
+  }
+  $('.tv-pop-text b', el).textContent = title;
+  el.classList.add('show');
+  clearTimeout(tv.pop.timer);
+  tv.pop.timer = setTimeout(tvPopClose, 30_000);
+  if (tv.saver) tvWake();
+  ding.play();
+}
+
+function tvPopClose() {
+  if (!tv.pop) return;
+  tv.pop.player?.stop();
+  clearTimeout(tv.pop.timer);
+  tv.pop = null;
+  const el = $('#tv-pop');
+  if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+}
+
+function tvPopOpen() {
+  const cam = tv.pop?.cam;
+  tvPopClose();
+  if (!cam) return;
+  tv.cam = cam;
+  if (ui.view !== 'tv') location.hash = '#/tv';
+  if (tv.tab !== 'home') tvSetTab('home'); else render();
+  tvSetFull(true);
+  $('[data-tv-cam]')?.focus();
+}
+
+// ---------- screensaver ----------
+
+function tvSleep() {
+  tv.saver = true;
+  tv.saverAt = 0;
+  tvStop();
+  let el = $('#tv-saver');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tv-saver';
+    el.className = 'tv-saver';
+    el.innerHTML = '<img class="tv-saver-bg" alt=""><img class="tv-saver-bg" alt=""><div class="tv-saver-info"></div>';
+    document.body.append(el);
+  }
+  tvPaintSaver();
+  requestAnimationFrame(() => el.classList.add('show'));
+}
+
+function tvWake() {
+  tv.saver = false;
+  tv.lastInput = Date.now();
+  $('#tv-saver')?.classList.remove('show');
+  if (ui.view === 'tv') tvPlay();
+}
+
+/** The clock, date, weather and next event, over a slow show of camera stills. */
+function tvPaintSaver() {
+  const el = $('#tv-saver');
+  if (!el) return;
+  const now = new Date();
+  const w = weatherEntity();
+  let next = '';
+  if (store.prefs.calendar && day.eventsKey) {
+    const today = calStartOfDay(now);
+    const ev = calOnDay(calView().events, today).find((x) => !x.allDay && x.end > now);
+    if (ev) next = `${fmtTime(ev.start)} · ${ev.title}`;
+  }
+  $('.tv-saver-info', el).innerHTML = `<time>${esc(fmtTime(now))}</time>
+    <p>${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
+    ${w ? `<p class="tv-saver-wx">${icon(weatherIcon(w.state, tvNight()))}${deg(w.attributes?.temperature)} · ${esc(weatherWord(w.state))}</p>` : ''}
+    ${next ? `<p class="tv-saver-next">${icon('calendar')}${esc(next)}</p>` : ''}`;
+  if (Date.now() - tv.saverAt < 20_000) return;
+  tv.saverAt = Date.now();
+  const cams = tvList('tvCams');
+  if (!cams.length) return;
+  const cam = cams[tv.saverCam++ % cams.length];
+  const url = cameraStillUrl(base(), store.states.get(cam), 1280);
+  if (!url) return;
+  const [a, b] = el.querySelectorAll('.tv-saver-bg');
+  const [shown, next2] = a.classList.contains('on') ? [a, b] : [b, a];
+  next2.onload = () => { next2.classList.add('on'); shown.classList.remove('on'); };
+  next2.src = url;
+}
+
+setInterval(() => {
+  if (tv.saver) { tvPaintSaver(); return; }
+  const mins = Number(store.prefs.tvSaver) || 0;
+  if (!tvMode || !mins || ui.view !== 'tv' || tv.full || tv.pop || $('#sheet')?.open || document.hidden) return;
+  if (Date.now() - tv.lastInput >= mins * 60_000) tvSleep();
+}, 5000);
+for (const ev of ['keydown', 'pointerdown', 'wheel']) document.addEventListener(ev, () => { tv.lastInput = Date.now(); }, { capture: true, passive: true });
+
+// Before anything else sees a key: the screensaver eats the key that wakes it, and the pop-up answers OK and Back.
+window.addEventListener('keydown', (e) => {
+  if (!tvMode && ui.view !== 'tv') return;
+  if (tv.saver) { tvWake(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+  if (!tv.pop) return;
+  if (isBackKey(e) || e.key === 'Backspace') { tvPopClose(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+  if (e.key === 'Enter' || e.key === ' ') { tvPopOpen(); e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
 
 /** Motion, person and similar sensors on each camera, newest first: a simple alerts list. */
@@ -10323,14 +11066,15 @@ function tvCamerasTabHtml(cams) {
 
 function tvHomeHtml(cams, cam) {
   return `<div class="tv-body">
-    ${cam ? `<div class="tv-cam-wrap">
+    <div class="tv-main">${cam ? `<div class="tv-cam-wrap">
       <button type="button" class="tv-cam" data-tv-cam data-tv-key="cam" aria-label="${esc(camName(store.states.get(cam)))}: left and right change camera, OK fills the screen">
         <span class="tv-cam-slot"></span>
         ${cams.length > 1 ? `<span class="tv-cam-arrow left">${icon('chevronLeft')}</span><span class="tv-cam-arrow right">${icon('chevronRight')}</span>` : ''}
         <span class="tv-cam-name">${esc(camName(store.states.get(cam)))}${cams.length > 1 ? ` · ${cams.indexOf(cam) + 1}/${cams.length}` : ''}</span>
       </button>
     </div>` : `<div class="tv-cam-wrap tv-card tv-nocam"><p class="muted">No cameras to show. Pick some in Settings → TV.</p></div>`}
-    <div class="tv-side">${tvWeatherHtml()}${tvReadingsHtml()}</div>
+    ${tvNowPlayingHtml(tvRoomThings(tvRoom()).players)}</div>
+    <div class="tv-side">${tvWeatherHtml()}${tvRoomCardHtml()}${tvUpNextHtml()}</div>
   </div>`;
 }
 
@@ -10467,6 +11211,20 @@ function tvKeydown(e) {
   if (moveFocus(dir, root)) e.preventDefault();
 }
 document.addEventListener('keydown', tvKeydown);
+// Like Google TV: the screen stays put until focus goes down to "Continue watching", and comes back up after.
+document.addEventListener('focusin', (e) => {
+  // The background takes the focused app's colours, like Google TV's home screen.
+  const app = e.target.closest?.('.tv-app');
+  if (app) {
+    const root = document.documentElement.style;
+    root.setProperty('--tv-amb', app.style.getPropertyValue('--app-glow'));
+    root.setProperty('--tv-amb-2', app.style.getPropertyValue('--app-glow-2'));
+  }
+  const v = e.target.closest?.('.v-tv');
+  if (!v || !tvMode) return;
+  const top = e.target.closest('.tv-shelf') ? v.scrollHeight : 0;
+  requestAnimationFrame(() => v.scrollTo({ top })); // after moveFocus's own scrollIntoView
+});
 document.addEventListener('visibilitychange', () => {
   if (ui.view !== 'tv') return;
   if (document.hidden) tvStop(); else tvPlay();
@@ -10495,6 +11253,25 @@ function tvSettingsHtml() {
     <details><summary>Cameras${auto('tvCams')}</summary>${pickList('tvCams', cams, 'No cameras in Home Assistant.')}</details>
     <details><summary>Readings on the right${auto('tvReadings')}</summary>${pickList('tvReadings', readings, 'No sensors with numbers yet.')}</details>
     <details><summary>Buttons in the top bar${auto('tvButtons')}</summary>${pickList('tvButtons', buttons, 'No scenes or scripts in Home Assistant.')}</details>
+    ${(() => {
+      const area = tvRoom();
+      const autoArea = pickRoom({ pick: '', areas: store.areas, states: store.states, areaOf, tvDevice: tvDeviceSlug() });
+      const urlRoom = urlParams.get('room');
+      return `<label class="row"><span><b>This TV's room</b><small class="muted">Its lights, blinds and climate show on Home and in their own tab. Automatic uses the room of the TV's device in Home Assistant (the Home Assistant app on the TV), so moving the TV only needs its area changed there.${urlRoom ? ` <b>This screen's address sets the room (${esc(urlRoom)}).</b>` : ''}</small></span>
+      <select data-pref="tvRoom"><option value="">${esc(`Automatic (${autoArea ? store.areas.get(autoArea) : 'none found'})`)}</option>
+        ${[...store.areas].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => `<option value="${esc(id)}"${store.prefs.tvRoom === id ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></label>
+      ${area ? '' : '<p class="muted">No room yet, so the room tab is hidden.</p>'}`;
+    })()}
+    <label class="row"><span><b>Screensaver</b><small class="muted">A big clock, the weather and your cameras when the remote hasn't been touched for a while. Any button wakes it.</small></span>
+      <select data-pref="tvSaver">${SAVER_CHOICES.map(([v, l]) => `<option value="${v}"${Number(p.tvSaver) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="row"><span><b>Camera pop-up</b><small class="muted">When someone's at the door, their camera pops up in the corner for 30 seconds. OK shows it big, Back closes it. This works while the TV screen is showing; for a pop-up over other apps, see the README.</small></span>
+      <select data-pref="tvPopup">${POPUP_CHOICES.map(([v, l]) => `<option value="${v}"${(p.tvPopup || 'person') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    <details><summary>Jellyfin: continue watching${tvJellyfin().ok ? '' : ' <small class="muted">(off)</small>'}</summary>
+      <p class="muted">Shows what you're part-way through under the apps. Make an API key in Jellyfin → Dashboard → API keys. Typing on a TV is slow, so you can also add <code>&amp;jellyfin=http://…:8096&amp;jfkey=…</code> to the TV's address.${tv.resumeErr ? ` <b>${esc(tv.resumeErr)}</b>` : tv.resume.length ? ` <b>Working: ${plural(tv.resume.length, 'show')} to continue.</b>` : ''}</p>
+      <label class="row"><span><b>Server address</b></span><input type="url" data-pref="jfUrl" value="${esc(p.jfUrl)}" placeholder="http://192.168.1.20:8096" autocomplete="off"></label>
+      <label class="row"><span><b>API key</b></span><input type="text" data-pref="jfKey" value="${esc(p.jfKey)}" autocomplete="off" spellcheck="false"></label>
+      <label class="row"><span><b>User</b><small class="muted">Whose list to show. Empty: the first administrator.</small></span><input type="text" data-pref="jfUser" value="${esc(p.jfUser)}" autocomplete="off"></label>
+    </details>
     <label class="row tv-apps-edit"><span><b>Apps</b><small class="muted">One per line: <code>Name = Android package</code> (the package is in the app's Play Store address after <code>id=</code>), or just the name for ${esc(parseApps('youtube,netflix,prime,disney,plex,jellyfin,kayo,binge,stan,iview,spotify,appletv').map((a) => a.name).join(', '))}. Typing on a TV is slow, so you can also put <code>&amp;apps=jellyfin,disney,kayo,binge</code> in the TV's address instead.${urlParams.get('apps') ? ' <b>This screen\'s address sets its apps, so this list is not used here.</b>' : ''}</small></span></label>
     <textarea data-pref="tvApps" rows="6" spellcheck="false">${esc(p.tvApps)}</textarea>
     <label class="row"><span><b>Open apps with</b><small class="muted">Automatic: on the TV itself, Android opens the app (in Fully Kiosk Browser, free or Plus). In other browsers, Home Assistant's Android TV Remote integration, which can't open some apps by name.</small></span>
@@ -10517,9 +11294,12 @@ const VIEWS = {
     loadForecast();
     loadHourly();
     const { cams, cam } = tvCamera();
-    return `<div class="v-tv tab-${tv.tab}">${tvTopHtml()}
-      ${tv.tab === 'cameras' ? tvCamerasTabHtml(cams) : tvHomeHtml(cams, cam)}
-      ${tvAppsHtml()}</div>`;
+    if (tv.tab === 'room' && !tvRoom()) tv.tab = 'home';
+    tvWatchAlerts();
+    const body = tv.tab === 'cameras' ? tvCamerasTabHtml(cams) : tv.tab === 'room' ? tvRoomTabHtml() : tvHomeHtml(cams, cam);
+    return `<div class="v-tv tab-${tv.tab}"><div class="tv-screen">${tvTopHtml()}
+      ${body}
+      ${tvAppsHtml()}</div>${tv.tab === 'home' ? tvResumeHtml() : ''}</div>`;
   },
 
   today() {
@@ -11502,7 +12282,7 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.pref) {
     const key = t.dataset.pref;
-    store.prefs[key] = t.type === 'checkbox' ? t.checked : ['idleMinutes', 'dim'].includes(key) ? Number(t.value) : t.value;
+    store.prefs[key] = t.type === 'checkbox' ? t.checked : ['idleMinutes', 'dim', 'tvSaver'].includes(key) ? Number(t.value) : t.value;
     writePrefs();
     applyTheme();
     if (['wall', 'idleMinutes', 'dim', 'dimNight', 'keepAwake'].includes(key)) { wallMode?.update(); renderFullscreenButton(); }
@@ -11542,6 +12322,40 @@ function handleTvClick(t) {
     toast(`${nameOf(store.states.get(id) || { entity_id: id })} ✓`);
     return true;
   }
+  if (t.closest('[data-tv-room-go]')) { tvSetTab('room'); return true; }
+  const tg = t.closest('[data-tv-toggle]');
+  if (tg) { const id = tg.dataset.tvToggle; call(domainOf(id), 'toggle', {}, id); return true; }
+  const off = t.closest('[data-tv-off]');
+  if (off) { call('homeassistant', 'turn_off', {}, off.dataset.tvOff.split(' ')); return true; }
+  const flip = t.closest('[data-tv-cover-flip]');
+  if (flip) {
+    const s = store.states.get(flip.dataset.tvCoverFlip);
+    if (s) call('cover', coverPos(s) > 0 && s.state !== 'opening' ? 'close_cover' : 'open_cover', {}, s.entity_id);
+    return true;
+  }
+  const cov = t.closest('[data-tv-cover]');
+  if (cov) { call('cover', `${cov.dataset.act}_cover`, {}, cov.dataset.tvCover.split(' ')); return true; }
+  const clim = t.closest('[data-tv-clim]');
+  if (clim) {
+    const s = store.states.get(clim.dataset.tvClim);
+    if (!s) return true;
+    if (clim.dataset.act === 'power') { call('climate', s.state === 'off' ? 'turn_on' : 'turn_off', {}, s.entity_id); return true; }
+    const step = Number(s.attributes?.target_temp_step) || (tempUnit() === '°F' ? 1 : 0.5);
+    const now = climateTarget(s) ?? Number(s.attributes?.current_temperature) ?? 21;
+    const next = Math.round((now + (clim.dataset.act === 'up' ? step : -step)) / step) * step;
+    const lo = Number(s.attributes?.min_temp ?? -Infinity);
+    const hi = Number(s.attributes?.max_temp ?? Infinity);
+    call('climate', 'set_temperature', { temperature: Math.min(hi, Math.max(lo, next)) }, s.entity_id);
+    return true;
+  }
+  const media = t.closest('[data-tv-media]');
+  if (media) {
+    const svc = { prev: 'media_previous_track', playpause: 'media_play_pause', next: 'media_next_track', voldown: 'volume_down', volup: 'volume_up' }[media.dataset.tvMedia];
+    call('media_player', svc, {}, media.dataset.id);
+    return true;
+  }
+  const show = t.closest('[data-tv-resume]');
+  if (show) { tvResumePlay(show); return true; }
   const app = t.closest('[data-tv-app]');
   if (app) { tvLaunch(app.dataset.tvApp, app.textContent.trim()); return true; }
   if (t.closest('[data-tv-cam]')) {
