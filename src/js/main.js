@@ -1851,7 +1851,13 @@ function tvOnDevice() {
 
 function tvLaunch(pkg, name) {
   if (window.fully?.startApplication) { window.fully.startApplication(pkg); return; }
-  const pick = urlParams.get('open') || store.prefs.tvRemote; // ?open=intent or ?open=remote.xxx in the address wins
+  const pick = urlParams.get('open') || store.prefs.tvRemote; // ?open=intent, ?open=remote.xxx or ?open=notify.mobile_app_xxx in the address wins
+  // ?open=notify.mobile_app_<tv>: the Home Assistant app installed on the TV opens it (command_launch_app).
+  if (/^notify\.mobile_app_\w+$/.test(pick)) {
+    call('notify', pick.slice('notify.'.length), { message: 'command_launch_app', data: { package_name: pkg } });
+    toast(`Opening ${name}…`);
+    return;
+  }
   if (pick === 'intent' || (pick === '' && tvOnDevice())) {
     const url = `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LEANBACK_LAUNCHER;package=${pkg};end`;
     if (window.__tvIntent) window.__tvIntent(url); else location.href = url;
