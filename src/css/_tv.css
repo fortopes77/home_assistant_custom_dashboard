@@ -33,23 +33,46 @@
 }
 
 .tv-top { display: flex; align-items: center; justify-content: space-between; gap: 1em; }
-.tv-tabs { display: flex; gap: 0.6em; flex: none; }
-.tv-tabs button { white-space: nowrap; }
-.tv-actions { justify-content: flex-end; }
-.tv-actions .tv-pill:not(.tv-gear) { min-width: 0; max-width: 17em; flex-shrink: 1; font-size: 0.88em; height: 2.95em; }
-.tv-actions .tv-pill:not(.tv-gear) > :not(.icon) { overflow: hidden; text-overflow: ellipsis; }
-.tv-clock { white-space: nowrap; }
+/* Tabs: plain text on the dark, with a thin purple-to-blue light under the one you're on */
+.tv-tabs { display: flex; gap: 1.6em; flex: none; }
 .tv-tabs button {
-  padding: 0.35em 0.6em;
+  position: relative;
+  padding: 0.35em 0;
   border: 0;
-  border-radius: 0.5em;
+  border-radius: 0;
   background: none;
   color: var(--muted);
   font: inherit;
-  font-size: 1.15em;
+  font-size: 1.1em;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: color 0.2s;
 }
-.tv-tabs button[aria-current] { color: var(--text); box-shadow: inset 0 -0.18em 0 var(--text); border-radius: 0.5em 0.5em 0.2em 0.2em; }
+.tv-tabs button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.2em;
+  height: 0.14em;
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6 60%, #06b6d4);
+  box-shadow: 0 0 0.9em 0.05em rgb(139 92 246 / 0.55);
+  opacity: 0;
+  transform: scaleX(0.2);
+  transform-origin: left;
+  transition: opacity 0.25s, transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+.tv-tabs button[aria-current] { color: var(--text); }
+.tv-tabs button[aria-current]::after { opacity: 1; transform: none; }
+/* the remote is on a tab: brighter text with a soft violet haze behind it */
+.tv-mode .tv-tabs button:focus-visible, .tv-tabs button:focus-visible, .tv-tabs button:hover {
+  outline: none;
+  color: #fff;
+  text-shadow: 0 0 0.9em rgb(139 92 246 / 0.9), 0 0 0.25em rgb(59 130 246 / 0.6);
+}
+.tv-mode .tv-tabs button:focus-visible::after, .tv-tabs button:hover::after { opacity: 1; transform: none; height: 0.18em; }
+.tv-mode .tv-tabs button:not([aria-current]):focus-visible::after { opacity: 0.7; }
 .tv-actions { display: flex; align-items: center; gap: 0.7em; min-width: 0; }
 .tv-pill {
   display: inline-flex;
