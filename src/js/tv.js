@@ -12,22 +12,33 @@ export const TV_APPS_DEFAULT = [
   'Plex = com.plexapp.android',
 ].join('\n');
 
-// Tile colours for apps people often add; anything else gets the plain card colour.
+// Banner colours for apps people often add: [background, wordmark, glow]. Our own simple artwork in each
+// brand's colours (no logos), like the wide app cards on Google TV's home screen. Anything else gets
+// colours made from its name, so every app still looks like a banner.
 const APP_COLORS = {
-  'com.google.android.youtube.tv': ['#ffffff', '#e62117'],
-  'com.netflix.ninja': ['#141414', '#e50914'],
-  'com.amazon.amazonvideo.livingroom': ['#1a98ff', '#ffffff'],
-  'com.disney.disneyplus': ['#0b1a4a', '#ffffff'],
-  'com.plexapp.android': ['#1f1f1f', '#e5a00d'],
-  'org.jellyfin.androidtv': ['#101322', '#aa5cc3'],
-  'com.wbd.stream': ['#002be7', '#ffffff'],
-  'com.hbo.hbonow': ['#000000', '#ffffff'],
-  'com.apple.atve.androidtv.appletv': ['#000000', '#ffffff'],
-  'com.spotify.tv.android': ['#121212', '#1ed760'],
-  'au.com.stan.and': ['#0a0a0a', '#00a8e1'],
-  'au.net.abc.iview': ['#000000', '#ffffff'],
-  'com.google.android.apps.youtube.unplugged': ['#ffffff', '#e62117'],
+  'com.google.android.youtube.tv': ['#1a1a1a', '#ffffff', '#ff0033'],
+  'com.netflix.ninja': ['#0b0b0b', '#e50914', '#b20710'],
+  'com.amazon.amazonvideo.livingroom': ['#0f1f33', '#ffffff', '#1a98ff'],
+  'com.disney.disneyplus': ['#0b1640', '#ffffff', '#2fb6ff'],
+  'com.plexapp.android': ['#1c1c1c', '#ffffff', '#e5a00d'],
+  'org.jellyfin.androidtv': ['#0f1126', '#ffffff', '#aa5cc3', '#00a4dc'],
+  'au.com.kayosports.tv': ['#071a14', '#ffffff', '#00d27a'],
+  'au.com.streamotion.ares.tv': ['#16061f', '#ffffff', '#f23d8a', '#7b2ff7'],
+  'com.wbd.stream': ['#001a8c', '#ffffff', '#3a5bff'],
+  'com.hbo.hbonow': ['#0b0b0b', '#ffffff', '#5b2bc2'],
+  'com.apple.atve.androidtv.appletv': ['#0b0b0b', '#ffffff', '#6e6e73'],
+  'com.spotify.tv.android': ['#121212', '#ffffff', '#1ed760'],
+  'au.com.stan.and': ['#060a10', '#ffffff', '#00a8e1'],
+  'au.net.abc.iview': ['#0b0b0b', '#ffffff', '#00c2b4'],
+  'com.google.android.apps.youtube.unplugged': ['#1a1a1a', '#ffffff', '#ff0033'],
 };
+
+/** Colours for an app we don't know, picked from its name so they stay the same. */
+function colorsFor(name) {
+  let h = 0;
+  for (const c of String(name)) h = (h * 31 + c.codePointAt(0)) % 360;
+  return [`hsl(${h} 40% 14%)`, '#ffffff', `hsl(${h} 75% 52%)`, `hsl(${(h + 40) % 360} 70% 45%)`];
+}
 
 // Apps that can be named on their own ("kayo", or ?apps=jellyfin,kayo in the address) without the package.
 const KNOWN_APPS = {
@@ -50,9 +61,9 @@ const knownKey = (name) => String(name).toLowerCase().replace(/[^a-z]/g, '').rep
 export function parseApps(text) {
   return String(text || '').split(/\n|,(?![^=\n]*\.)/).map((line) => {
     const m = line.match(/^\s*(.+?)\s*=\s*([\w.]+)\s*$/);
-    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || null };
+    if (m) return { name: m[1], pkg: m[2], colors: APP_COLORS[m[2]] || colorsFor(m[1]) };
     const known = line.trim() && KNOWN_APPS[knownKey(line)];
-    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || null } : null;
+    return known ? { name: known[0], pkg: known[1], colors: APP_COLORS[known[1]] || colorsFor(known[0]) } : null;
   }).filter(Boolean);
 }
 

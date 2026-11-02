@@ -1744,7 +1744,7 @@ function tvAppsHtml() {
   const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
   if (!apps.length) return '';
   return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
-      ${a.colors ? `style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]}"` : ''}><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
+      data-name="${esc(a.name)}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span></button>`).join('')}</nav>`;
 }
 
 /** Motion, person and similar sensors on each camera, newest first: a simple alerts list. */
