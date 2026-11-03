@@ -1913,13 +1913,18 @@ function tvRoomTabHtml() {
 
 const PLAYING = ['playing', 'paused', 'buffering'];
 
-/** Something playing: the TV room's players first, then anything else in the house that's playing. */
+/**
+ * Something playing: the TV room's players first, then anything else in the house that's playing.
+ * "In the house" means the player is in a room. Jellyfin makes a player for every device signed in
+ * to the server, including friends' TVs in other homes, and those have no room, so they're skipped.
+ */
 function tvPlayer(roomPlayers) {
   const active = (list) => list.filter((s) => PLAYING.includes(s.state) && (s.attributes?.media_title || s.attributes?.app_name));
   const room = active(roomPlayers);
   const rank = (s) => (s.state === 'playing' ? 0 : 1);
   if (room.length) return room.sort((a, b) => rank(a) - rank(b))[0];
-  return active([...store.states.values()].filter((s) => domainOf(s.entity_id) === 'media_player')).sort((a, b) => rank(a) - rank(b))[0] || null;
+  const house = [...store.states.values()].filter((s) => domainOf(s.entity_id) === 'media_player' && areaOf(s.entity_id));
+  return active(house).sort((a, b) => rank(a) - rank(b))[0] || null;
 }
 
 function tvNowPlayingHtml(roomPlayers) {
