@@ -25,7 +25,6 @@ Open the address directly. In Home Assistant, go to your profile, then the **Sec
 
 - `?wall` turns on wall mode for that address.
 - `?kiosk` also hides the menu.
-- `?tv` opens the [TV home screen](#tv-home-screen-google-tv--android-tv) for a Google TV or Android TV.
 - `?token=<token>` signs in a screen without a keyboard, such as a Nest Hub cast with `catt`.
 
 ### Updating
@@ -139,41 +138,6 @@ Turn on **Settings → Wall mode** on the tablet, or add `?wall` to the address.
 - **Keep the screen on** stops the tablet sleeping. Browsers allow this only on `https` addresses.
 - The first touch only wakes the screen. A full screen button appears in the top bar.
 
-## TV home screen (Google TV / Android TV)
-
-Add `?tv` to the address for a home screen made for a TV and its remote: a big live camera, the weather with the next few hours, a few readings, buttons for scenes along the top, a Cameras tab, and your TV apps along the bottom.
-
-1. On the TV, install **Fully Kiosk Browser** (Android TV version from fully-kiosk.com, for example with the Downloader app).
-2. Make a long-lived token for a separate, non-administrator Home Assistant user, and set Fully's **Start URL** to `http://<your-home-assistant>:8123/local/dashboard/index.html?tv&token=<token>`.
-3. Optional: make it the home screen. A launcher such as Projectivy Launcher can send the Home button to Fully Kiosk. This is fully reversible: turn the override off or uninstall the launcher and the stock home screen comes back.
-
-Using it with the remote:
-
-- The arrows move between buttons, and focus starts on the first app.
-- On the camera, **left** and **right** change camera and **OK** fills the screen. **Back** leaves full screen and the Cameras tab.
-- The Cameras tab shows every camera and recent motion and person detections; pick one to watch it big.
-- App tiles open apps through Android on the TV: in Fully Kiosk Browser (the free version is enough) they open an `intent:` link, or use Fully's JavaScript interface if you have Plus and turned it on. In other browsers they use Home Assistant's **Android TV Remote** integration (`remote.turn_on` with the app's package), which can't open some apps by name since a Play Store change. If tiles say "Opening…" on the TV but nothing opens, add `&open=intent` to the TV's address. The most dependable free way is the **Home Assistant app** installed on the TV: add `&open=notify.mobile_app_<tv>` (the TV's notify service) and tiles send it `command_launch_app`. The app needs the display-over-other-apps permission the first time.
-
-**Settings → TV home screen** picks the cameras, the readings, the top-bar buttons, and the apps (one per line, `Name = Android package`, where the package is the `id=` in the app's Play Store address, or just the name for common ones such as Netflix, Disney+, Jellyfin, Kayo or Binge). Typing on a TV is slow, so you can also add `&apps=jellyfin,disney,kayo,binge` to the TV's address instead. The TV screen is dark unless you choose Light under Theme.
-
-**App logos:** the app cards show each app's name in its colours. To show the real logo instead, put a picture of it in Home Assistant at `config/www/dashboard/logos/<app>.png`, using the app's short name in lower case: `jellyfin.png`, `disney.png`, `kayo.png`, `binge.png`, `netflix.png`, `youtube.png`, `prime.png` and so on (an app you named yourself uses its name without spaces or symbols, so "My App" is `myapp.png`). A wide picture (about 16:9, like a Google TV banner) fills the whole card. A square icon sits in the middle on the app's colours. No logos come with the dashboard, so use pictures you have saved yourself. A good source is the app's icon from its Play Store page.
-
-Add `&v=<number>` to the TV's address and raise the number after you change a logo picture, so the TV fetches it again instead of keeping the old one.
-
-### More on the TV screen
-
-- **Light mode for slow TVs:** add `&lite` to the address (or turn on **Settings → TV → Light mode**). The background stays still, focus is a plain white ring with no glow or zoom, and the camera shows a fresh picture every 10 seconds instead of live video; press OK on it for live, full screen.
-- **The room the TV is in:** the room gets its own tab (named after the room) with every light, blind and thermostat there, the room's readings, and what's playing. Home shows a small card with quick buttons for them. By default the room is the area of the TV's own device in Home Assistant (the Home Assistant app on the TV, named by `&open=notify.mobile_app_<tv>`), so when you move the TV to another room, change that device's area in **Settings → Devices** and the screen follows. You can also pick a room in **Settings → TV**, or add `&room=living room` to the address. Only devices exposed to your voice assistant show.
-- **Up next:** today's remaining events (then tomorrow's) from the family calendar, with who they're for, and how many things are on the shopping list.
-- **Solar at a glance:** battery level, solar power right now, buying or selling, and whether it's peak or off-peak. Peak and off-peak come from a utility meter's tariff `select` (one with a "peak" option).
-- **Now playing:** when something's playing in the TV's room (or, failing that, anywhere in the house), a strip with previous, play/pause, next and volume.
-- **Doorbell pop-up:** when a camera sees a person, or the doorbell rings, that camera pops up in the corner for 30 seconds. **OK** shows it big and **Back** closes it. **Settings → TV → Camera pop-up** can switch to any motion, or off. This works while the TV screen is showing. To pop the camera up over Jellyfin or any other app too, see `homeassistant/tv_doorbell.yaml`.
-- **Screensaver:** after 5 minutes without the remote (change it in Settings → TV), a big clock, the date, the weather and the next event over a slow show of your cameras. Any button wakes it, and that press does nothing else.
-- **Jellyfin "Continue watching":** press down from the apps for what you're part-way through. OK opens Jellyfin and starts it where you left off. Make an API key in Jellyfin (**Dashboard → API keys**) and add `&jellyfin=http://<jellyfin>:8096&jfkey=<key>` to the TV's address, plus `&jfuser=<name>` if it isn't the first administrator's list. You can also type these in Settings → TV. If Home Assistant is on https, Jellyfin has to be on https too, or the browser blocks it. If the show doesn't start by itself, Jellyfin is open and it's first in its own Continue watching row.
-- **Background:** a slow, soft glow in the colours of the app you're on.
-
-Inside the Home Assistant app on the TV, add it as a **Webpage** dashboard (no token needed). There it hides Home Assistant's sidebar and title bar, `&open=notify.mobile_app_<tv>` opens apps through the app, and `&home` makes that dashboard the TV login's start page. `&home` only does this for a non-administrator login on the TV itself, so opening the TV dashboard on your phone or computer changes nothing there.
-
 ## Time and weather tint
 
 Today has a soft wash of colour behind it that follows the sun (`sun.sun`) and the weather: gold in the morning, blue at midday, rose at sunset, indigo at night, and greyer or bluer when it's cloudy or raining. The colours drift slowly as things change, and the other pages stay plain. Turn it off under **Settings → Look → Time and weather tint on Today**. It steps aside while the live sky is on.
@@ -221,7 +185,7 @@ If a download fails, a notice appears in Home Assistant.
 | `index.html`, `version.json` | The built dashboard to upload (made by GitHub; don't edit) |
 | `build.py` | Bundles `src/` into `dist/index.html` and `dist/version.json` |
 | `src/index.html` | Page shell |
-| `src/css/app.css` | Layout and themes; the `_*.css` partials style the floor plan, map, cameras, settings, wall mode and the TV screen |
+| `src/css/app.css` | Layout and themes; the `_*.css` partials style the floor plan, map, cameras, settings and wall mode |
 | `src/js/main.js` | The app: views, sheets, actions, Settings, the exposed list, notifications, news and the shopping list |
 | `src/js/ha.js`, `auth.js` | WebSocket client and sign-in |
 | `src/js/entities.js`, `controls.js`, `icons.js` | Entity names and states, tiles and controls, icons |
@@ -232,5 +196,4 @@ If a download fails, a notice appears in Home Assistant.
 | `src/js/calendar.js`, `brief.js`, `notify.js`, `news.js` | Calendar, day summary, notifications and news |
 | `src/js/camera.js`, `voice.js` | Camera player and Assist |
 | `src/js/sky.js`, `tint.js`, `wall.js`, `install.js` | Live sky, the Today tint, wall mode, and installing as an app |
-| `src/js/tv.js` | The TV home screen's app list, weather icons and moving focus with a remote |
 | `homeassistant/` | Example automations and the GitHub update package |
