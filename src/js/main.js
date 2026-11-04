@@ -37,8 +37,6 @@ import {
 } from './home.js';
 import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './news.js';
 import { Voice } from './voice.js';
-import { TV_APPS_DEFAULT, parseApps, weatherIcon, isReading, autoReadings, moveFocus, TV_KEYS, isBackKey } from './tv.js';
-import { SAVER_CHOICES, POPUP_CHOICES, pickRoom, popupSensor, tariffNow, Jellyfin } from './tvplus.js';
 
 const DASH_BUILD = 'source';
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -83,18 +81,6 @@ const DEFAULT_PREFS = {
   dim: 0.55,
   dimNight: true,
   keepAwake: true,
-  tvCams: [],            // TV screen: cameras in order; empty = every shown camera
-  tvReadings: [],        // TV screen: sensors on the right; empty = a few temperature / air readings
-  tvButtons: [],         // TV screen: scenes and scripts in the top bar; empty = the first two
-  tvApps: TV_APPS_DEFAULT, // TV screen: "Name = package" per line
-  tvRoom: '',            // TV screen: the room it's in (area id); empty = the TV device's area in Home Assistant
-  tvSaver: 5,            // TV screen: minutes before the screensaver; 0 = never
-  tvPopup: 'person',     // TV screen: pop a camera up for 'person' (and doorbells), 'motion' or 'off'
-  tvLite: false,         // TV screen: light mode for slow TVs (also ?lite in the address)
-  jfUrl: '',             // Jellyfin server for "Continue watching", e.g. http://192.168.1.20:8096
-  jfKey: '',             // Jellyfin API key
-  jfUser: '',            // Jellyfin user name; empty = the first administrator
-  tvRemote: '',          // how app tiles open apps: '' = automatic (intent link on the TV, else the first remote.*), 'intent', a remote.* id, or 'none'
 };
 
 function readPrefs() {
@@ -211,35 +197,12 @@ const VIEWS_META = {
   energy: { title: 'Energy', icon: 'solar' },
   places: { title: 'Places', icon: 'mapMarker' },
   home: { title: 'Home', icon: 'home' },
-  tv: { title: 'TV', icon: 'tv' },
   settings: { title: 'Settings', icon: 'settings' },
 };
 const urlParams = new URLSearchParams(location.search);
 const kiosk = urlParams.has('kiosk');
 const urlWall = kiosk || urlParams.has('wall');
-// ?tv: the TV home screen (Google TV / Android TV in Fully Kiosk Browser), worked with the remote.
-const tvMode = urlParams.has('tv');
-if (kiosk || tvMode) document.documentElement.classList.add('kiosk');
-if (tvMode) {
-  document.documentElement.classList.add('tv-mode');
-  // The moving colour behind the screen, in its own element so changing its colour doesn't restyle the page.
-  const aurora = document.createElement('div');
-  aurora.className = 'tv-aurora';
-  aurora.setAttribute('aria-hidden', 'true');
-  const addAurora = () => document.body.prepend(aurora);
-  if (document.body) addAurora(); else document.addEventListener('DOMContentLoaded', addAurora);
-  // Shown as a Home Assistant dashboard (in the app on the TV): hide HA's sidebar and title bar, which a remote can't work.
-  // Same as Profile → "Always hide the sidebar", and only on this device. Only on the TV itself: a phone or computer
-  // that opens the TV dashboard keeps its sidebar.
-  try {
-    const haRoot = tvOnDevice() && window.parent !== window && window.parent.document.querySelector('home-assistant');
-    if (haRoot) {
-      haRoot.dispatchEvent(new CustomEvent('hass-dock-sidebar', { detail: { dock: 'always_hidden' }, bubbles: true, composed: true }));
-      // Newer Home Assistant also has a kiosk mode that hides its title bar; it lasts until the app reloads.
-      window.parent.dispatchEvent(new CustomEvent('hass-kiosk-mode', { detail: { enable: true } }));
-    }
-  } catch { /* not inside Home Assistant */ }
-}
+if (kiosk) document.documentElement.classList.add('kiosk');
 
 /** Pages turned off in Settings drop out of the menu. */
 function viewOn(v) {
@@ -250,12 +213,12 @@ function viewOn(v) {
 
 function parseRoute() {
   const [path, query = ''] = location.hash.replace(/^#\/?/, '').split('?');
-  const view = VIEWS_META[path] && viewOn(path) ? path : tvMode ? 'tv' : 'today';
+  const view = VIEWS_META[path] && viewOn(path) ? path : 'today';
   return { view, params: Object.fromEntries(new URLSearchParams(query)) };
 }
 
 function renderNav() {
-  $('#nav').innerHTML = `<span class="brand" aria-hidden="true">${icon('home')}</span>${Object.entries(VIEWS_META).filter(([v]) => viewOn(v) && v !== 'tv').map(([v, m]) => `
+  $('#nav').innerHTML = `<span class="brand" aria-hidden="true">${icon('home')}</span>${Object.entries(VIEWS_META).filter(([v]) => viewOn(v)).map(([v, m]) => `
     <a href="#/${v}" data-view="${v}" class="nav-${v}"${ui.view === v ? ' aria-current="page"' : ''}>${icon(m.icon)}<span>${m.title}</span></a>`).join('')}`;
 }
 
@@ -270,8 +233,6 @@ function renderStatus() {
 function tickClock() {
   const now = new Date();
   $('#clock').textContent = fmtTime(now);
-  const tvClock = $('.tv-clock');
-  if (tvClock) tvClock.textContent = fmtTime(now);
   const big = $('.hero-time');
   if (big) big.textContent = fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, '');
   applyTheme();
@@ -282,7 +243,6 @@ function applyTheme() {
   const t = store.prefs.theme;
   let theme = '';
   if (t === 'light' || t === 'dark') theme = t;
-  else if (tvMode && t === 'auto') theme = 'dark'; // a TV in a lounge room: dark unless chosen otherwise
   else if (t === 'sun') theme = store.states.get('sun.sun')?.state === 'below_horizon' ? 'dark' : 'light';
   if ((document.documentElement.dataset.theme || '') !== theme) {
     if (theme) document.documentElement.dataset.theme = theme;
@@ -409,7 +369,7 @@ function applySky() {
 
 function render() {
   const r = parseRoute();
-  if (r.view !== ui.view) { closeSheet(); ui.camEdit = false; ui.camPick = ''; if (ui.view === 'tv') tvLeave(); }
+  if (r.view !== ui.view) { closeSheet(); ui.camEdit = false; ui.camPick = ''; }
   ui.view = r.view;
   ui.params = r.params;
   document.documentElement.dataset.view = ui.view;
@@ -424,13 +384,8 @@ function render() {
   ui.viewHtml = html;
   view.dataset.view = ui.view;
   const typing = document.activeElement?.matches('#view .shop-add input');
-  // Redraws must not lose the remote's place: put focus back on the same thing.
-  const focusKey = document.activeElement?.closest?.('#view [data-tv-key]')?.dataset.tvKey;
-  const rowScroll = $('.tv-apps', view)?.scrollLeft || 0;
   view.innerHTML = html;
   if (typing) view.querySelector('.shop-add input')?.focus();
-  if (rowScroll && $('.tv-apps', view)) $('.tv-apps', view).scrollLeft = rowScroll;
-  if (focusKey) view.querySelector(`[data-tv-key="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
   after[ui.view]?.(view);
   ui.lastRender = Date.now();
   paintCameras(view);
@@ -1640,840 +1595,10 @@ function camEditAct(act) {
 }
 
 // ============================================================
-// TV home screen (?tv)
-// ============================================================
-
-const tv = {
-  tab: 'home',        // 'home' | 'cameras'
-  cam: '',            // the camera shown big
-  full: false,        // the big camera filling the screen
-  hourly: [],
-  hourlyAt: 0,
-  player: null,
-  stage: null,        // kept between redraws so the video keeps playing
-  seen: new Map(),    // pop-up sensors: entity_id -> when it last went off (so each visit pops up once)
-  seenReady: false,
-  pop: null,          // the camera popped up: { cam, player, timer }
-  resume: [],         // Jellyfin "continue watching"
-  resumeAt: 0,
-  resumeErr: '',
-  jf: null,
-  lastInput: Date.now(),
-  saver: false,
-  saverAt: 0,
-  saverCam: 0,
-};
-
-/** Effective lists: what was picked in Settings, or the automatic choice. */
-function tvList(key) {
-  const picked = (store.prefs[key] || []).filter((id) => store.states.has(id));
-  if (picked.length) return picked;
-  if (key === 'tvCams') {
-    const cams = listedCameras();
-    return (cams.length ? cams : [...store.states.keys()].filter((id) => domainOf(id) === 'camera'))
-      .filter((id) => !isUnavailable(store.states.get(id)));
-  }
-  if (key === 'tvReadings') {
-    const shownOnes = autoReadings(store.states, listed);
-    // None exposed to the voice assistant: fall back to any ordinary (non-diagnostic) sensor.
-    return shownOnes.length ? shownOnes : autoReadings(store.states, (id) => !store.entityInfo.get(id)?.category && !store.entityInfo.get(id)?.hidden);
-  }
-  if (key === 'tvButtons') {
-    return [...store.states.keys()].filter((id) => ['scene', 'script'].includes(domainOf(id)) && listed(id))
-      .sort((a, b) => nameOf(store.states.get(a)).localeCompare(nameOf(store.states.get(b)))).slice(0, 2);
-  }
-  return [];
-}
-
-function tvCamera() {
-  const cams = tvList('tvCams');
-  if (!cams.includes(tv.cam)) tv.cam = cams[0] || '';
-  return { cams, cam: tv.cam };
-}
-
-async function loadHourly() {
-  const w = weatherEntity();
-  if (!w || !store.client || Date.now() - tv.hourlyAt < 20 * 60_000) return;
-  tv.hourlyAt = Date.now();
-  try {
-    const res = await store.client.send({
-      type: 'call_service', domain: 'weather', service: 'get_forecasts', service_data: { type: 'hourly' },
-      target: { entity_id: w.entity_id }, return_response: true,
-    });
-    tv.hourly = res?.response?.[w.entity_id]?.forecast || [];
-  } catch {
-    tv.hourly = []; // no hourly forecast: the card shows the next days instead
-  }
-  queueRefresh();
-}
-
-function tvNight() {
-  return store.states.get('sun.sun')?.state === 'below_horizon';
-}
-
-function tvWeatherHtml() {
-  const w = weatherEntity();
-  if (!w) return '';
-  const a = w.attributes || {};
-  const fc = forecastFor(new Date());
-  const rain = fc?.precipitation_probability;
-  const soon = Date.now() - 30 * 60_000;
-  const hours = tv.hourly.filter((f) => new Date(f.datetime).getTime() >= soon).slice(0, 3);
-  const days = hours.length ? [] : day.forecast.slice(1, 4);
-  const word = weatherWord(w.state).replace(/^\w/, (c) => c.toUpperCase());
-  return `<section class="tv-card tv-weather">
-    <div class="tv-wx-now">
-      ${icon(weatherIcon(w.state, tvNight()), 'icon tv-wx-big')}
-      <b>${deg(a.temperature)}</b>
-      <span><span class="tv-wx-word">${esc(word)}</span>
-        ${fc ? `<small>${deg(fc.temperature)} / ${deg(fc.templow)} · ${rain ? `${rain}% rain` : 'no rain'}</small>` : ''}</span>
-    </div>
-    ${hours.length || days.length ? `<ol class="tv-wx-hours">${(hours.length ? hours : days).map((f) => {
-      const d = new Date(f.datetime);
-      const label = hours.length ? d.toLocaleTimeString(undefined, { hour: 'numeric' }) : d.toLocaleDateString(undefined, { weekday: 'short' });
-      return `<li><small>${esc(label)}</small>${icon(weatherIcon(f.condition, f.is_daytime === false))}<b>${deg(f.temperature)}</b></li>`;
-    }).join('')}</ol>` : ''}
-    ${tvSolarHtml()}
-  </section>`;
-}
-
-function tvReadingsHtml(area = '') {
-  // Picked in Settings, else the TV room's own readings, else a few from around the house.
-  const picked = (store.prefs.tvReadings || []).filter((id) => store.states.has(id));
-  const inRoom = area ? autoReadings(store.states, (id) => areaOf(id) === area && (listed(id) || !store.entityInfo.get(id)?.category)) : [];
-  const ids = picked.length ? picked : inRoom.length ? inRoom : tvList('tvReadings');
-  if (!ids.length) return '';
-  const groups = new Map();
-  for (const id of ids) {
-    const area = store.areas.get(areaOf(id)) || 'Other';
-    if (!groups.has(area)) groups.set(area, []);
-    groups.get(area).push(store.states.get(id));
-  }
-  return `<section class="tv-card tv-readings"><h3 class="tv-h">Readings</h3>${[...groups].map(([area, list]) => `
-    <h3>${esc(area)}</h3>
-    <ul>${list.map((s) => `<li>${icon(iconFor(s))}<span>${esc(nameOf(s))}</span><b>${esc(formatState(s))}</b></li>`).join('')}</ul>`).join('')}
-  </section>`;
-}
-
-/** Home, the TV's room (by name) and Cameras. */
-function tvTabs() {
-  const area = tvRoom();
-  return [['home', 'Home'], ...(area ? [['room', store.areas.get(area) || 'Room']] : []), ['cameras', 'Cameras']];
-}
-
-function tvTopHtml() {
-  const buttons = tvList('tvButtons').map((id) => store.states.get(id));
-  return `<header class="tv-top">
-    <nav class="tv-tabs">
-      ${tvTabs().map(([k, l]) => `<button type="button" data-tv-tab="${k}" data-tv-key="tab-${k}"${tv.tab === k ? ' aria-current="page"' : ''}>${l}</button>`).join('')}
-    </nav>
-    <div class="tv-actions">
-      ${buttons.map((s) => `<button type="button" class="tv-pill" data-tv-run="${esc(s.entity_id)}" data-tv-key="run-${esc(s.entity_id)}">${icon(iconFor(s))}<span>${esc(nameOf(s))}</span></button>`).join('')}
-      <a class="tv-pill tv-gear" href="#/settings?section=tv" data-tv-key="settings" aria-label="Settings">${icon('settings')}</a>
-      <span class="tv-status" data-status="${esc(store.status)}"></span>
-      <time class="tv-clock">${esc(fmtTime(new Date()))}</time>
-    </div>
-  </header>`;
-}
-
-function tvAppsHtml() {
-  const apps = parseApps(urlParams.get('apps') || store.prefs.tvApps); // ?apps=jellyfin,disney,kayo in the address wins
-  if (!apps.length) return '';
-  return `<nav class="tv-apps" aria-label="Apps">${apps.map((a, i) => `<button type="button" class="tv-app" data-tv-app="${esc(a.pkg)}" data-tv-key="app-${esc(a.pkg)}"${i === 0 ? ' data-tv-start' : ''}
-      data-name="${esc(a.name)}" data-logo="${tvLogos.get(a.key) || ''}" style="--app-bg:${a.colors[0]};--app-fg:${a.colors[1]};--app-glow:${a.colors[2]};--app-glow-2:${a.colors[3] || a.colors[2]}"><span>${esc(a.name)}</span>${tvLogos.get(a.key) === 'none' ? '' : `<img class="tv-app-logo" src="logos/${esc(a.key)}.png${urlParams.get('v') ? `?v=${esc(urlParams.get('v'))}` : ''}" data-logo-key="${esc(a.key)}" alt="" decoding="async">`}</button>`).join('')}</nav>`;
-}
-
-// App logos are the user's own image files in Home Assistant (config/www/dashboard/logos/<app>.png), so none
-// ship with the dashboard. Each is checked once: a wide picture fills the card like a Google TV banner, a square
-// icon sits in the middle, and a missing one leaves the name on the card.
-const tvLogos = new Map(); // key -> 'wide' | 'icon' | 'none'
-document.addEventListener('load', (e) => {
-  const img = e.target;
-  if (!img.matches?.('img.tv-app-logo')) return;
-  const kind = img.naturalWidth / img.naturalHeight > 1.4 ? 'wide' : 'icon';
-  tvLogos.set(img.dataset.logoKey, kind);
-  img.closest('.tv-app').dataset.logo = kind;
-}, true);
-document.addEventListener('error', (e) => {
-  const img = e.target;
-  if (!img.matches?.('img.tv-app-logo')) return;
-  tvLogos.set(img.dataset.logoKey, 'none');
-  img.remove();
-}, true);
-
-// ---------- the TV's room: lights, blinds and climate ----------
-
-/** The Home Assistant app on the TV, from ?open=notify.mobile_app_<tv>: its device's area is the TV's room. */
-function tvDeviceSlug() {
-  const m = String(urlParams.get('open') || store.prefs.tvRemote || '').match(/^notify\.mobile_app_(\w+)$/);
-  return m ? m[1] : '';
-}
-
-function tvRoom() {
-  return pickRoom({ pick: urlParams.get('room') || store.prefs.tvRoom, areas: store.areas, states: store.states, areaOf, tvDevice: tvDeviceSlug() });
-}
-
-const TV_SWITCHES = /light|lamp|fan|heater|blanket|lights/i;
-
-/** What the TV's room has that the remote can work: lights (and light-like switches, fans), blinds, climate, players. */
-function tvRoomThings(area) {
-  const out = { lights: [], blinds: [], climate: [], players: [], ents: [] };
-  if (!area) return out;
-  out.ents = areaEntities(area).map(shown);
-  for (const s of out.ents) {
-    const d = domainOf(s.entity_id);
-    if ((d === 'light' && !isStatusLight(s)) || d === 'fan' || (d === 'switch' && TV_SWITCHES.test(nameOf(s)))) out.lights.push(s);
-    else if (d === 'cover' && !isCoverDoor(s)) out.blinds.push(s);
-    else if (d === 'climate') out.climate.push(s);
-    else if (d === 'media_player') out.players.push(s);
-  }
-  return out;
-}
-
-/** "Living Room Blind Left" in the Living Room is just "Blind Left". */
-function tvShortName(s, area) {
-  const room = store.areas.get(area) || '';
-  const n = nameOf(s);
-  const cut = room ? n.replace(new RegExp(`^${reEsc(room)}\\s*`, 'i'), '') : n;
-  return (cut || n).replace(/^\w/, (c) => c.toUpperCase());
-}
-
-const coverPos = (s) => (s.attributes?.current_position != null ? Number(s.attributes.current_position) : s.state === 'closed' ? 0 : 100);
-function coverWord(s) {
-  if (s.state === 'opening' || s.state === 'closing') return s.state.replace(/^\w/, (c) => c.toUpperCase());
-  const p = coverPos(s);
-  return p <= 0 ? 'Closed' : p >= 100 ? 'Open' : `${p}% open`;
-}
-function lightWord(s) {
-  if (s.state !== 'on') return 'Off';
-  const b = s.attributes?.brightness;
-  return b ? `On · ${Math.round((b / 255) * 100)}%` : 'On';
-}
-function climateTarget(s) {
-  const t = s.attributes?.temperature ?? s.attributes?.target_temp_high ?? null;
-  return t == null ? null : Number(t);
-}
-
-/** Home's small room card: a quick button for each light and blind, and the temperature. */
-function tvRoomCardHtml() {
-  const area = tvRoom();
-  if (!area) return '';
-  const t = tvRoomThings(area);
-  const temp = roomTemperature(t.ents) || t.climate.find((c) => c.attributes?.current_temperature != null);
-  const tempVal = temp ? (domainOf(temp.entity_id) === 'climate' ? temp.attributes.current_temperature : temp.state) : null;
-  // One of each kind first (a light, a blind, the aircon), then more lights and blinds.
-  const order = [t.lights[0], t.blinds[0], t.climate[0], ...t.lights.slice(1), ...t.blinds.slice(1)].filter(Boolean).slice(0, 3);
-  const pickT = { lights: t.lights.filter((s) => order.includes(s)), blinds: t.blinds.filter((s) => order.includes(s)), climate: t.climate.filter((s) => order.includes(s)) };
-  const chips = [
-    ...pickT.lights.map((s) => `<button type="button" class="tv-chip${s.state === 'on' ? ' on' : ''}" data-tv-toggle="${esc(s.entity_id)}" data-tv-key="chip-${esc(s.entity_id)}">${icon(s.state === 'on' ? iconFor(s) : 'lightOff')}<span>${esc(tvShortName(s, area))}<small>${esc(lightWord(s))}</small></span></button>`),
-    ...pickT.blinds.map((s) => `<button type="button" class="tv-chip${coverPos(s) > 0 ? ' on' : ''}" data-tv-cover-flip="${esc(s.entity_id)}" data-tv-key="chip-${esc(s.entity_id)}">${icon(coverPos(s) > 0 ? 'blindOpen' : 'cover')}<span>${esc(tvShortName(s, area))}<small>${esc(coverWord(s))}</small></span></button>`),
-    ...pickT.climate.map((s) => `<button type="button" class="tv-chip${s.state !== 'off' ? ' on' : ''}" data-tv-room-go data-tv-key="chip-${esc(s.entity_id)}">${icon('thermostatAuto')}<span>${esc(tvShortName(s, area))}<small>${s.state === 'off' ? 'Off' : `${esc(s.state.replace(/_/g, ' '))} · ${deg(climateTarget(s))}`}</small></span></button>`),
-  ];
-  if (!chips.length && tempVal == null) return '';
-  return `<section class="tv-card tv-room">
-    <h3><span>${esc(store.areas.get(area))}</span>${tempVal != null ? `<b>${deg(tempVal)}</b>` : ''}</h3>
-    ${chips.length ? `<div class="tv-chips">${chips.join('')}</div>` : ''}
-  </section>`;
-}
-
-/** The room tab: every light, blind and thermostat in the TV's room, its readings and what's playing there. */
-function tvRoomTabHtml() {
-  const area = tvRoom();
-  if (!area) return `<div class="tv-card tv-empty"><p>Which room is this TV in? Pick it in Settings → TV, or add <code>&amp;room=living room</code> to the TV's address.</p></div>`;
-  const t = tvRoomThings(area);
-  const key = (s, k) => `data-tv-key="${k}-${esc(s.entity_id)}"`;
-  const anyOn = t.lights.filter((s) => s.state === 'on');
-  const lights = t.lights.length ? `<section class="tv-card tv-ctl"><h3>Lights${anyOn.length > 1 ? `<button type="button" class="tv-mini" data-tv-off="${esc(anyOn.map((s) => s.entity_id).join(' '))}" data-tv-key="lights-off">All off</button>` : ''}</h3>
-    <ul>${t.lights.map((s) => `<li><button type="button" class="tv-row-btn${s.state === 'on' ? ' on' : ''}" data-tv-toggle="${esc(s.entity_id)}" ${key(s, 'tg')}>${icon(s.state === 'on' ? iconFor(s) : 'lightOff')}<span>${esc(tvShortName(s, area))}</span><b>${esc(lightWord(s))}</b></button></li>`).join('')}</ul></section>` : '';
-  const blindRow = (ids, label, word, k) => `<li class="tv-blind"><span><b>${esc(label)}</b><small>${esc(word)}</small></span>
-      <span class="tv-btns">${[['open', 'arrowUp', 'Open'], ['stop', 'stop', 'Stop'], ['close', 'arrowDown', 'Close']].map(([a, ic, l]) => `<button type="button" class="tv-round" data-tv-cover="${esc(ids)}" data-act="${a}" data-tv-key="${k}-${a}" aria-label="${l} ${esc(label)}">${icon(ic)}</button>`).join('')}</span></li>`;
-  const blinds = t.blinds.length ? `<section class="tv-card tv-ctl"><h3>Blinds</h3><ul>
-    ${t.blinds.length > 1 ? blindRow(t.blinds.map((s) => s.entity_id).join(' '), 'All blinds', t.blinds.every((s) => coverPos(s) <= 0) ? 'Closed' : t.blinds.every((s) => coverPos(s) >= 100) ? 'Open' : 'Partly open', 'blinds-all') : ''}
-    ${t.blinds.map((s) => blindRow(s.entity_id, tvShortName(s, area), coverWord(s), `bl-${s.entity_id}`)).join('')}</ul></section>` : '';
-  const climate = t.climate.map((s) => {
-    const target = climateTarget(s);
-    const cur = s.attributes?.current_temperature;
-    return `<section class="tv-card tv-ctl tv-clim"><h3>${esc(tvShortName(s, area))}<small>${s.state === 'off' ? 'Off' : esc(s.state.replace(/_/g, ' '))}${cur != null ? ` · ${deg(cur)} now` : ''}</small></h3>
-      <div class="tv-clim-row">
-        <button type="button" class="tv-round" data-tv-clim="${esc(s.entity_id)}" data-act="down" ${key(s, 'cd')} aria-label="Cooler">${icon('minus')}</button>
-        <b class="tv-clim-set">${target != null ? deg(target) : '–'}</b>
-        <button type="button" class="tv-round" data-tv-clim="${esc(s.entity_id)}" data-act="up" ${key(s, 'cu')} aria-label="Warmer">${icon('plus')}</button>
-        <button type="button" class="tv-pill${s.state !== 'off' ? ' on' : ''}" data-tv-clim="${esc(s.entity_id)}" data-act="power" ${key(s, 'cp')}>${icon('power')}${s.state === 'off' ? 'Turn on' : 'Turn off'}</button>
-      </div></section>`;
-  }).join('');
-  const readings = tvReadingsHtml(area);
-  const playing = tvNowPlayingHtml(t.players);
-  // Columns: lights with the readings under them, the blinds, the climate.
-  const cards = [lights + readings, blinds, climate].filter(Boolean).map((c) => `<div class="tv-ctl-col">${c}</div>`);
-  if (!cards.length && !playing) return `<div class="tv-card tv-empty"><p>Nothing to control in ${esc(store.areas.get(area))} yet. Only devices exposed to your voice assistant show here.</p></div>`;
-  return `<div class="tv-roomtab">${playing}<div class="tv-ctl-grid">${cards.join('')}</div></div>`;
-}
-
-// ---------- now playing ----------
-
-const PLAYING = ['playing', 'paused', 'buffering'];
-
-/** Something playing: the TV room's players first, then anything else in the house that's playing. */
-function tvPlayer(roomPlayers) {
-  const active = (list) => list.filter((s) => PLAYING.includes(s.state) && (s.attributes?.media_title || s.attributes?.app_name));
-  const room = active(roomPlayers);
-  const rank = (s) => (s.state === 'playing' ? 0 : 1);
-  if (room.length) return room.sort((a, b) => rank(a) - rank(b))[0];
-  return active([...store.states.values()].filter((s) => domainOf(s.entity_id) === 'media_player')).sort((a, b) => rank(a) - rank(b))[0] || null;
-}
-
-function tvNowPlayingHtml(roomPlayers) {
-  const s = tvPlayer(roomPlayers);
-  if (!s) return '';
-  const a = s.attributes || {};
-  const art = a.entity_picture ? (/^https?:/.test(a.entity_picture) ? a.entity_picture : `${base()}${a.entity_picture}`) : '';
-  const sub = [a.media_artist || a.media_series_title, a.app_name, nameOf(s)].filter(Boolean).filter((v, i, l) => l.indexOf(v) === i).join(' · ');
-  const id = esc(s.entity_id);
-  const b = (act, ic, label, extra = '') => `<button type="button" class="tv-round${extra}" data-tv-media="${act}" data-id="${id}" data-tv-key="np-${act}" aria-label="${label}">${icon(ic)}</button>`;
-  return `<section class="tv-np">
-    ${art ? `<img class="tv-np-art" src="${esc(art)}" alt="">` : `<span class="tv-np-art">${icon('play')}</span>`}
-    <span class="tv-np-text"><b>${esc(a.media_title || a.app_name || 'Playing')}</b><small>${esc(sub)}</small></span>
-    <span class="tv-btns">${b('prev', 'skipPrev', 'Previous')}${b('playpause', s.state === 'playing' ? 'pause' : 'play', s.state === 'playing' ? 'Pause' : 'Play', ' big')}${b('next', 'skipNext', 'Next')}${b('voldown', 'volumeLow', 'Quieter')}${b('volup', 'volumeHigh', 'Louder')}</span>
-  </section>`;
-}
-
-// ---------- up next: the calendar and the shopping list ----------
-
-function tvUpNextHtml() {
-  const lines = [];
-  if (store.prefs.calendar && shownCalendars().length) {
-    loadEvents();
-    const vw = calView();
-    const now = new Date();
-    const today = calStartOfDay(now);
-    const tomorrow = calAddDays(today, 1);
-    const todays = calOnDay(vw.events, today).filter((ev) => ev.allDay || ev.end > now);
-    const next = [...todays.map((ev) => [ev, today, '']), ...calOnDay(vw.events, tomorrow).map((ev) => [ev, tomorrow, 'Tomorrow'])].slice(0, 3);
-    for (const [ev, d, when] of next) {
-      const w = vw.info(ev);
-      const start = ev.allDay ? 'All day' : fmtTime(ev.start);
-      lines.push(`<li style="--cal:${vw.colorOf(ev)}"><small>${esc(when ? `${when}${ev.allDay ? '' : ` ${start}`}` : start)}</small><span>${esc(ev.title)}</span>${w ? `<i>${esc(w.label)}</i>` : ''}</li>`);
-    }
-    if (!next.length && day.eventsKey) lines.push('<li class="quiet"><span>Nothing else on today or tomorrow</span></li>');
-  }
-  let shopping = '';
-  let count = '';
-  if (store.prefs.shopping) {
-    watchShopList();
-    const open = (shop.items || []).filter((i) => i.status !== 'completed');
-    if (shop.id && shop.items && open.length) count = `<span class="tv-shop-count">${icon('cart')}${open.length} to buy</span>`;
-    if (shop.id && shop.items) shopping = `<p class="tv-shop">${icon('cart')}<span>${open.length ? `<b>${plural(open.length, 'thing')} to buy:</b> ${esc(open.slice(0, 4).map((i) => i.summary).join(', '))}${open.length > 4 ? '…' : ''}` : 'Nothing on the shopping list'}</span></p>`;
-  }
-  if (!lines.length && !shopping) return '';
-  return `<section class="tv-card tv-next"><h3><span>Up next</span>${count}</h3>${lines.length ? `<ul>${lines.join('')}</ul>` : ''}${shopping}</section>`;
-}
-
-// ---------- solar at a glance (top bar) ----------
-
-function tvSolarHtml() {
-  if (!store.prefs.energyTab) return '';
-  const e = energyNow();
-  const f = e.flow;
-  const tariff = tariffNow(store.states);
-  if (!f.found && !tariff) return '';
-  const bits = [];
-  if (f.found && f.soc != null) bits.push(`${icon(f.charging > 0.05 ? 'batteryCharging' : 'battery')}<b>${Math.round(f.soc)}%</b>`);
-  if (f.found && f.solar != null) bits.push(`${icon('solar')}<b>${energyPower(f.solar)}</b>`);
-  if (f.found && f.selling > 0.05) bits.push(`<span class="pos">Selling ${energyPower(f.selling)}</span>`);
-  else if (f.found && f.buying > 0.05) bits.push(`<span class="neg">Buying ${energyPower(f.buying)}</span>`);
-  if (tariff) bits.push(`<span class="tv-tariff${tariff === 'Peak' ? ' peak' : ''}">${esc(tariff)}</span>`);
-  return `<span class="tv-solar">${bits.join('')}</span>`;
-}
-
-// ---------- Jellyfin: continue watching ----------
-
-function tvJellyfin() {
-  const cfg = { url: urlParams.get('jellyfin') || store.prefs.jfUrl, key: urlParams.get('jfkey') || store.prefs.jfKey, user: urlParams.get('jfuser') || store.prefs.jfUser };
-  const sig = JSON.stringify(cfg);
-  if (tv.jf?.sig !== sig) { tv.jf = new Jellyfin(cfg); tv.jf.sig = sig; tv.resumeAt = 0; tv.resume = []; }
-  return tv.jf;
-}
-
-async function loadResume(force = false) {
-  const jf = tvJellyfin();
-  if (!jf.ok || (!force && Date.now() - tv.resumeAt < 3 * 60_000)) return;
-  tv.resumeAt = Date.now();
-  try {
-    tv.resume = await jf.resume();
-    tv.resumeErr = '';
-  } catch (err) {
-    tv.resume = [];
-    tv.resumeErr = /fetch|network/i.test(err.message) ? `Couldn't reach Jellyfin at ${jf.url}. If Home Assistant is on https, Jellyfin needs https too.` : err.message;
-  }
-  queueRefresh();
-}
-
-function tvResumeHtml() {
-  loadResume();
-  if (!tv.resume.length) return '';
-  return `<section class="tv-shelf"><h3>Continue watching</h3><div class="tv-resume">${tv.resume.map((it) => `<button type="button" class="tv-show" data-tv-resume="${esc(it.id)}" data-ticks="${it.ticks}" data-tv-key="jf-${esc(it.id)}">
-    <span class="tv-show-art"><img src="${esc(it.image)}" alt="" loading="lazy"><i style="width:${it.progress}%"></i></span>
-    <b>${esc(it.title)}</b><small>${esc(it.sub)}</small></button>`).join('')}</div></section>`;
-}
-
-async function tvResumePlay(btn) {
-  const jf = tvJellyfin();
-  const app = parseApps(urlParams.get('apps') || store.prefs.tvApps).find((a) => /jellyfin/i.test(a.pkg)) || { pkg: 'org.jellyfin.androidtv', name: 'Jellyfin' };
-  const since = Date.now();
-  tvLaunch(app.pkg, app.name);
-  try {
-    if (!(await jf.playOnTv(btn.dataset.tvResume, Number(btn.dataset.ticks), { since }))) toast('Jellyfin is open: pick it from Continue watching there.');
-  } catch (err) {
-    toast(`Jellyfin is open, but it couldn't start the show: ${err.message}`);
-  }
-}
-
-// ---------- doorbell and person pop-up ----------
-
-/** Pops a camera up when someone's at the door (or, if picked, any motion), once per visit. */
-function tvWatchAlerts() {
-  const mode = store.prefs.tvPopup || 'person';
-  const cams = tvList('tvCams');
-  const byDevice = new Map(cams.map((id) => [store.entityInfo.get(id)?.deviceId, id]).filter(([d]) => d));
-  for (const s of store.states.values()) {
-    if (!popupSensor(s, mode)) continue;
-    const stamp = domainOf(s.entity_id) === 'event' ? s.state : s.state === 'on' ? s.last_changed : '';
-    const prev = tv.seen.get(s.entity_id);
-    tv.seen.set(s.entity_id, stamp);
-    if (!tv.seenReady || !stamp || stamp === prev) continue;
-    const area = areaOf(s.entity_id);
-    const cam = byDevice.get(store.entityInfo.get(s.entity_id)?.deviceId) || (area && cams.find((c) => areaOf(c) === area));
-    if (!cam) continue;
-    const camLabel = camName(store.states.get(cam));
-    let kind = nameOf(s).replace(new RegExp(reEsc(camLabel), 'i'), '').trim() || 'Motion';
-    if (/visitor|doorbell|ding|ring/i.test(`${s.entity_id} ${kind}`) || domainOf(s.entity_id) === 'event') kind = 'Doorbell';
-    tvPopup(cam, kind);
-  }
-  tv.seenReady = true;
-}
-
-function tvPopup(cam, kind) {
-  let el = $('#tv-pop');
-  if (!el) {
-    el = document.createElement('aside');
-    el.id = 'tv-pop';
-    el.className = 'tv-pop';
-    document.body.append(el);
-  }
-  const title = kind === 'Doorbell' ? `Someone's at the ${camName(store.states.get(cam))}` : `${kind} · ${camName(store.states.get(cam))}`;
-  if (tv.pop?.cam !== cam) {
-    tv.pop?.player?.stop();
-    clearTimeout(tv.pop?.timer);
-    el.innerHTML = `<div class="cam-stage tv-pop-stage" data-phase="connecting"><img class="cam-poster" data-cam="${esc(cam)}" alt="">
-        <div class="cam-status"><div class="spinner"></div></div></div>
-      <p class="tv-pop-text"><b></b><small>OK to watch · Back to close</small></p>`;
-    paintCameras(el);
-    const stage = $('.tv-pop-stage', el);
-    const player = store.client ? new CameraPlayer({
-      client: store.client, entityId: cam, getState: () => store.states.get(cam), stage,
-      onState: ({ phase }) => { stage.dataset.phase = phase; },
-    }) : null;
-    tv.pop = { cam, player, timer: 0 };
-    if (!document.hidden) player?.start();
-  }
-  $('.tv-pop-text b', el).textContent = title;
-  el.classList.add('show');
-  clearTimeout(tv.pop.timer);
-  tv.pop.timer = setTimeout(tvPopClose, 30_000);
-  if (tv.saver) tvWake();
-  ding.play();
-}
-
-function tvPopClose() {
-  if (!tv.pop) return;
-  tv.pop.player?.stop();
-  clearTimeout(tv.pop.timer);
-  tv.pop = null;
-  const el = $('#tv-pop');
-  if (el) { el.classList.remove('show'); el.innerHTML = ''; }
-}
-
-function tvPopOpen() {
-  const cam = tv.pop?.cam;
-  tvPopClose();
-  if (!cam) return;
-  tv.cam = cam;
-  if (ui.view !== 'tv') location.hash = '#/tv';
-  if (tv.tab !== 'home') tvSetTab('home'); else render();
-  tvSetFull(true);
-  $('[data-tv-cam]')?.focus();
-}
-
-// ---------- screensaver ----------
-
-function tvSleep() {
-  tv.saver = true;
-  tv.saverAt = 0;
-  tvStop();
-  let el = $('#tv-saver');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'tv-saver';
-    el.className = 'tv-saver';
-    el.innerHTML = '<img class="tv-saver-bg" alt=""><img class="tv-saver-bg" alt=""><div class="tv-saver-info"></div>';
-    document.body.append(el);
-  }
-  tvPaintSaver();
-  requestAnimationFrame(() => el.classList.add('show'));
-}
-
-function tvWake() {
-  tv.saver = false;
-  tv.lastInput = Date.now();
-  $('#tv-saver')?.classList.remove('show');
-  if (ui.view === 'tv') tvPlay();
-}
-
-/** The clock, date, weather and next event, over a slow show of camera stills. */
-function tvPaintSaver() {
-  const el = $('#tv-saver');
-  if (!el) return;
-  const now = new Date();
-  const w = weatherEntity();
-  let next = '';
-  if (store.prefs.calendar && day.eventsKey) {
-    const today = calStartOfDay(now);
-    const ev = calOnDay(calView().events, today).find((x) => !x.allDay && x.end > now);
-    if (ev) next = `${fmtTime(ev.start)} · ${ev.title}`;
-  }
-  $('.tv-saver-info', el).innerHTML = `<time>${esc(fmtTime(now))}</time>
-    <p>${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-    ${w ? `<p class="tv-saver-wx">${icon(weatherIcon(w.state, tvNight()))}${deg(w.attributes?.temperature)} · ${esc(weatherWord(w.state))}</p>` : ''}
-    ${next ? `<p class="tv-saver-next">${icon('calendar')}${esc(next)}</p>` : ''}`;
-  if (Date.now() - tv.saverAt < 20_000) return;
-  tv.saverAt = Date.now();
-  const cams = tvList('tvCams');
-  if (!cams.length) return;
-  const cam = cams[tv.saverCam++ % cams.length];
-  const url = cameraStillUrl(base(), store.states.get(cam), 1280);
-  if (!url) return;
-  const [a, b] = el.querySelectorAll('.tv-saver-bg');
-  const [shown, next2] = a.classList.contains('on') ? [a, b] : [b, a];
-  next2.onload = () => { next2.classList.add('on'); shown.classList.remove('on'); };
-  next2.src = url;
-}
-
-setInterval(() => {
-  if (tv.saver) { tvPaintSaver(); return; }
-  const mins = Number(store.prefs.tvSaver) || 0;
-  if (!tvMode || !mins || ui.view !== 'tv' || tv.full || tv.pop || $('#sheet')?.open || document.hidden) return;
-  if (Date.now() - tv.lastInput >= mins * 60_000) tvSleep();
-}, 5000);
-for (const ev of ['keydown', 'pointerdown', 'wheel']) document.addEventListener(ev, () => { tv.lastInput = Date.now(); }, { capture: true, passive: true });
-
-// Before anything else sees a key: the screensaver eats the key that wakes it, and the pop-up answers OK and Back.
-window.addEventListener('keydown', (e) => {
-  if (!tvMode && ui.view !== 'tv') return;
-  if (tv.saver) { tvWake(); e.preventDefault(); e.stopImmediatePropagation(); return; }
-  if (!tv.pop) return;
-  if (isBackKey(e) || e.key === 'Backspace') { tvPopClose(); e.preventDefault(); e.stopImmediatePropagation(); return; }
-  if (e.key === 'Enter' || e.key === ' ') { tvPopOpen(); e.preventDefault(); e.stopImmediatePropagation(); }
-}, true);
-
-/** Motion, person and similar sensors on each camera, newest first: a simple alerts list. */
-function tvAlerts(cams) {
-  const byDevice = new Map(cams.map((id) => [store.entityInfo.get(id)?.deviceId, id]).filter(([d]) => d));
-  const out = [];
-  for (const s of store.states.values()) {
-    if (domainOf(s.entity_id) !== 'binary_sensor' || isUnavailable(s)) continue;
-    const cam = byDevice.get(store.entityInfo.get(s.entity_id)?.deviceId);
-    if (!cam) continue;
-    if (!MOTION_CLASSES.has(s.attributes?.device_class) && !/_(person|motion|visitor|vehicle|animal|pet)$/.test(s.entity_id)) continue;
-    if (s.state !== 'on' && Date.now() - new Date(s.last_changed).getTime() > 86_400_000) continue; // nothing in the last day
-    const kind = nameOf(s).replace(nameOf(store.states.get(cam)).replace(/\s*fluent$/i, ''), '').trim() || 'Motion';
-    out.push({ cam, on: s.state === 'on', when: s.last_changed, kind });
-  }
-  return out.sort((a, b) => (b.on - a.on) || String(b.when).localeCompare(String(a.when))).slice(0, 8);
-}
-
-function tvCamerasTabHtml(cams) {
-  if (!cams.length) return emptyHtml('No cameras', 'Pick cameras in Settings → TV.');
-  const alerts = tvAlerts(cams);
-  return `<div class="tv-camgrid-wrap">
-    <ul class="tv-camgrid">${cams.map((id) => `<li><button type="button" class="tv-camtile" data-tv-pick-cam="${esc(id)}" data-tv-key="pick-${esc(id)}">
-      <img data-cam="${esc(id)}" alt="" decoding="async"><span>${esc(camName(store.states.get(id)))}</span></button></li>`).join('')}</ul>
-    ${alerts.length ? `<section class="tv-card tv-alerts"><h3>Recent activity</h3><ul>${alerts.map((x) => `<li>
-      <button type="button" data-tv-pick-cam="${esc(x.cam)}" data-tv-key="alert-${esc(x.cam)}-${esc(x.kind)}" class="${x.on ? 'on' : ''}">
-        <b>${esc(camName(store.states.get(x.cam)))}</b><span>${esc(x.kind)}</span><small>${x.on ? 'Now' : esc(relativeTime(x.when))}</small></button></li>`).join('')}</ul></section>` : ''}
-  </div>`;
-}
-
-function tvHomeHtml(cams, cam) {
-  return `<div class="tv-body">
-    <div class="tv-main">${cam ? `<div class="tv-cam-wrap">
-      <button type="button" class="tv-cam" data-tv-cam data-tv-key="cam" aria-label="${esc(camName(store.states.get(cam)))}: left and right change camera, OK fills the screen">
-        <span class="tv-cam-slot"></span>
-        ${cams.length > 1 ? `<span class="tv-cam-arrow left">${icon('chevronLeft')}</span><span class="tv-cam-arrow right">${icon('chevronRight')}</span>` : ''}
-        <span class="tv-cam-name">${esc(camName(store.states.get(cam)))}${cams.length > 1 ? ` · ${cams.indexOf(cam) + 1}/${cams.length}` : ''}</span>
-      </button>
-    </div>` : `<div class="tv-cam-wrap tv-card tv-nocam"><p class="muted">No cameras to show. Pick some in Settings → TV.</p></div>`}
-    ${tvNowPlayingHtml(tvRoomThings(tvRoom()).players)}</div>
-    <div class="tv-side">${tvWeatherHtml()}${tvRoomCardHtml()}${tvUpNextHtml()}</div>
-  </div>`;
-}
-
-/** The big camera's video, made once per camera and moved into each redraw. */
-function tvStage(cam) {
-  if (tv.stage?.dataset.cam === cam) return tv.stage;
-  tv.player?.stop();
-  tv.player = null;
-  const el = document.createElement('div');
-  el.className = 'cam-stage tv-stage';
-  el.dataset.cam = cam;
-  el.dataset.phase = 'connecting';
-  el.innerHTML = `<img class="cam-poster" data-cam="${esc(cam)}" alt="">
-    <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span></div><span class="cam-kind"></span>`;
-  tv.stage = el;
-  return el;
-}
-
-function tvPlay() {
-  const cam = tv.stage?.dataset.cam;
-  if (!cam || tv.player || document.hidden || !store.client) return;
-  const stage = tv.stage;
-  if (tvLite() && !tv.full) {
-    // A still every 10 seconds instead of live video, which a slow TV struggles to decode while you move around.
-    stage.dataset.phase = 'still';
-    $('.cam-kind', stage).textContent = 'OK for live';
-    const still = () => {
-      const url = cameraStillUrl(base(), store.states.get(cam), 1280);
-      const img = $('.cam-poster', stage);
-      if (!url || !img) return;
-      const pre = new Image();
-      pre.onload = () => { img.src = url; stage.classList.add('has-pic'); };
-      pre.src = url;
-    };
-    still();
-    const timer = setInterval(still, 10_000);
-    tv.player = { stop: () => clearInterval(timer) };
-    return;
-  }
-  tv.player = new CameraPlayer({
-    client: store.client, entityId: cam, getState: () => store.states.get(cam), stage,
-    onState: ({ phase, kind, message }) => {
-      stage.dataset.phase = phase;
-      $('.cam-status-text', stage).textContent = phase === 'failed' ? `No live video. ${message || ''}` : `Connecting${kind ? ` (${streamLabel(kind)})` : ''}…`;
-      $('.cam-kind', stage).textContent = phase === 'playing' ? `Live · ${streamLabel(kind)}` : '';
-    },
-  });
-  tv.player.start();
-}
-
-function tvStop() {
-  tv.player?.stop();
-  tv.player = null;
-}
-
-function tvLeave() {
-  tvStop();
-  tv.stage = null;
-  tv.full = false;
-  document.documentElement.classList.remove('tv-full');
-}
-
-function tvSetFull(on) {
-  tv.full = on;
-  document.documentElement.classList.toggle('tv-full', on);
-  // Light mode shows a still that refreshes; the live video only plays full screen.
-  if (tvLite()) { tvStop(); tvPlay(); }
-}
-
-/** Light mode for slow TVs: ?lite in the address, or Settings → TV. */
-function tvLite() {
-  const on = urlParams.has('lite') || !!store.prefs.tvLite;
-  document.documentElement.classList.toggle('tv-lite', on);
-  return on;
-}
-
-function tvSwitchCam(step) {
-  const { cams, cam } = tvCamera();
-  if (cams.length < 2) return;
-  tv.cam = cams[(cams.indexOf(cam) + step + cams.length) % cams.length];
-  render();
-}
-
-function tvSetTab(tab) {
-  tv.tab = tab;
-  tvSetFull(false);
-  if (tab !== 'home') { tvStop(); tv.stage = null; }
-  render();
-  $(`[data-tv-key="tab-${tab}"]`)?.focus();
-}
-
-/**
- * Opens an Android TV app. In Fully Kiosk Browser: its JavaScript interface (Plus) if turned on, else an
- * intent: link, which the free version hands to Android. Elsewhere: Home Assistant's Android TV Remote.
- */
-/** Showing on the TV itself (or another Android box), not a phone or computer. Fully's user agent can be changed, so only rule out what is clearly not a TV. */
-function tvOnDevice() {
-  const ua = navigator.userAgent;
-  if (/Android/i.test(ua)) return !/Mobile/i.test(ua) || /\b(TV|AFT\w*|BRAVIA|Streamer|Chromecast)\b/i.test(ua);
-  return tvMode && !/Windows|Macintosh|X11|CrOS|iPhone|iPad/i.test(ua);
-}
-
-function tvLaunch(pkg, name) {
-  if (window.fully?.startApplication) { window.fully.startApplication(pkg); return; }
-  const pick = urlParams.get('open') || store.prefs.tvRemote; // ?open=intent, ?open=remote.xxx or ?open=notify.mobile_app_xxx in the address wins
-  // ?open=notify.mobile_app_<tv>: the Home Assistant app installed on the TV opens it (command_launch_app).
-  if (/^notify\.mobile_app_\w+$/.test(pick)) {
-    call('notify', pick.slice('notify.'.length), { message: 'command_launch_app', data: { package_name: pkg } });
-    toast(`Opening ${name}…`);
-    return;
-  }
-  if (pick === 'intent' || (pick === '' && tvOnDevice())) {
-    const url = `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LEANBACK_LAUNCHER;package=${pkg};end`;
-    if (window.__tvIntent) window.__tvIntent(url); else location.href = url;
-    return;
-  }
-  const remotes = [...store.states.keys()].filter((id) => domainOf(id) === 'remote' && !isUnavailable(store.states.get(id)));
-  const remote = pick === 'none' ? '' : remotes.includes(pick) ? pick : remotes[0];
-  if (!remote) { toast(`To open ${name}, show this page in Fully Kiosk Browser on the TV, or add the Android TV Remote integration.`); return; }
-  call('remote', 'turn_on', { activity: pkg }, remote);
-  toast(`Opening ${name}…`);
-}
-
-/**
- * ?tv&home inside a Home Assistant dashboard: make that dashboard this login's start page, so the Home Assistant
- * app on the TV always opens on it (a remote can't reach Profile → Dashboard). Only for the login showing it.
- */
-async function tvClaimHome(client) {
-  if (!tvMode || !urlParams.has('home') || store.authMode !== 'embedded') return;
-  // Only the TV's own login, on the TV: an administrator (or anyone on a phone or computer) opening the TV dashboard
-  // to look at it must not have every one of their devices start on it.
-  if (!tvOnDevice()) return;
-  const user = await client.send({ type: 'auth/current_user' }).catch(() => null);
-  if (!user || user.is_admin) return;
-  let panel = '';
-  try { panel = window.parent.location.pathname.split('/')[1] || ''; } catch { return; }
-  if (!panel) return;
-  try {
-    const cur = (await client.send({ type: 'frontend/get_user_data', key: 'core' }))?.value || {};
-    if (cur.default_panel === panel) return;
-    await client.send({ type: 'frontend/set_user_data', key: 'core', value: { ...cur, default_panel: panel } });
-  } catch { /* older Home Assistant: set it in Profile instead */ }
-}
-
-function tvKeydown(e) {
-  if (!(tvMode || ui.view === 'tv') || e.defaultPrevented) return;
-  const t = e.target;
-  const typing = t.matches?.('input:not([type=checkbox]):not([type=range]), textarea, select');
-  if (isBackKey(e) || (e.key === 'Backspace' && !typing)) {
-    if (tv.full) { tvSetFull(false); $('[data-tv-cam]')?.focus(); e.preventDefault(); return; }
-    if ($('#sheet').open) return; // the dialog closes itself
-    if (ui.view === 'tv' && tv.tab !== 'home') { tvSetTab('home'); e.preventDefault(); return; }
-    if (ui.view !== 'tv' && tvMode) { location.hash = '#/tv'; e.preventDefault(); }
-    return;
-  }
-  const dir = TV_KEYS[e.key];
-  if (!dir || (typing && (dir === 'left' || dir === 'right'))) return;
-  if (ui.view === 'tv' && t.closest?.('[data-tv-cam]') && (dir === 'left' || dir === 'right')) {
-    tvSwitchCam(dir === 'left' ? -1 : 1);
-    e.preventDefault();
-    return;
-  }
-  if (tv.full) { e.preventDefault(); return; }
-  const root = $('#sheet').open ? $('#sheet') : ui.view === 'tv' ? $('#view') : document.body;
-  if (moveFocus(dir, root)) e.preventDefault();
-}
-document.addEventListener('keydown', tvKeydown);
-// Like Google TV: the screen stays put until focus goes down to "Continue watching", and comes back up after.
-document.addEventListener('focusin', (e) => {
-  // The background takes the focused app's colours, like Google TV's home screen.
-  const app = e.target.closest?.('.tv-app');
-  if (app) {
-    const amb = document.querySelector('.tv-aurora')?.style;
-    amb?.setProperty('--tv-amb', app.style.getPropertyValue('--app-glow'));
-    amb?.setProperty('--tv-amb-2', app.style.getPropertyValue('--app-glow-2'));
-  }
-  const v = e.target.closest?.('.v-tv');
-  if (!v || !tvMode) return;
-  const top = e.target.closest('.tv-shelf') ? v.scrollHeight : 0;
-  requestAnimationFrame(() => v.scrollTo({ top })); // after moveFocus's own scrollIntoView
-});
-document.addEventListener('visibilitychange', () => {
-  if (ui.view !== 'tv') return;
-  if (document.hidden) tvStop(); else tvPlay();
-});
-
-function tvSettingsHtml() {
-  const p = store.prefs;
-  const pickList = (key, items, empty) => {
-    const on = new Set(tvList(key));
-    if (!items.length) return `<p class="muted">${empty}</p>`;
-    return items.map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc([store.areas.get(areaOf(s.entity_id)), isReading(s) ? formatState(s) : ''].filter(Boolean).join(' · '))}</small></span>
-      <input type="checkbox" data-tv-list="${key}" value="${esc(s.entity_id)}"${on.has(s.entity_id) ? ' checked' : ''}></label>`).join('');
-  };
-  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
-  const all = [...store.states.values()];
-  const cams = all.filter((s) => domainOf(s.entity_id) === 'camera').sort(byName);
-  const readings = all.filter((s) => isReading(s) && !store.entityInfo.get(s.entity_id)?.category).sort((a, b) =>
-    (store.areas.get(areaOf(a.entity_id)) || '~').localeCompare(store.areas.get(areaOf(b.entity_id)) || '~') || byName(a, b));
-  const buttons = all.filter((s) => ['scene', 'script'].includes(domainOf(s.entity_id))).sort(byName);
-  const remotes = all.filter((s) => domainOf(s.entity_id) === 'remote');
-  const auto = (key) => (p[key]?.length ? ` <button type="button" class="btn small" data-tv-auto="${key}">Back to automatic</button>` : ' <small class="muted">(automatic)</small>');
-  return `<section class="card" id="tv">
-    <h2 class="card-title">${icon('tv')}TV home screen</h2>
-    <p class="muted">A home screen for a Google TV or Android TV, worked with the remote: a big camera, the weather, a few readings, buttons for scenes, and your apps along the bottom. Add <b>?tv</b> to this page's address (for example <code>index.html?tv&amp;token=…</code>) and open it in Fully Kiosk Browser on the TV.</p>
-    <a class="btn" href="#/tv">${icon('tv')}Open the TV screen</a>
-    <details><summary>Cameras${auto('tvCams')}</summary>${pickList('tvCams', cams, 'No cameras in Home Assistant.')}</details>
-    <details><summary>Readings on the right${auto('tvReadings')}</summary>${pickList('tvReadings', readings, 'No sensors with numbers yet.')}</details>
-    <details><summary>Buttons in the top bar${auto('tvButtons')}</summary>${pickList('tvButtons', buttons, 'No scenes or scripts in Home Assistant.')}</details>
-    ${(() => {
-      const area = tvRoom();
-      const autoArea = pickRoom({ pick: '', areas: store.areas, states: store.states, areaOf, tvDevice: tvDeviceSlug() });
-      const urlRoom = urlParams.get('room');
-      return `<label class="row"><span><b>This TV's room</b><small class="muted">Its lights, blinds and climate show on Home and in their own tab. Automatic uses the room of the TV's device in Home Assistant (the Home Assistant app on the TV), so moving the TV only needs its area changed there.${urlRoom ? ` <b>This screen's address sets the room (${esc(urlRoom)}).</b>` : ''}</small></span>
-      <select data-pref="tvRoom"><option value="">${esc(`Automatic (${autoArea ? store.areas.get(autoArea) : 'none found'})`)}</option>
-        ${[...store.areas].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => `<option value="${esc(id)}"${store.prefs.tvRoom === id ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select></label>
-      ${area ? '' : '<p class="muted">No room yet, so the room tab is hidden.</p>'}`;
-    })()}
-    <label class="row"><span><b>Screensaver</b><small class="muted">A big clock, the weather and your cameras when the remote hasn't been touched for a while. Any button wakes it.</small></span>
-      <select data-pref="tvSaver">${SAVER_CHOICES.map(([v, l]) => `<option value="${v}"${Number(p.tvSaver) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
-    <label class="row"><span><b>Light mode</b><small class="muted">For a slow TV: a still background, no glows, and the camera shows a picture every 10 seconds until you press OK for live.${urlParams.has('lite') ? ' <b>This screen\'s address turns it on (lite).</b>' : ''}</small></span>
-      <input type="checkbox" data-pref="tvLite"${tvLite() ? ' checked' : ''}${urlParams.has('lite') ? ' disabled' : ''}></label>
-    <label class="row"><span><b>Camera pop-up</b><small class="muted">When someone's at the door, their camera pops up in the corner for 30 seconds. OK shows it big, Back closes it. This works while the TV screen is showing; for a pop-up over other apps, see the README.</small></span>
-      <select data-pref="tvPopup">${POPUP_CHOICES.map(([v, l]) => `<option value="${v}"${(p.tvPopup || 'person') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
-    <details><summary>Jellyfin: continue watching${tvJellyfin().ok ? '' : ' <small class="muted">(off)</small>'}</summary>
-      <p class="muted">Shows what you're part-way through under the apps. Make an API key in Jellyfin → Dashboard → API keys. Typing on a TV is slow, so you can also add <code>&amp;jellyfin=http://…:8096&amp;jfkey=…</code> to the TV's address.${tv.resumeErr ? ` <b>${esc(tv.resumeErr)}</b>` : tv.resume.length ? ` <b>Working: ${plural(tv.resume.length, 'show')} to continue.</b>` : ''}</p>
-      <label class="row"><span><b>Server address</b></span><input type="url" data-pref="jfUrl" value="${esc(p.jfUrl)}" placeholder="http://192.168.1.20:8096" autocomplete="off"></label>
-      <label class="row"><span><b>API key</b></span><input type="text" data-pref="jfKey" value="${esc(p.jfKey)}" autocomplete="off" spellcheck="false"></label>
-      <label class="row"><span><b>User</b><small class="muted">Whose list to show. Empty: the first administrator.</small></span><input type="text" data-pref="jfUser" value="${esc(p.jfUser)}" autocomplete="off"></label>
-    </details>
-    <label class="row tv-apps-edit"><span><b>Apps</b><small class="muted">One per line: <code>Name = Android package</code> (the package is in the app's Play Store address after <code>id=</code>), or just the name for ${esc(parseApps('youtube,netflix,prime,disney,plex,jellyfin,kayo,binge,stan,iview,spotify,appletv').map((a) => a.name).join(', '))}. Typing on a TV is slow, so you can also put <code>&amp;apps=jellyfin,disney,kayo,binge</code> in the TV's address instead.${urlParams.get('apps') ? ' <b>This screen\'s address sets its apps, so this list is not used here.</b>' : ''}</small></span></label>
-    <textarea data-pref="tvApps" rows="6" spellcheck="false">${esc(p.tvApps)}</textarea>
-    <label class="row"><span><b>Open apps with</b><small class="muted">Automatic: on the TV itself, Android opens the app (in Fully Kiosk Browser, free or Plus). In other browsers, Home Assistant's Android TV Remote integration, which can't open some apps by name.</small></span>
-      <select data-pref="tvRemote">
-        <option value=""${p.tvRemote === '' ? ' selected' : ''}>${esc(`Automatic (${tvOnDevice() ? 'on the TV' : remotes[0] ? nameOf(remotes[0]) : 'no remote found'})`)}</option>
-        <option value="intent"${p.tvRemote === 'intent' ? ' selected' : ''}>The TV (Fully Kiosk Browser)</option>
-        ${remotes.map((s) => `<option value="${esc(s.entity_id)}"${p.tvRemote === s.entity_id ? ' selected' : ''}>${esc(nameOf(s))}</option>`).join('')}
-        <option value="none"${p.tvRemote === 'none' ? ' selected' : ''}>Only Fully Kiosk's JavaScript interface</option>
-      </select></label>
-  </section>`;
-}
-
-// ============================================================
 // the views
 // ============================================================
 
 const VIEWS = {
-  tv() {
-    if (!ready()) return `<div class="v-tv">${notReady()}</div>`;
-    loadForecast();
-    loadHourly();
-    const { cams, cam } = tvCamera();
-    if (tv.tab === 'room' && !tvRoom()) tv.tab = 'home';
-    tvWatchAlerts();
-    const body = tv.tab === 'cameras' ? tvCamerasTabHtml(cams) : tv.tab === 'room' ? tvRoomTabHtml() : tvHomeHtml(cams, cam);
-    return `<div class="v-tv tab-${tv.tab}"><div class="tv-screen">${tvTopHtml()}
-      ${body}
-      ${tvAppsHtml()}</div>${tv.tab === 'home' ? tvResumeHtml() : ''}</div>`;
-  },
-
   today() {
     if (!ready()) return notReady();
     loadForecast();
@@ -2645,7 +1770,6 @@ const VIEWS = {
     const signs = energySigns();
     const wallOn = p.wall || urlWall;
     return `<div class="v-settings">
-      ${tvMode ? `<a class="btn primary tv-back" href="#/tv">${icon('back')}Back to the TV screen</a>${tvSettingsHtml()}` : ''}
       <section class="card" id="devices">
         <h2 class="card-title">${icon('home')}Devices</h2>
         ${check('exposedOnly', 'Only devices exposed to the voice assistant', `${esc(exposedNote)} Change which ones in Home Assistant: Settings → Voice assistants → Expose.`)}
@@ -2657,8 +1781,6 @@ const VIEWS = {
       <section class="card" id="plan-settings"></section>
 
       <section class="card" id="entity-rooms"></section>
-
-      ${tvMode ? '' : tvSettingsHtml()}
 
       <section class="card" id="today">
         <h2 class="card-title">${icon('today')}Today</h2>
@@ -2773,12 +1895,6 @@ const VIEWS = {
 
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
-  tv(view) {
-    tvLite();
-    const slot = $('.tv-cam-slot', view);
-    if (slot && tv.tab === 'home' && tv.cam) { slot.append(tvStage(tv.cam)); tvPlay(); } else { tvStop(); tv.stage = null; }
-    if (!view.contains(document.activeElement) || document.activeElement === view) $('[data-tv-start]', view)?.focus({ preventScroll: true });
-  },
   today(view) {
     const slot = $('.pmap-slot', view);
     if (slot) { peopleMap.attach(slot); syncMap(); }
@@ -3274,7 +2390,7 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
-  if (handleSettingsClick(t) || handleCalendarClick(t) || handleTvClick(t)) return;
+  if (handleSettingsClick(t) || handleCalendarClick(t)) return;
   const ce = t.closest('[data-cam-edit]');
   if (ce) { camEditAct(ce.dataset.camEdit); return; }
   const cp = t.closest('[data-cam-pick]');
@@ -3435,14 +2551,6 @@ document.addEventListener('change', (e) => {
     renderEntityRooms();
     return;
   }
-  if (t.dataset.tvList) {
-    const key = t.dataset.tvList;
-    const list = tvList(key).filter((id) => id !== t.value);
-    if (t.checked) list.push(t.value);
-    store.prefs[key] = list;
-    writePrefs();
-    return;
-  }
   if (t.dataset.energyRole) {
     const picks = { ...store.prefs.energyPicks };
     if (t.value) picks[t.dataset.energyRole] = t.value; else delete picks[t.dataset.energyRole];
@@ -3455,7 +2563,7 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.pref) {
     const key = t.dataset.pref;
-    store.prefs[key] = t.type === 'checkbox' ? t.checked : ['idleMinutes', 'dim', 'tvSaver'].includes(key) ? Number(t.value) : t.value;
+    store.prefs[key] = t.type === 'checkbox' ? t.checked : ['idleMinutes', 'dim'].includes(key) ? Number(t.value) : t.value;
     writePrefs();
     applyTheme();
     if (['wall', 'idleMinutes', 'dim', 'dimNight', 'keepAwake'].includes(key)) { wallMode?.update(); renderFullscreenButton(); }
@@ -3485,63 +2593,6 @@ document.addEventListener('change', (e) => {
     loadEvents(true);
   }
 });
-function handleTvClick(t) {
-  const tab = t.closest('[data-tv-tab]');
-  if (tab) { tvSetTab(tab.dataset.tvTab); return true; }
-  const run = t.closest('[data-tv-run]');
-  if (run) {
-    const id = run.dataset.tvRun;
-    call(domainOf(id), 'turn_on', {}, id);
-    toast(`${nameOf(store.states.get(id) || { entity_id: id })} ✓`);
-    return true;
-  }
-  if (t.closest('[data-tv-room-go]')) { tvSetTab('room'); return true; }
-  const tg = t.closest('[data-tv-toggle]');
-  if (tg) { const id = tg.dataset.tvToggle; call(domainOf(id), 'toggle', {}, id); return true; }
-  const off = t.closest('[data-tv-off]');
-  if (off) { call('homeassistant', 'turn_off', {}, off.dataset.tvOff.split(' ')); return true; }
-  const flip = t.closest('[data-tv-cover-flip]');
-  if (flip) {
-    const s = store.states.get(flip.dataset.tvCoverFlip);
-    if (s) call('cover', coverPos(s) > 0 && s.state !== 'opening' ? 'close_cover' : 'open_cover', {}, s.entity_id);
-    return true;
-  }
-  const cov = t.closest('[data-tv-cover]');
-  if (cov) { call('cover', `${cov.dataset.act}_cover`, {}, cov.dataset.tvCover.split(' ')); return true; }
-  const clim = t.closest('[data-tv-clim]');
-  if (clim) {
-    const s = store.states.get(clim.dataset.tvClim);
-    if (!s) return true;
-    if (clim.dataset.act === 'power') { call('climate', s.state === 'off' ? 'turn_on' : 'turn_off', {}, s.entity_id); return true; }
-    const step = Number(s.attributes?.target_temp_step) || (tempUnit() === '°F' ? 1 : 0.5);
-    const now = climateTarget(s) ?? Number(s.attributes?.current_temperature) ?? 21;
-    const next = Math.round((now + (clim.dataset.act === 'up' ? step : -step)) / step) * step;
-    const lo = Number(s.attributes?.min_temp ?? -Infinity);
-    const hi = Number(s.attributes?.max_temp ?? Infinity);
-    call('climate', 'set_temperature', { temperature: Math.min(hi, Math.max(lo, next)) }, s.entity_id);
-    return true;
-  }
-  const media = t.closest('[data-tv-media]');
-  if (media) {
-    const svc = { prev: 'media_previous_track', playpause: 'media_play_pause', next: 'media_next_track', voldown: 'volume_down', volup: 'volume_up' }[media.dataset.tvMedia];
-    call('media_player', svc, {}, media.dataset.id);
-    return true;
-  }
-  const show = t.closest('[data-tv-resume]');
-  if (show) { tvResumePlay(show); return true; }
-  const app = t.closest('[data-tv-app]');
-  if (app) { tvLaunch(app.dataset.tvApp, app.textContent.trim()); return true; }
-  if (t.closest('[data-tv-cam]')) {
-    tvSetFull(!tv.full);
-    return true;
-  }
-  const pick = t.closest('[data-tv-pick-cam]');
-  if (pick) { tv.cam = pick.dataset.tvPickCam; tvSetTab('home'); $('[data-tv-cam]')?.focus(); return true; }
-  const autoBtn = t.closest('[data-tv-auto]');
-  if (autoBtn) { store.prefs[autoBtn.dataset.tvAuto] = []; writePrefs(); ui.viewHtml = ''; render(); return true; }
-  return false;
-}
-
 function handleSettingsClick(t) {
   if (t.closest('[data-test-ding]')) { ding.play(); return true; }
   const prev = t.closest('[data-sky-preview]');
@@ -3682,7 +2733,6 @@ async function start() {
     render();
     client.send({ type: 'auth/current_user' }).then((u) => { store.user = u; queueRefresh(); }).catch(() => {});
     loadExposed();
-    tvClaimHome(client);
     planStore.areas = store.areas;
     loadFloorPlan(client);
     updateSky({ instant: true });
