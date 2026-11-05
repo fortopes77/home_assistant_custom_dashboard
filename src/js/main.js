@@ -1503,11 +1503,32 @@ function camerasHtml(ids) {
 
 /** "DRIVEWAY Fluent" reads as "Driveway". */
 function camName(s) {
-  return nameOf(s).replace(/\s*fluent$/i, '').replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase());
+  return nameOf(s).replace(/(\s+snapshots)?\s*(fluent|clear)$/i, '').replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase());
 }
 
 function listedCameras() {
-  return [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && listed(id));
+  const bells = doorbellDevices();
+  return [...store.states.keys()].filter((id) => domainOf(id) === 'camera' && (listed(id) || doorbellCam(id, bells)));
+}
+
+/** Devices with a doorbell button (a Reolink "Visitor" sensor or a doorbell event) that is shown on the dashboard. */
+function doorbellDevices() {
+  const devs = new Set();
+  for (const s of store.states.values()) {
+    const id = s.entity_id;
+    const bell = (domainOf(id) === 'binary_sensor' && /_(visitor|doorbell|ding)$/.test(id)) || (domainOf(id) === 'event' && s.attributes?.device_class === 'doorbell');
+    const d = bell && listed(id) && store.entityInfo.get(id)?.deviceId;
+    if (d) devs.add(d);
+  }
+  return devs;
+}
+
+/** A doorbell's camera shows with its button even when the camera itself isn't exposed to the voice assistant. */
+function doorbellCam(id, bells) {
+  const s = store.states.get(id);
+  const info = store.entityInfo.get(id);
+  if (!s || isUnavailable(s) || (info?.hidden && !store.prefs.showHidden)) return false;
+  return !!info?.deviceId && bells.has(info.deviceId);
 }
 
 /** Cameras whose own motion or person sensor is on right now. */
@@ -2131,7 +2152,7 @@ function renderCameraSheet(s, sh) {
   const d = $('#sheet');
   if (camPlayer?.entityId === s.entity_id && $('.cam-stage', d)) return; // keep the video playing
   ui.sheetHtml = '';
-  d.innerHTML = `${sheetHead(nameOf(s).replace(/\s*fluent$/i, ''), store.areas.get(areaOf(s.entity_id)) || '', { ic: 'camera', back: !!sh.back })}
+  d.innerHTML = `${sheetHead(camName(s), store.areas.get(areaOf(s.entity_id)) || '', { ic: 'camera', back: !!sh.back })}
     <div class="cam-stage" data-phase="connecting">
       <img class="cam-poster" data-cam="${esc(s.entity_id)}" alt="">
       <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span>
