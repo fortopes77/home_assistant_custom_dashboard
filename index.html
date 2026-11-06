@@ -378,6 +378,24 @@ small { font-size: 0.8em; }
   font-variant-numeric: tabular-nums;
 }
 .hero-date { margin-top: 6px; font-size: 1.05rem; font-weight: 600; }
+.bins {
+  --bin-body: color-mix(in srgb, var(--text) 62%, var(--surface));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 3px 10px 3px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.bins.soon { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+.bins-ic { display: inline-flex; }
+.bin-ic { width: 22px; height: 22px; }
+.bin-ic + .bin-ic { margin-left: -4px; }
 .hero-weather {
   display: grid;
   justify-items: end;
@@ -8117,6 +8135,78 @@ class Voice {
   }
 }
 
+// ---- bins.js ----
+// Bin night: shows which bins go out next, as little wheelie bins with coloured lids.
+// Reads a sensor whose state names the bins by colour ("Red and green") and whose `date` attribute is that
+// bin night (YYYY-MM-DD). homeassistant/bin_night.yaml makes one; any sensor with "bin" in its id and a
+// `date` attribute works too, and so does `sensor.bin_night` without the date.
+
+const BIN_COLOURS = {
+  red: '#d6403a',
+  yellow: '#f0c419',
+  green: '#3d9b4a',
+  lime: '#8cc63f',
+  blue: '#2f6fd6',
+  purple: '#8a52c9',
+  orange: '#ee8a2a',
+  black: '#2b2b2b',
+  grey: '#8a8f98',
+  gray: '#8a8f98',
+};
+
+const binPad = (n) => String(n).padStart(2, '0');
+const binDayKey = (d) => `${d.getFullYear()}-${binPad(d.getMonth() + 1)}-${binPad(d.getDate())}`;
+
+// The bin night sensor, or null. `states` is the Map of entity_id → state.
+function binSensor(states) {
+  const named = states.get('sensor.bin_night');
+  if (named) return named;
+  for (const s of states.values()) {
+    if (s.entity_id.startsWith('sensor.') && /bin/.test(s.entity_id) && /^\d{4}-\d\d-\d\d/.test(s.attributes?.date || '')) return s;
+  }
+  return null;
+}
+
+// { id, colours: [{ name, hex }], when: 'tonight' | 'tomorrow night' | 'Thursday' | '', soon } or null.
+function binNight(states, now = new Date()) {
+  const s = binSensor(states);
+  if (!s || ['unknown', 'unavailable', ''].includes(s.state)) return null;
+  const words = String(s.state).toLowerCase().match(/[a-z]+/g) || [];
+  const colours = [...new Set(words.filter((w) => BIN_COLOURS[w]))].map((name) => ({ name, hex: BIN_COLOURS[name] }));
+  if (!colours.length) return null;
+  const date = String(s.attributes?.date || '').slice(0, 10);
+  let when = '';
+  let soon = false;
+  if (date) {
+    const [y, m, d] = date.split('-').map(Number);
+    const night = new Date(y, m - 1, d);
+    const today = binDayKey(now);
+    const tomorrow = binDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+    if (date === today) { when = 'tonight'; soon = true; }
+    else if (date === tomorrow) { when = 'tomorrow night'; soon = true; }
+    else if (date > today) when = night.toLocaleDateString(undefined, { weekday: 'long' });
+  }
+  return { id: s.entity_id, colours, when, soon, text: String(s.state) };
+}
+
+// A wheelie bin: dark body, coloured lid.
+function binSvg(hex) {
+  return `<svg class="bin-ic" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 8.5h12l-1.25 11.1a1.6 1.6 0 0 1-1.6 1.4H8.85a1.6 1.6 0 0 1-1.6-1.4z" fill="var(--bin-body)"/>
+    <rect x="4" y="4.5" width="16" height="3.4" rx="1.2" fill="${hex}"/>
+    <rect x="9.5" y="2.8" width="5" height="2.2" rx="0.8" fill="${hex}"/>
+    <rect x="7.8" y="9.6" width="8.4" height="1.6" rx="0.8" fill="${hex}" opacity="0.85"/>
+  </svg>`;
+}
+
+const binCap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+
+// Joined names: "Red and green", "Red, yellow and green".
+function binWords(colours) {
+  const n = colours.map((c) => c.name);
+  return binCap(n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0]);
+}
+
 // ---- main.js ----
 // The dashboard: Today (the day at a glance, notifications, news), Energy (solar, battery, selling to
 // the grid), Places (where everyone is) and Home (floor plan and rooms). Devices are the ones exposed
@@ -8124,7 +8214,7 @@ class Voice {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '6 Nov 2026, 13:19 (de99780)';
+const DASH_BUILD = '6 Nov 2026, 17:27 (7e2f785)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8994,6 +9084,18 @@ function summaryText() {
 
 // ----- Today's cards -----
 
+// Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
+function binsHtml(now) {
+  const b = binNight(store.states, now);
+  if (!b) return '';
+  const words = binWords(b.colours);
+  const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
+  return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
+    <span class="bins-ic">${b.colours.map((c) => binSvg(c.hex)).join('')}</span>
+    <span class="bins-text">${esc(b.when === 'tonight' ? 'Bins out tonight' : b.when === 'tomorrow night' ? 'Bins tomorrow' : b.when ? `Bins ${b.when.slice(0, 3)}` : 'Bins')}</span>
+  </button>`;
+}
+
 function heroHtml() {
   const now = new Date();
   const w = weatherEntity();
@@ -9012,6 +9114,7 @@ function heroHtml() {
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
+        ${binsHtml(now)}
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
