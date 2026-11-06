@@ -1,0 +1,53 @@
+# Bin night: a reminder at 6 pm on bin night, and a sensor the dashboard shows as little coloured bins.
+# Put this file in /config/packages/ (see dashboard_update.yaml for turning packages on), then go to
+# Developer tools → YAML and reload "Template entities" and "Automations" (or restart once).
+#
+# Change three things to suit your street:
+#   - the bin night (weekday(): Monday is 0, so Thursday is 3), in "days to bin night" below and in the
+#     automation's condition;
+#   - START: any bin night that put out the "week A" bins;
+#   - WEEK_A / WEEK_B: the bins for each week. Colour words (red, yellow, green, blue, purple...) are what
+#     the dashboard draws, so keep them in the text.
+# For the same bins every week, make WEEK_A and WEEK_B the same.
+
+template:
+  - sensor:
+      - name: Bin night
+        unique_id: dashboard_bin_night
+        icon: mdi:trash-can
+        # This bin night's bins, e.g. "Red and green". The day after bin night it moves on to the next one.
+        state: >-
+          {% set START = '2026-11-05' %}
+          {% set WEEK_A = 'Red and green' %}
+          {% set WEEK_B = 'Red and yellow' %}
+          {% set today = now().date() %}
+          {% set night = today + timedelta(days=(3 - today.weekday()) % 7) %}
+          {% set weeks = ((night - strptime(START, '%Y-%m-%d').date()).days // 7) %}
+          {{ WEEK_A if weeks % 2 == 0 else WEEK_B }}
+        attributes:
+          # The date of that bin night, which the dashboard uses for "tonight" / "tomorrow" / "Thu".
+          date: >-
+            {% set today = now().date() %}
+            {{ (today + timedelta(days=(3 - today.weekday()) % 7)).isoformat() }}
+
+automation:
+  - id: dashboard_bin_night
+    alias: Bin night reminder
+    mode: single
+    triggers:
+      - trigger: time
+        at: "18:00:00"
+    conditions:
+      - condition: time
+        weekday: thu
+      - condition: template
+        value_template: "{{ states('sensor.bin_night') not in ['unknown', 'unavailable', ''] }}"
+    actions:
+      # notify_family.yaml sends to every family phone and tablet; use a notify.mobile_app_* action instead
+      # to send to one phone.
+      - action: script.notify_family
+        data:
+          title: 🗑️ Bin night
+          message: "Put the {{ states('sensor.bin_night') | lower }} bins out tonight."
+          data:
+            tag: bin-night

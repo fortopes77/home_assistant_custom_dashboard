@@ -37,6 +37,7 @@ import {
 } from './home.js';
 import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './news.js';
 import { Voice } from './voice.js';
+import { binNight, binSvg, binWords } from './bins.js';
 
 const DASH_BUILD = 'source';
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -908,6 +909,18 @@ function summaryText() {
 
 // ----- Today's cards -----
 
+// Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
+function binsHtml(now) {
+  const b = binNight(store.states, now);
+  if (!b) return '';
+  const words = binWords(b.colours);
+  const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
+  return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
+    <span class="bins-ic">${b.colours.map((c) => binSvg(c.hex)).join('')}</span>
+    <span class="bins-text">${esc(b.when === 'tonight' ? 'Bins out tonight' : b.when === 'tomorrow night' ? 'Bins tomorrow' : b.when ? `Bins ${b.when.slice(0, 3)}` : 'Bins')}</span>
+  </button>`;
+}
+
 function heroHtml() {
   const now = new Date();
   const w = weatherEntity();
@@ -926,6 +939,7 @@ function heroHtml() {
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
+        ${binsHtml(now)}
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
