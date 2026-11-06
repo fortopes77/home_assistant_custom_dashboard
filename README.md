@@ -104,6 +104,12 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 `homeassistant/shopping_nearby.yaml` is an example automation. When someone arrives at a supermarket and the shopping list isn't empty, it sends them the list. A supermarket is any zone with the `mdi:cart` icon, so add your local shops as zones with that icon. They show as small carts on the map.
 
+## Bin night
+
+[`homeassistant/bin_night.yaml`](homeassistant/bin_night.yaml) is a package with a **Bin night** sensor and a 6 pm reminder on bin night, sent through the `notify_family` script. The sensor names the bins by colour ("Red and green"), alternating between two weeks, so it suits a fortnightly recycling and garden rotation. Set your bin night, a start date and each week's bins at the top of the file.
+
+Today then shows little bins with those coloured lids under the date: "Bins Thu" during the week, "Bins tomorrow" the day before and "Bins out tonight" on the night. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
+
 ## Floor plan (Home)
 
 Each home sets up its own floor plan in **Settings → Floor plan**. Nothing about any one house is built in.
@@ -195,5 +201,6 @@ If a download fails, a notice appears in Home Assistant.
 | `src/js/people.js` | People, zones and the Leaflet map |
 | `src/js/calendar.js`, `brief.js`, `notify.js`, `news.js` | Calendar, day summary, notifications and news |
 | `src/js/camera.js`, `voice.js` | Camera player and Assist |
+| `src/js/bins.js` | Bin night colours on Today |
 | `src/js/sky.js`, `tint.js`, `wall.js`, `install.js` | Live sky, the Today tint, wall mode, and installing as an app |
 | `homeassistant/` | Example automations and the GitHub update package |
