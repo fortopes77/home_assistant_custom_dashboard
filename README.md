@@ -108,6 +108,8 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 [`homeassistant/bin_night.yaml`](homeassistant/bin_night.yaml) is a package with a **Bin night** sensor and a 6 pm reminder on bin night, sent through the `notify_family` script. The sensor names the bins by colour ("Red and green"), alternating between two weeks, so it suits a fortnightly recycling and garden rotation. Set your bin night, a start date and each week's bins at the top of the file.
 
+[`homeassistant/car_arrivals.yaml`](homeassistant/car_arrivals.yaml) is a package that says **"Andrew is home"** when a family car pulls into the driveway. When a Reolink camera sees a vehicle, it asks the AI task (Gemini) to read the number plate from the snapshot. A plate in its `CARS` list (one misread character is allowed) sends "<owner> is home" with the photo through `notify_family`, only if that driver wasn't already home, so a car leaving isn't announced. Any other car gets a "Car in the driveway" alert with its plate. Put your plates and drivers in `CARS`, and take the driveway vehicle sensors out of the camera alert automation so cars aren't announced twice.
+
 Today then shows little bins with those coloured lids under the date: "Bins Thu" during the week, "Bins tomorrow" the day before and "Bins out tonight" on the night. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
 
 ## Floor plan (Home)
