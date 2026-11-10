@@ -349,6 +349,7 @@ small { font-size: 0.8em; }
 .music-card { order: 1; } /* right under the hero */
 
 /* Music */
+.music-slot { display: contents; }
 .music-where { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; min-width: 0; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .music-where .icon { width: 16px; height: 16px; flex: none; }
 .music-now { display: flex; align-items: center; gap: 14px; min-width: 0; }

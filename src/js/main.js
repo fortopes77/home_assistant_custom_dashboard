@@ -411,6 +411,7 @@ function queueRefresh() {
     if (document.activeElement?.matches('#view input[type=text]') && document.activeElement.value) { setTimeout(queueRefresh, 1000); return; }
     render();
     renderSheet();
+    if (ui.view === 'today') paintMusic();
   }, wait);
 }
 
@@ -1639,7 +1640,7 @@ function camEditAct(act) {
 // ---------- music: Spotify through Music Assistant (or HA's Spotify integration), and this screen as a speaker ----------
 
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-const music = { lists: null, listsFor: '', listsAt: 0 };
+const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
 const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
 
 function musicName() {
@@ -1689,6 +1690,31 @@ function musicHtml() {
     needsTap: sp.status === 'ready' && sp.needsTap,
   } : null;
   return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel() });
+}
+
+/**
+ * The Music card lives in its own slot and is redrawn on its own, so speakers reporting their position
+ * every few seconds don't redraw the whole Today page (slow on an old iPad).
+ */
+function paintMusic(root = document) {
+  const slot = root.querySelector('#view .music-slot, .music-slot');
+  if (!slot || ui.dragging) return;
+  const html = musicHtml();
+  if (html !== music.html || !slot.firstElementChild !== !html) {
+    // Keep a playlist row's scroll position across redraws.
+    const scroll = slot.querySelector('.music-lists')?.scrollLeft || 0;
+    music.html = html;
+    slot.innerHTML = html;
+    const lists = slot.querySelector('.music-lists');
+    if (lists && scroll) lists.scrollLeft = scroll;
+  }
+  const id = slot.querySelector('.music-card')?.dataset.entity;
+  paintMusicBar(slot, id && store.states.get(id));
+}
+
+function queueMusicPaint() {
+  if (music.timer) return;
+  music.timer = setTimeout(() => { music.timer = 0; if (ui.view === 'today') paintMusic(); }, 700);
 }
 
 /** Tap a speaker: control it from here, and move the music there if something is playing. */
@@ -1741,7 +1767,7 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}${musicHtml()}</div>
+      <div class="col col-a">${heroHtml()}<div class="music-slot"></div></div>
       <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
       <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
@@ -2034,7 +2060,8 @@ const VIEWS = {
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
   today(view) {
-    paintMusicBar(view);
+    music.html = '';
+    paintMusic(view);
     const slot = $('.pmap-slot', view);
     if (slot) { peopleMap.attach(slot); syncMap(); }
   },
@@ -2907,6 +2934,8 @@ async function start() {
       learnSigns(f.raw, null, energyIds());
     }
     if (ui.view === 'settings') return;
+    // On Today a speaker only changes the Music card: redraw just that (speakers report every few seconds).
+    if (ui.view === 'today' && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
     queueRefresh();
   });
   client.connect();
