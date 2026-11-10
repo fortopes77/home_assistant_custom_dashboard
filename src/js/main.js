@@ -38,6 +38,7 @@ import {
 import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './news.js';
 import { Voice } from './voice.js';
 import { binNight, binSvg, binWords } from './bins.js';
+import { musicPlayers, musicMain, musicHereEntity, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
 
 const DASH_BUILD = 'source';
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -70,6 +71,12 @@ const DEFAULT_PREFS = {
   calFor: '',            // show only one person's events (and shared ones) on this screen
   notifications: true,   // the notifications card on Today (the bell is always there)
   todayExtras: false,    // cameras, thermostats and scenes on Today too
+  music: true,           // the Music card on Today
+  musicHere: false,      // this screen is a Music Assistant speaker (plays music from the page)
+  musicName: '',         // its name in Music Assistant; empty = "Wall iPad" / "Dashboard"
+  musicServer: '',       // Music Assistant's player address; empty = this Home Assistant's host, port 8927
+  musicPlayer: '',       // the speaker this screen's card controls; empty = whatever is playing
+  musicHidden: {},       // media_player ids left off the card
   peopleMap: true,       // the Places page and the map on Today
   showHidden: false,     // hidden and diagnostic entities
   showUnavailable: false,
@@ -1629,6 +1636,100 @@ function camEditAct(act) {
   render();
 }
 
+// ---------- music: Spotify through Music Assistant (or HA's Spotify integration), and this screen as a speaker ----------
+
+const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const music = { lists: null, listsFor: '', listsAt: 0 };
+const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
+
+function musicName() {
+  return (store.prefs.musicName || '').trim() || (store.prefs.wall || urlWall ? (IS_IPAD ? 'Wall iPad' : 'Wall screen') : 'Dashboard');
+}
+const musicHereLabel = () => (IS_IPAD ? 'This iPad' : 'This screen');
+
+function musicState() {
+  const players = musicPlayers(store.states, {
+    ok: listed,
+    platform: (id) => store.entityInfo.get(id)?.platform || '',
+    hidden: store.prefs.musicHidden || {},
+  });
+  const hereEntity = store.prefs.musicHere ? musicHereEntity(players, musicName()) : null;
+  const main = musicMain(players, store.prefs.musicPlayer, hereEntity?.entity_id);
+  return { players, main, hereEntity };
+}
+
+/** Start, restart or stop this screen's own player to match Settings. */
+function syncScreenSpeaker() {
+  if (store.prefs.music && store.prefs.musicHere) screenSpeaker.start({ url: musicServerUrl(store.prefs.musicServer, base()), name: musicName() });
+  else screenSpeaker.stop();
+}
+
+async function loadMusicLists(players, main) {
+  if (!store.client || !main || players.kind === 'plain') return;
+  const key = players.kind === 'mass' ? 'mass' : main.entity_id; // Music Assistant's players share one library
+  if (music.listsFor === key && Date.now() - music.listsAt < 30 * 60_000) return;
+  music.listsFor = key;
+  music.listsAt = Date.now();
+  try {
+    music.lists = await loadPlaylists(store.client, main.entity_id);
+  } catch {
+    music.lists = [];
+    music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
+  }
+  queueRefresh();
+}
+
+function musicHtml() {
+  if (!store.prefs.music) return '';
+  const { players, main, hereEntity } = musicState();
+  loadMusicLists(players, main);
+  const sp = screenSpeaker;
+  const here = store.prefs.musicHere ? {
+    on: true, entity: hereEntity, status: sp.status, error: sp.error, pin: sp.pin, name: sp.name || musicName(),
+    needsTap: sp.status === 'ready' && sp.needsTap,
+  } : null;
+  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel() });
+}
+
+/** Tap a speaker: control it from here, and move the music there if something is playing. */
+function musicPick(id) {
+  const { players, main } = musicState();
+  store.prefs.musicPlayer = id;
+  writePrefs();
+  if (players.kind === 'mass' && main && main.entity_id !== id && main.state === 'playing') {
+    call('music_assistant', 'transfer_queue', { source_player: main.entity_id, auto_play: true }, id);
+  }
+  render();
+}
+
+function musicPlay(i) {
+  const l = music.lists?.[i];
+  const { main } = musicState();
+  if (!l || !main) return;
+  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id)
+    .then(() => toast(`Playing ${l.title}`));
+}
+
+function musicSettingsHtml(check) {
+  const p = store.prefs;
+  const { players, hereEntity } = musicState();
+  const sp = screenSpeaker;
+  const all = [...store.states.values()].filter((s) => s.entity_id.startsWith('media_player.') && !isUnavailable(s));
+  const shown = new Set(musicPlayers(store.states, { ok: listed, platform: (id) => store.entityInfo.get(id)?.platform || '' }).speakers.map((s) => s.entity_id));
+  const status = { off: '', loading: 'Connecting to Music Assistant…', waiting: `Connected. In Music Assistant, open Settings → Players and add “${musicName()}” (Connect unpaired).`,
+    ready: hereEntity ? `Ready: it's the “${nameOf(hereEntity)}” speaker.` : 'Ready.', error: sp.error }[sp.status] || '';
+  const source = { mass: 'Music Assistant', spotify: 'the Spotify integration', plain: 'your speakers (no Music Assistant yet)' }[players.kind];
+  return `<section class="card" id="music">
+    <h2 class="card-title">${icon('music')}Music</h2>
+    ${check('music', 'Music card on Today', all.length ? `Plays through ${source}` : 'No speakers in Home Assistant yet')}
+    ${p.music ? `${check('musicHere', `Play music on ${musicHereLabel().replace(/^This/, 'this')}`, 'Needs Music Assistant. This screen becomes one of its speakers, so the sound comes from here with no other app.')}
+      ${p.musicHere ? `<label class="row"><span><b>Speaker name</b><small class="muted">How it shows in Music Assistant and Home Assistant</small></span><input type="text" data-pref="musicName" value="${esc(p.musicName)}" placeholder="${esc(musicName())}" autocomplete="off"></label>
+        <label class="row"><span><b>Music Assistant address</b><small class="muted">Leave empty when Music Assistant runs as a Home Assistant add-on</small></span><input type="text" data-pref="musicServer" value="${esc(p.musicServer)}" placeholder="${esc(musicServerUrl('', base()))}" autocomplete="off" inputmode="url"></label>
+        ${status ? `<p class="hint">${esc(status)}</p>` : ''}` : ''}
+      ${players.kind !== 'spotify' && shown.size ? `<details><summary>Speakers on the card</summary>${[...shown].map((id) => store.states.get(id)).map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc(s.entity_id)}</small></span><input type="checkbox" data-music-hide="${esc(s.entity_id)}"${p.musicHidden?.[s.entity_id] ? '' : ' checked'}></label>`).join('')}</details>` : ''}` : ''}
+  </section>`;
+}
+
 // ============================================================
 // the views
 // ============================================================
@@ -1640,7 +1741,7 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}</div>
+      <div class="col col-a">${heroHtml()}${musicHtml()}</div>
       <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
       <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
@@ -1838,6 +1939,8 @@ const VIEWS = {
         ${!lists.length ? `<details><summary>Get more headlines</summary><p class="muted">Your Feedreader feeds only hold their latest story, so this screen collects them as they arrive. For a full list, add a feed sensor to Home Assistant (the dashboard's README has the few lines to paste). News sites don't let a web page read them directly.</p></details>` : ''}
       </section>
 
+      ${musicSettingsHtml(check)}
+
       <section class="card" id="energy">
         <h2 class="card-title">${icon('solar')}Energy</h2>
         ${check('energyTab', 'Show the Energy page')}
@@ -1931,6 +2034,7 @@ const VIEWS = {
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
   today(view) {
+    paintMusicBar(view);
     const slot = $('.pmap-slot', view);
     if (slot) { peopleMap.attach(slot); syncMap(); }
   },
@@ -2464,6 +2568,13 @@ document.addEventListener('click', (e) => {
     call('todo', 'update_item', { item: uid, status: 'completed' }, shop.id);
     return;
   }
+  const mp = t.closest('[data-music-pick]');
+  if (mp) { musicPick(mp.dataset.musicPick); return; }
+  const ms = t.closest('[data-music-source]');
+  if (ms) { const id = ms.closest('[data-entity]')?.dataset.entity; if (id) call('media_player', 'select_source', { source: ms.dataset.musicSource }, id); return; }
+  const ml = t.closest('[data-music-play]');
+  if (ml) { musicPlay(Number(ml.dataset.musicPlay)); return; }
+  if (t.closest('[data-music-unlock]')) { screenSpeaker.unlock(); render(); return; }
   if (t.closest('[data-shop-clear]')) {
     call('todo', 'remove_completed_items', {}, shop.id);
     return;
@@ -2573,7 +2684,7 @@ document.addEventListener('change', (e) => {
   const r = t.closest('[data-slide]');
   if (r) {
     ui.dragging = false;
-    const id = ui.sheet?.id;
+    const id = r.closest('.music-card')?.dataset.entity || ui.sheet?.id;
     if (id) SLIDERS[r.dataset.slide]?.(id, Number(r.value));
     return;
   }
@@ -2596,6 +2707,13 @@ document.addEventListener('change', (e) => {
     render();
     return;
   }
+  if (t.dataset.musicHide) {
+    const hidden = { ...store.prefs.musicHidden };
+    if (t.checked) delete hidden[t.dataset.musicHide]; else hidden[t.dataset.musicHide] = true;
+    store.prefs.musicHidden = hidden;
+    writePrefs();
+    return;
+  }
   if (t.dataset.pref) {
     const key = t.dataset.pref;
     store.prefs[key] = t.type === 'checkbox' ? t.checked : ['idleMinutes', 'dim'].includes(key) ? Number(t.value) : t.value;
@@ -2604,6 +2722,7 @@ document.addEventListener('change', (e) => {
     if (['wall', 'idleMinutes', 'dim', 'dimNight', 'keepAwake'].includes(key)) { wallMode?.update(); renderFullscreenButton(); }
     if (['tint', 'sky', 'skyAnimate', 'weatherEntity'].includes(key)) applySky();
     if (key === 'calView') loadEvents(true);
+    if (['music', 'musicHere', 'musicName', 'musicServer', 'wall'].includes(key)) syncScreenSpeaker();
     if (t.dataset.pref !== 'feedIn' && t.dataset.pref !== 'buyRate') render();
     return;
   }
@@ -2847,3 +2966,4 @@ setupInstall();
 onInstallChange(() => { if (ui.view === 'settings') { ui.viewHtml = ''; render(); } });
 applySky();
 start();
+syncScreenSpeaker();

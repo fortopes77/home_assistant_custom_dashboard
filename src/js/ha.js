@@ -239,7 +239,7 @@ export class HAClient extends EventTarget {
     const deviceArea = new Map();
     for (const d of devices || []) if (d.area_id) deviceArea.set(d.id, d.area_id);
 
-    // entityInfo: entity_id -> { areaId, hidden, category, deviceId }
+    // entityInfo: entity_id -> { areaId, hidden, category, deviceId, platform }
     const entityInfo = new Map();
     const categories = entities?.entity_categories || {};
     for (const e of entities?.entities || []) {
@@ -248,6 +248,7 @@ export class HAClient extends EventTarget {
         hidden: !!e.hb,
         category: e.ec !== undefined ? categories[e.ec] : null,
         deviceId: e.di || null,
+        platform: e.pl || '',
       });
     }
     return { areas: areas || [], entityInfo };
