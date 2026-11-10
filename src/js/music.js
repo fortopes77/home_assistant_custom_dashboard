@@ -85,7 +85,7 @@ export function musicCardHtml(players, main, { lists = null, art = (u) => u, her
     .filter(Boolean).join(' · ');
   const dur = Number(a.media_duration);
   const bar = live && Number.isFinite(dur) && dur > 0 && a.media_position != null
-    ? `<div class="music-bar" data-music-bar data-pos="${esc(a.media_position)}" data-at="${esc(a.media_position_updated_at || '')}" data-dur="${esc(dur)}" data-run="${playing ? 1 : 0}"><i></i></div>` : '';
+    ? '<div class="music-bar" data-music-bar><i></i></div>' : ''; // painted by paintMusicBar, so position ticks don't change the HTML
 
   const ctlBtn = (act, ic, label, extra = '') =>
     `<button type="button" class="icon-btn music-btn${extra}" data-act="${act}" aria-label="${esc(label)}">${icon(ic)}</button>`;
@@ -161,16 +161,20 @@ export async function loadPlaylists(client, entityId, limit = 12) {
 }
 
 /** Keep the progress bar moving between Home Assistant's updates. */
-export function paintMusicBar(root) {
+export function paintMusicBar(root, s) {
   const el = root.querySelector('[data-music-bar]');
-  if (!el) return;
+  const a = s?.attributes || {};
+  const dur = Number(a.media_duration);
+  if (!el || !(dur > 0)) return;
+  const playing = s.state === 'playing' || s.state === 'buffering';
+  const key = `${a.media_position}|${a.media_position_updated_at}|${dur}|${playing}`;
+  if (el.dataset.key === key) return; // already running from this report
+  el.dataset.key = key;
   const i = el.querySelector('i');
-  const dur = Number(el.dataset.dur);
-  const s = { state: el.dataset.run === '1' ? 'playing' : 'paused', attributes: { media_position: el.dataset.pos, media_position_updated_at: el.dataset.at, media_duration: dur } };
-  const pos = musicPosition(s) ?? 0;
+  const pos = musicPosition({ state: playing ? 'playing' : 'paused', attributes: a }) ?? 0;
   i.style.transition = 'none';
   i.style.width = `${Math.min(100, (pos / dur) * 100).toFixed(2)}%`;
-  if (s.state !== 'playing') return;
+  if (!playing) return;
   void i.offsetWidth; // apply the start before animating to the end
   i.style.transition = `width ${Math.max(0, dur - pos).toFixed(1)}s linear`;
   i.style.width = '100%';
