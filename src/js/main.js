@@ -2815,6 +2815,19 @@ async function checkForUpdate() {
   location.replace(url.href);
 }
 
+// Wall screens have nobody to press reload, so start afresh when the connection has been down
+// for 3 minutes, and once a night at about 3:30 so a long-running page never goes stale.
+let downSince = 0;
+const bootDay = new Date().toDateString();
+function kioskSafetyNet() {
+  if (!(urlWall || wallMode?.enabled) || document.hidden) return;
+  const up = store.status === 'connected' || store.status === 'auth_invalid';
+  downSince = up ? 0 : downSince || Date.now();
+  const now = new Date();
+  const nightly = now.toDateString() !== bootDay && now.getHours() === 3 && now.getMinutes() >= 30;
+  if ((downSince && Date.now() - downSince > 3 * 60_000) || nightly) location.reload();
+}
+
 // ============================================================
 // boot
 // ============================================================
@@ -2827,6 +2840,8 @@ setInterval(tickClock, 15_000);
 setInterval(() => { if (!document.hidden && ui.view !== 'settings') queueRefresh(); }, 60_000);
 setInterval(checkForUpdate, 5 * 60_000);
 document.addEventListener('visibilitychange', checkForUpdate);
+window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); else checkForUpdate(); });
+setInterval(kioskSafetyNet, 60_000);
 setupWall();
 setupInstall();
 onInstallChange(() => { if (ui.view === 'settings') { ui.viewHtml = ''; render(); } });
