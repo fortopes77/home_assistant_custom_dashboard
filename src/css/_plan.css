@@ -235,6 +235,7 @@
   place-items: center;
   width: 38px;
   height: 38px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 50%;
   background: var(--surface);
