@@ -49,6 +49,7 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 - **Hero:** a greeting, a big clock, the date and the weather now (tap it for the forecast). Below that is a short **summary of the day**: the weather, what's on and where everyone is. If Home Assistant has an AI integration (Anthropic, OpenAI or Google Gemini) with an **AI Task**, the AI writes the summary; otherwise a plain one is shown. To pick who writes it, or turn it off, use **Settings → Today**.
 - **Right now** lists open doors, someone at a camera, appliances running and lights left on, with quick actions.
 - **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings. It's also a **family calendar** you can add to, see [Family calendar](#family-calendar).
+- **Music:** what's playing, with its cover, play/pause/skip, volume, your playlists and the speakers to play on. See [Music and Spotify](#music-and-spotify).
 - **Shopping list:** your Home Assistant to-do list. Tap an item to tick it off, type to add one, and use **Clear ticked** to tidy up.
 - **Notifications:** Home Assistant's own notices, which you can dismiss, and what your automations sent to phones (`notify.*`). The **bell** in the top bar counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
 - **News:** Feedreader feeds work, but Home Assistant only keeps the latest story from each, so the dashboard collects stories as they arrive and shares them between screens. For a full list straight away, add a sensor from the HACS **feedparser** integration:
@@ -63,6 +64,23 @@ An administrator login reads the exposed list and shares a copy, so screens sign
       inclusions: [title, link, published, summary, image]
   ```
 - **Settings → Today** can also add cameras, climate and scenes to Today, and turn off any card.
+
+## Music and Spotify
+
+The **Music** card on Today shows what's playing and lets you pick a playlist and a speaker. It works best with **Music Assistant**, which signs in to Spotify (Premium) and plays to Google Nest hubs, TVs and other speakers. A wall screen can also be one of its speakers, so the music comes out of the iPad from the dashboard page itself, with no Spotify app.
+
+1. In Home Assistant, go to **Settings → Add-ons → Add-on store**, then install and start **Music Assistant**.
+2. Open Music Assistant. Under **Settings → Providers**, add **Spotify** and sign in. Add **Google Cast** too if it isn't there (for the Nest hubs and TVs).
+3. Home Assistant finds Music Assistant by itself. Accept the **Music Assistant** integration it offers.
+4. On the wall iPad, go to **Settings → Music** and turn on **Play music on this iPad**. The screen joins Music Assistant as a speaker called **Wall iPad** (you can rename it there).
+5. In Music Assistant, open **Settings → Players**, find **Wall iPad** and choose **Connect unpaired**. If it asks for a PIN instead, the card shows one.
+
+Then tap **This iPad** among the speakers on the card. If something is playing on another speaker, tapping a new one moves the music there.
+
+- **One tap for sound:** iPads and iPhones only let a page make sound after the screen has been touched. After the page reloads (an update, or the nightly refresh on wall screens), the card shows **Tap to play on this iPad** until someone touches the screen.
+- The page reaches Music Assistant at the Home Assistant host on port **8927**, which the add-on opens. If Music Assistant runs somewhere else, put its address in **Settings → Music**. This only works when the dashboard is opened over `http` on your home network, because browsers block an `https` page from an `http` speaker connection.
+- It uses Music Assistant's own web player library (`@sendspin/sendspin-js`), which the page downloads from jsDelivr the first time.
+- **Without Music Assistant:** with Home Assistant's **Spotify** integration, the card controls your Spotify account and lists its Spotify Connect speakers. With neither, it controls whichever speaker or TV is playing. **Settings → Music** can take speakers off the card.
 
 ## Energy
 
@@ -200,6 +218,7 @@ If a download fails, a notice appears in Home Assistant.
 | `src/js/plan.js`, `planedit.js`, `planset.js` | Drawing the floor plan, the room editor, and saving the plan in Home Assistant |
 | `src/js/home.js` | Grouping rooms and "Right now" |
 | `src/js/energy.js` | Finding the solar sensors and the power flow |
+| `src/js/music.js` | The Music card and this screen as a Music Assistant speaker |
 | `src/js/people.js` | People, zones and the Leaflet map |
 | `src/js/calendar.js`, `brief.js`, `notify.js`, `news.js` | Calendar, day summary, notifications and news |
 | `src/js/camera.js`, `voice.js` | Camera player and Assist |

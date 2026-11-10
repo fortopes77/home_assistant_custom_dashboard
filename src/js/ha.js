@@ -9,6 +9,10 @@
 const PING_INTERVAL = 30_000;
 const PONG_TIMEOUT = 10_000;
 const MAX_BACKOFF = 30_000;
+// iPads (Guided Access, home screen apps) freeze the page when the screen sleeps and can wake
+// with a socket that still says OPEN but is dead. A watchdog spots the frozen gap or the silence.
+const WATCHDOG_EVERY = 10_000;
+const STALE_AFTER = PING_INTERVAL + PONG_TIMEOUT + 20_000;
 
 export class HAClient extends EventTarget {
   /**
@@ -35,8 +39,20 @@ export class HAClient extends EventTarget {
       if (document.visibilityState === 'visible') this._reconnectNowIfDown();
     };
     this._onOnline = () => this._reconnectNowIfDown();
+    this._onWake = () => this._checkHealth();
     document.addEventListener('visibilitychange', this._onVisible);
     window.addEventListener('online', this._onOnline);
+    window.addEventListener('pageshow', this._onWake);
+    window.addEventListener('focus', this._onWake);
+    this.lastRx = Date.now();
+    this.lastTick = Date.now();
+    this.watchdog = setInterval(() => {
+      const now = Date.now();
+      const slept = now - this.lastTick > WATCHDOG_EVERY * 3;
+      this.lastTick = now;
+      if (slept) this._checkHealth();
+      else if (this.ws && now - this.lastRx > STALE_AFTER) this._forceReconnect();
+    }, WATCHDOG_EVERY);
   }
 
   get wsUrl() {
@@ -69,7 +85,9 @@ export class HAClient extends EventTarget {
       return;
     }
     this.ws = ws;
+    this.lastRx = Date.now();
     ws.onmessage = (ev) => {
+      this.lastRx = Date.now();
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
       // HA may batch several messages into one frame (coalesce_messages).
@@ -83,8 +101,11 @@ export class HAClient extends EventTarget {
     this.stopped = true;
     clearTimeout(this.reconnectTimer);
     clearInterval(this.pingTimer);
+    clearInterval(this.watchdog);
     document.removeEventListener('visibilitychange', this._onVisible);
     window.removeEventListener('online', this._onOnline);
+    window.removeEventListener('pageshow', this._onWake);
+    window.removeEventListener('focus', this._onWake);
     if (this.ws) this.ws.close();
   }
 
@@ -218,7 +239,7 @@ export class HAClient extends EventTarget {
     const deviceArea = new Map();
     for (const d of devices || []) if (d.area_id) deviceArea.set(d.id, d.area_id);
 
-    // entityInfo: entity_id -> { areaId, hidden, category, deviceId }
+    // entityInfo: entity_id -> { areaId, hidden, category, deviceId, platform }
     const entityInfo = new Map();
     const categories = entities?.entity_categories || {};
     for (const e of entities?.entities || []) {
@@ -227,6 +248,7 @@ export class HAClient extends EventTarget {
         hidden: !!e.hb,
         category: e.ec !== undefined ? categories[e.ec] : null,
         deviceId: e.di || null,
+        platform: e.pl || '',
       });
     }
     return { areas: areas || [], entityInfo };
@@ -258,6 +280,32 @@ export class HAClient extends EventTarget {
     clearTimeout(this.reconnectTimer);
     const delay = Math.min(MAX_BACKOFF, 1000 * 2 ** this.retries++);
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
+  }
+
+  /** After a wake: if the socket is down reconnect now, if it is up make sure it still answers. */
+  _checkHealth() {
+    if (this.stopped || document.hidden) return;
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (ws && ws.readyState !== WebSocket.CONNECTING) this._forceReconnect();
+      else this._reconnectNowIfDown();
+      return;
+    }
+    if (this.status !== 'connected') return;
+    const timeout = setTimeout(() => { if (ws === this.ws) this._forceReconnect(); }, 5_000);
+    this.send({ type: 'ping' }).then(() => clearTimeout(timeout), () => {});
+  }
+
+  /** Drop a socket that looks dead and connect again straight away (fresh states and subscriptions). */
+  _forceReconnect() {
+    const ws = this.ws;
+    if (this.stopped || !ws) return;
+    ws.onclose = null;
+    ws.onmessage = null;
+    try { ws.close(); } catch { /* already closed */ }
+    this._onClose(ws);
+    this.retries = 0;
+    this.connect();
   }
 
   _reconnectNowIfDown() {
