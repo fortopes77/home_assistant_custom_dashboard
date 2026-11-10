@@ -188,6 +188,11 @@ export function musicServerUrl(pref, haUrl) {
   return `http://${u.hostname}:8927`;
 }
 
+const SPEAKER_STORAGE = {
+  getItem: (k) => { try { return localStorage.getItem(`ha-dash2.speaker.${k}`); } catch { return null; } },
+  setItem: (k, v) => { try { localStorage.setItem(`ha-dash2.speaker.${k}`, v); } catch { /* private mode */ } },
+};
+
 /**
  * This page as a Music Assistant speaker. `onChange` runs whenever its state changes.
  * status: 'off' | 'loading' | 'waiting' (connected, not yet added in Music Assistant) | 'ready' | 'error'
@@ -224,6 +229,9 @@ export class ScreenSpeaker {
     const player = new mod.SendspinPlayer({
       baseUrl: url,
       clientName: name,
+      // Its own identity: Music Assistant's web app (same site when opened through Home Assistant) keeps one
+      // under the library's default keys, and two players sharing one id keep pushing each other off.
+      storage: SPEAKER_STORAGE,
       productName: 'Home dashboard',
       codecs: ['pcm', 'opus'], // plain PCM first: nothing to decode on an old iPad, and fine on home Wi-Fi
       correctionMode: 'quality-local',
