@@ -1641,7 +1641,8 @@ function camEditAct(act) {
 
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
-const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
+// Only the Music card shows the speaker on Today, so only it is redrawn there.
+const screenSpeaker = new ScreenSpeaker(() => (ui.view === 'today' ? queueMusicPaint() : queueRefresh()));
 
 function musicName() {
   return (store.prefs.musicName || '').trim() || (store.prefs.wall || urlWall ? (IS_IPAD ? 'Wall iPad' : 'Wall screen') : 'Dashboard');
@@ -1677,7 +1678,7 @@ async function loadMusicLists(players, main) {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
   }
-  queueRefresh();
+  if (ui.view === 'today') queueMusicPaint(); else queueRefresh();
 }
 
 function musicHtml() {
@@ -1725,15 +1726,16 @@ function musicPick(id) {
   if (players.kind === 'mass' && main && main.entity_id !== id && main.state === 'playing') {
     call('music_assistant', 'transfer_queue', { source_player: main.entity_id, auto_play: true }, id);
   }
-  render();
+  if (ui.view === 'today') { music.html = ''; paintMusic(); } else render();
 }
 
 function musicPlay(i) {
   const l = music.lists?.[i];
   const { main } = musicState();
   if (!l || !main) return;
-  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id)
-    .then(() => toast(`Playing ${l.title}`));
+  // Say so straight away: Music Assistant takes a few seconds to fetch a Spotify playlist.
+  toast(`Starting ${l.title} on ${nameOf(main)}…`);
+  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id);
 }
 
 function musicSettingsHtml(check) {
