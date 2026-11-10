@@ -251,7 +251,14 @@ export class HAClient extends EventTarget {
         platform: e.pl || '',
       });
     }
-    return { areas: areas || [], entityInfo };
+    // Android phones with the Home Assistant app: it can open apps on them (e.g. Spotify from the Music card).
+    // Their notify action is named after the device's original name: "Azelia's Phone" -> mobile_app_azelia_s_phone.
+    const slug = (t) => String(t).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const phones = (devices || [])
+      .filter((d) => (d.identifiers || []).some((i) => i[0] === 'mobile_app') && !/apple/i.test(d.manufacturer || '')
+        && !/\btv\b|streamer|television/i.test(`${d.model || ''} ${d.name || ''} ${d.name_by_user || ''}`))
+      .map((d) => ({ name: d.name_by_user || d.name, service: `mobile_app_${slug(d.name)}` }));
+    return { areas: areas || [], entityInfo, phones };
   }
 
   _startPing() {

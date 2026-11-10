@@ -373,6 +373,9 @@ small { font-size: 0.8em; }
 .music-vol { margin: 6px 0 10px; }
 .music-speakers { margin: 4px 0 10px; }
 .music-speakers .chip { cursor: pointer; }
+.music-phones { margin: 8px 0 0; align-items: center; }
+.music-phones > .muted { font-size: .85em; margin-right: 2px; }
+.music-phones .chip { cursor: pointer; }
 .music-lists { display: flex; gap: 10px; overflow-x: auto; margin: 2px -4px 0; padding: 2px 4px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .music-lists::-webkit-scrollbar { display: none; }
 .music-list { flex: none; display: grid; gap: 6px; width: 92px; padding: 0; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }

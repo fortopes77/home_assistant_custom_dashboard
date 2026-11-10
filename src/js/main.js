@@ -77,6 +77,7 @@ const DEFAULT_PREFS = {
   musicServer: '',       // Music Assistant's player address; empty = this Home Assistant's host, port 8927
   musicPlayer: '',       // the speaker this screen's card controls; empty = whatever is playing
   musicHidden: {},       // media_player ids left off the card
+  musicPhones: true,     // "Open Spotify on" buttons for the family's Android phones
   peopleMap: true,       // the Places page and the map on Today
   showHidden: false,     // hidden and diagnostic entities
   showUnavailable: false,
@@ -1690,7 +1691,8 @@ function musicHtml() {
     on: true, entity: hereEntity, status: sp.status, error: sp.error, pin: sp.pin, name: sp.name || musicName(),
     needsTap: sp.status === 'ready' && sp.needsTap,
   } : null;
-  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel() });
+  const phones = store.prefs.musicPhones === false ? [] : store.phones || [];
+  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel(), phones });
 }
 
 /**
@@ -1754,6 +1756,7 @@ function musicSettingsHtml(check) {
       ${p.musicHere ? `<label class="row"><span><b>Speaker name</b><small class="muted">How it shows in Music Assistant and Home Assistant</small></span><input type="text" data-pref="musicName" value="${esc(p.musicName)}" placeholder="${esc(musicName())}" autocomplete="off"></label>
         <label class="row"><span><b>Music Assistant address</b><small class="muted">Leave empty when Music Assistant runs as a Home Assistant add-on</small></span><input type="text" data-pref="musicServer" value="${esc(p.musicServer)}" placeholder="${esc(musicServerUrl('', base()))}" autocomplete="off" inputmode="url"></label>
         ${status ? `<p class="hint">${esc(status)}</p>` : ''}` : ''}
+      ${store.phones?.length ? check('musicPhones', 'Open Spotify on phones', esc(`Buttons that open the Spotify app on ${store.phones.map((x) => x.name).join(' or ')}`)) : ''}
       ${players.kind !== 'spotify' && shown.size ? `<details><summary>Speakers on the card</summary>${[...shown].map((id) => store.states.get(id)).map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc(s.entity_id)}</small></span><input type="checkbox" data-music-hide="${esc(s.entity_id)}"${p.musicHidden?.[s.entity_id] ? '' : ' checked'}></label>`).join('')}</details>` : ''}` : ''}
   </section>`;
 }
@@ -2601,6 +2604,13 @@ document.addEventListener('click', (e) => {
   if (mp) { musicPick(mp.dataset.musicPick); return; }
   const ms = t.closest('[data-music-source]');
   if (ms) { const id = ms.closest('[data-entity]')?.dataset.entity; if (id) call('media_player', 'select_source', { source: ms.dataset.musicSource }, id); return; }
+  const sph = t.closest('[data-spotify-phone]');
+  if (sph) {
+    const ph = (store.phones || []).find((x) => x.service === sph.dataset.spotifyPhone);
+    toast(`Opening Spotify on ${ph?.name || 'the phone'}…`);
+    call('notify', sph.dataset.spotifyPhone, { message: 'command_launch_app', data: { package_name: 'com.spotify.music' } });
+    return;
+  }
   const ml = t.closest('[data-music-play]');
   if (ml) { musicPlay(Number(ml.dataset.musicPlay)); return; }
   if (t.closest('[data-music-unlock]')) { screenSpeaker.unlock(); render(); return; }
@@ -2907,7 +2917,8 @@ async function start() {
   });
   client.addEventListener('ready', async (e) => {
     if (client !== store.client) return;
-    const { states, config, areas, entityInfo } = e.detail;
+    const { states, config, areas, entityInfo, phones } = e.detail;
+    store.phones = phones || [];
     store.states = new Map(states.map((s) => [s.entity_id, s]));
     store.config = config || {};
     store.areas = new Map(areas.map((a) => [a.area_id, a.name]));
