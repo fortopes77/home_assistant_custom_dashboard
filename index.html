@@ -356,6 +356,7 @@ small { font-size: 0.8em; }
 .music-card { order: 1; } /* right under the hero */
 
 /* Music */
+.music-slot { display: contents; }
 .music-where { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; min-width: 0; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .music-where .icon { width: 16px; height: 16px; flex: none; }
 .music-now { display: flex; align-items: center; gap: 14px; min-width: 0; }
@@ -8388,7 +8389,7 @@ function musicCardHtml(players, main, { lists = null, art = (u) => u, here = nul
     .filter(Boolean).join(' · ');
   const dur = Number(a.media_duration);
   const bar = live && Number.isFinite(dur) && dur > 0 && a.media_position != null
-    ? `<div class="music-bar" data-music-bar data-pos="${esc(a.media_position)}" data-at="${esc(a.media_position_updated_at || '')}" data-dur="${esc(dur)}" data-run="${playing ? 1 : 0}"><i></i></div>` : '';
+    ? '<div class="music-bar" data-music-bar><i></i></div>' : ''; // painted by paintMusicBar, so position ticks don't change the HTML
 
   const ctlBtn = (act, ic, label, extra = '') =>
     `<button type="button" class="icon-btn music-btn${extra}" data-act="${act}" aria-label="${esc(label)}">${icon(ic)}</button>`;
@@ -8464,16 +8465,20 @@ async function loadPlaylists(client, entityId, limit = 12) {
 }
 
 /** Keep the progress bar moving between Home Assistant's updates. */
-function paintMusicBar(root) {
+function paintMusicBar(root, s) {
   const el = root.querySelector('[data-music-bar]');
-  if (!el) return;
+  const a = s?.attributes || {};
+  const dur = Number(a.media_duration);
+  if (!el || !(dur > 0)) return;
+  const playing = s.state === 'playing' || s.state === 'buffering';
+  const key = `${a.media_position}|${a.media_position_updated_at}|${dur}|${playing}`;
+  if (el.dataset.key === key) return; // already running from this report
+  el.dataset.key = key;
   const i = el.querySelector('i');
-  const dur = Number(el.dataset.dur);
-  const s = { state: el.dataset.run === '1' ? 'playing' : 'paused', attributes: { media_position: el.dataset.pos, media_position_updated_at: el.dataset.at, media_duration: dur } };
-  const pos = musicPosition(s) ?? 0;
+  const pos = musicPosition({ state: playing ? 'playing' : 'paused', attributes: a }) ?? 0;
   i.style.transition = 'none';
   i.style.width = `${Math.min(100, (pos / dur) * 100).toFixed(2)}%`;
-  if (s.state !== 'playing') return;
+  if (!playing) return;
   void i.offsetWidth; // apply the start before animating to the end
   i.style.transition = `width ${Math.max(0, dur - pos).toFixed(1)}s linear`;
   i.style.width = '100%';
@@ -8619,7 +8624,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '10 Nov 2026, 20:09 (273e3b6)';
+const DASH_BUILD = '10 Nov 2026, 20:37 (1bc5fa9)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8990,6 +8995,7 @@ function queueRefresh() {
     if (document.activeElement?.matches('#view input[type=text]') && document.activeElement.value) { setTimeout(queueRefresh, 1000); return; }
     render();
     renderSheet();
+    if (ui.view === 'today') paintMusic();
   }, wait);
 }
 
@@ -10218,7 +10224,7 @@ function camEditAct(act) {
 // ---------- music: Spotify through Music Assistant (or HA's Spotify integration), and this screen as a speaker ----------
 
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-const music = { lists: null, listsFor: '', listsAt: 0 };
+const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
 const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
 
 function musicName() {
@@ -10268,6 +10274,31 @@ function musicHtml() {
     needsTap: sp.status === 'ready' && sp.needsTap,
   } : null;
   return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel() });
+}
+
+/**
+ * The Music card lives in its own slot and is redrawn on its own, so speakers reporting their position
+ * every few seconds don't redraw the whole Today page (slow on an old iPad).
+ */
+function paintMusic(root = document) {
+  const slot = root.querySelector('#view .music-slot, .music-slot');
+  if (!slot || ui.dragging) return;
+  const html = musicHtml();
+  if (html !== music.html || !slot.firstElementChild !== !html) {
+    // Keep a playlist row's scroll position across redraws.
+    const scroll = slot.querySelector('.music-lists')?.scrollLeft || 0;
+    music.html = html;
+    slot.innerHTML = html;
+    const lists = slot.querySelector('.music-lists');
+    if (lists && scroll) lists.scrollLeft = scroll;
+  }
+  const id = slot.querySelector('.music-card')?.dataset.entity;
+  paintMusicBar(slot, id && store.states.get(id));
+}
+
+function queueMusicPaint() {
+  if (music.timer) return;
+  music.timer = setTimeout(() => { music.timer = 0; if (ui.view === 'today') paintMusic(); }, 700);
 }
 
 /** Tap a speaker: control it from here, and move the music there if something is playing. */
@@ -10320,7 +10351,7 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}${musicHtml()}</div>
+      <div class="col col-a">${heroHtml()}<div class="music-slot"></div></div>
       <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
       <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
@@ -10613,7 +10644,8 @@ const VIEWS = {
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
   today(view) {
-    paintMusicBar(view);
+    music.html = '';
+    paintMusic(view);
     const slot = $('.pmap-slot', view);
     if (slot) { peopleMap.attach(slot); syncMap(); }
   },
@@ -11486,6 +11518,8 @@ async function start() {
       learnSigns(f.raw, null, energyIds());
     }
     if (ui.view === 'settings') return;
+    // On Today a speaker only changes the Music card: redraw just that (speakers report every few seconds).
+    if (ui.view === 'today' && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
     queueRefresh();
   });
   client.connect();
