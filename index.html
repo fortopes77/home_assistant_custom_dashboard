@@ -8346,10 +8346,12 @@ function musicPlayers(states, { ok = () => true, platform = () => '', hidden = {
 function musicMain(players, picked = '', hereId = '') {
   if (players.account) return players.account;
   const sp = players.speakers;
+  // This screen's own speaker comes before whatever else is playing, so a tap on a playlist plays here
+  // (another speaker reporting "playing", such as a phone app, mustn't steal the card).
   return sp.find((s) => s.entity_id === picked)
+    || sp.find((s) => s.entity_id === hereId)
     || sp.find((s) => s.state === 'playing')
     || sp.find((s) => s.state === 'paused')
-    || sp.find((s) => s.entity_id === hereId)
     || sp[0] || null;
 }
 
@@ -8599,15 +8601,14 @@ class ScreenSpeaker {
   /** Call straight from a tap: wakes the audio before anything else is awaited. */
   unlock() {
     const p = this.player;
-    if (!p) return;
-    const before = this.needsTap;
+    if (!p || !this.needsTap) return; // already making sound: leave every other tap alone
     try {
-      p.unlock().then(() => this.onChange?.(), () => {});
+      p.unlock().then(() => { if (!this.needsTap) this.onChange?.(); }, () => {});
       // Audio that started before the first tap left its <audio> element paused; start it in the gesture.
       const el = p.scheduler?.audioElement;
       if (el?.paused && (el.srcObject || el.src)) el.play().catch(() => {});
     } catch { /* not ready */ }
-    if (before) setTimeout(() => this.onChange?.(), 300);
+    setTimeout(() => { if (!this.needsTap) this.onChange?.(); }, 300);
   }
 
   _set(patch) {
@@ -8624,7 +8625,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '10 Nov 2026, 20:37 (1bc5fa9)';
+const DASH_BUILD = '10 Nov 2026, 21:05 (d25c436)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -10225,7 +10226,8 @@ function camEditAct(act) {
 
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
-const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
+// Only the Music card shows the speaker on Today, so only it is redrawn there.
+const screenSpeaker = new ScreenSpeaker(() => (ui.view === 'today' ? queueMusicPaint() : queueRefresh()));
 
 function musicName() {
   return (store.prefs.musicName || '').trim() || (store.prefs.wall || urlWall ? (IS_IPAD ? 'Wall iPad' : 'Wall screen') : 'Dashboard');
@@ -10261,7 +10263,7 @@ async function loadMusicLists(players, main) {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
   }
-  queueRefresh();
+  if (ui.view === 'today') queueMusicPaint(); else queueRefresh();
 }
 
 function musicHtml() {
@@ -10309,15 +10311,16 @@ function musicPick(id) {
   if (players.kind === 'mass' && main && main.entity_id !== id && main.state === 'playing') {
     call('music_assistant', 'transfer_queue', { source_player: main.entity_id, auto_play: true }, id);
   }
-  render();
+  if (ui.view === 'today') { music.html = ''; paintMusic(); } else render();
 }
 
 function musicPlay(i) {
   const l = music.lists?.[i];
   const { main } = musicState();
   if (!l || !main) return;
-  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id)
-    .then(() => toast(`Playing ${l.title}`));
+  // Say so straight away: Music Assistant takes a few seconds to fetch a Spotify playlist.
+  toast(`Starting ${l.title} on ${nameOf(main)}…`);
+  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id);
 }
 
 function musicSettingsHtml(check) {
