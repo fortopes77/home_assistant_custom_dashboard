@@ -675,7 +675,8 @@ small { font-size: 0.8em; }
 .flow-line.go.battery { stroke: var(--battery); }
 .flow-line.go.grid.in { stroke: var(--negative); }
 .flow-line.go.grid.out { stroke: var(--positive); }
-@keyframes dash { to { stroke-dashoffset: 24; } }
+/* Positive offsets slide dashes back toward a line's start, so go negative to travel x1 -> x2 (node to hub). */
+@keyframes dash { to { stroke-dashoffset: -24; } }
 .flow-hub {
   position: absolute;
   left: 50%;
