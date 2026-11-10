@@ -918,12 +918,15 @@ small { font-size: 0.8em; }
    ============================================================ */
 
 @media (min-width: 700px) {
-  .shell { display: grid; grid-template-columns: calc(var(--rail) + var(--safe-left)) minmax(0, 1fr); }
-  .kiosk .shell { grid-template-columns: minmax(0, 1fr); }
+  /* The rail is fixed, not sticky: sticky came loose and scrolled away in some browsers (the HA app's frame). */
+  .main { margin-left: calc(var(--rail) + var(--safe-left)); }
+  .kiosk .main { margin-left: 0; }
   .nav {
-    position: sticky;
-    top: 0;
-    inset: auto;
+    position: fixed;
+    inset: 0 auto 0 0;
+    box-sizing: border-box;
+    width: calc(var(--rail) + var(--safe-left));
+    overflow-y: auto;
     flex-direction: column;
     justify-content: flex-start;
     gap: 4px;
