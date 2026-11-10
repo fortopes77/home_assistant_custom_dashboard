@@ -3,25 +3,31 @@
 # Developer tools → YAML and reload "Input text" and "Automations" (or restart once).
 #
 # How it works: when a Reolink camera sees a vehicle, the automation sends a snapshot to the AI task
-# (Gemini), which reads the number plate. If the plate is one of CARS below, everyone gets
+# (Gemini), which reads the number plate. If the plate is one of the family cars, everyone gets
 # "<owner> is home" with the photo, through the notify_family script. Any other car gets the usual
 # "Car in the driveway" alert, now with its plate.
 #
-# Change these to suit your home:
-#   - CARS (in the automation's variables): each family car's plate and who drives it. Plates can be
-#     typed with or without spaces. person is that driver's person entity, used to tell an arrival from
-#     the car just leaving.
+# The family's cars are typed in on the dashboard: Settings → Family cars (plate and whose car it is).
+# They're kept in input_text.family_cars as "ABC123=person.andy;XYZ789=Nana", so you can also edit that
+# helper in Home Assistant. The owner is a person entity (used for the name and to tell an arrival from
+# the car just leaving) or a plain name.
+#
+# Change to suit your home:
 #   - the trigger: the vehicle sensors of the cameras that look at the driveway, and the matching camera
 #     in CAMERAS so the right snapshot is read.
 #
-# Leaving vs arriving: a single photo can't tell which way a car is going, so it only says "is home"
-# when that driver wasn't already home 10 minutes ago. The same car is announced at most once every
+# Leaving vs arriving: a single photo can't tell which way a car is going, so for a person's car it only
+# says "is home" when they weren't already home 10 minutes ago. The same car is announced at most once every
 # 15 minutes.
 #
 # The "Camera alert with snapshot" automation also alerts on vehicles. Take the driveway vehicle
 # sensor(s) out of its triggers so a family car isn't announced twice; this file covers them now.
 
 input_text:
+  family_cars:
+    name: Family cars
+    icon: mdi:car-multiple
+    max: 255
   last_car_arrival:
     name: Last car arrival
     icon: mdi:car-arrow-left
@@ -40,13 +46,19 @@ automation:
           - binary_sensor.door_bell_vehicle
         to: "on"
     variables:
-      CARS:
-        - plate: "ABC 123"      # Andrew's car
-          owner: Andrew
-          person: person.andy
-        - plate: "XYZ 789"      # Azelia's car
-          owner: Azelia
-          person: person.azelia
+      # [{plate, owner, person}] from the Family cars helper. person is '' for a plain name.
+      CARS: >-
+        {% set ns = namespace(cars=[]) %}
+        {% for part in states('input_text.family_cars').split(';') if '=' in part %}
+          {% set plate = part.split('=')[0] | upper | regex_replace('[^A-Z0-9]', '') %}
+          {% set who = part.split('=')[1] | trim %}
+          {% set is_person = who.startswith('person.') %}
+          {% set name = (state_attr(who, 'friendly_name') or who.split('.')[1] | replace('_', ' ') | title) if is_person else who %}
+          {% if plate and who %}
+            {% set ns.cars = ns.cars + [{'plate': plate, 'owner': name, 'person': who if is_person else ''}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.cars }}
       CAMERAS:
         binary_sensor.driveway_vehicle: camera.driveway_fluent
         binary_sensor.door_bell_vehicle: camera.door_bell_snapshots_fluent
@@ -109,7 +121,7 @@ automation:
                 alias: Arriving, not leaving (the driver wasn't home 10 minutes ago)
                 value_template: >-
                   {% set p = car.person %}
-                  {{ not is_state(p, 'home')
+                  {{ not p or states[p] is none or not is_state(p, 'home')
                      or (now() - states[p].last_changed) < timedelta(minutes=10) }}
               - action: input_text.set_value
                 target: { entity_id: input_text.last_car_arrival }

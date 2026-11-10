@@ -38,6 +38,7 @@ import {
 import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './news.js';
 import { Voice } from './voice.js';
 import { binNight, binSvg, binWords } from './bins.js';
+import { CARS_ENTITY, parseCars, serializeCars, addCar, cleanPlate } from './cars.js';
 import { musicPlayers, musicMain, musicHereEntity, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
 
 const DASH_BUILD = 'source';
@@ -1997,6 +1998,8 @@ const VIEWS = {
           <input type="checkbox" data-person-show="${esc(pp.id)}"${hidden(pp) ? '' : ' checked'}></label>`).join('') : '<p class="muted">No people yet.</p>') : ''}
       </section>
 
+      ${carsSettingsHtml(people)}
+
       <section class="card" id="look">
         <h2 class="card-title">${icon('sun')}Look</h2>
         ${choose('theme', 'Theme', [['auto', 'Same as this device'], ['sun', 'Dark after sunset'], ['light', 'Light'], ['dark', 'Dark']])}
@@ -2056,6 +2059,56 @@ const VIEWS = {
     </div>`;
   },
 };
+
+/** Settings → Family cars: the plates the car arrivals automation announces as "Andrew is home". */
+function carsSettingsHtml(people) {
+  const helper = store.states.get(CARS_ENTITY);
+  if (!helper) {
+    return store.user?.is_admin ? `<section class="card" id="cars">
+        <h2 class="card-title">${icon('car')}Family cars</h2>
+        <p class="muted">Add <code>homeassistant/car_arrivals.yaml</code> to Home Assistant to hear “Andrew is home” when a family car pulls in. Its plates are typed in here.</p>
+      </section>` : '';
+  }
+  const persons = people.filter((pp) => pp.id.startsWith('person.') && !/wall|display|kiosk|tablet|ipad|dashboard|^tv$|livingtv/i.test(pp.name));
+  const ownerName = (o) => (o.startsWith('person.') ? (people.find((pp) => pp.id === o)?.name || o) : o);
+  const cars = parseCars(helper.state);
+  return `<section class="card" id="cars">
+      <h2 class="card-title">${icon('car')}Family cars</h2>
+      <p class="muted">When a camera reads one of these plates, everyone gets a “… is home” notification, like “Andrew is home”. Other cars get the usual camera alert. They’re saved in Home Assistant, so every screen shares them.</p>
+      ${cars.length ? cars.map((c) => `<div class="row"><span><b>${esc(c.plate)}</b><small class="muted">${esc(ownerName(c.owner))}’s car</small></span>
+        <button type="button" class="btn" data-car-remove="${esc(c.plate)}" aria-label="Remove ${esc(c.plate)}">Remove</button></div>`).join('')
+        : '<p class="muted quiet">No cars yet.</p>'}
+      <form class="car-add" data-car-add>
+        <label>Number plate<input name="plate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. ABC123" maxlength="12"></label>
+        <label>Whose car<select name="owner">${persons.map((pp) => `<option value="${esc(pp.id)}">${esc(pp.name)}</option>`).join('')}<option value="">Someone else…</option></select></label>
+        <label class="car-other"${persons.length ? ' hidden' : ''}>Their name<input name="other" autocomplete="off" placeholder="e.g. Nana"></label>
+        <button class="btn primary" type="submit">Add car</button>
+      </form>
+    </section>`;
+}
+
+/** Settings doesn't redraw on state changes (it would wipe what's being typed), so the cars card redraws itself. */
+function redrawCars(force = false) {
+  const sec = document.getElementById('cars');
+  if (!sec || (!force && sec.contains(document.activeElement) && document.activeElement.matches('input, select'))) return;
+  const html = carsSettingsHtml(peopleOf(store.states));
+  if (html) sec.outerHTML = html;
+  ui.viewHtml = '';
+}
+
+/** Writes the cars back to Home Assistant and redraws the card. */
+async function saveCars(cars, done) {
+  try {
+    const value = serializeCars(cars);
+    await store.client.callService('input_text', 'set_value', { value }, { entity_id: CARS_ENTITY });
+    const cur = store.states.get(CARS_ENTITY);
+    if (cur) store.states.set(CARS_ENTITY, { ...cur, state: value });
+    redrawCars(true);
+    toast(done);
+  } catch (err) {
+    toast(`Couldn't save the cars: ${err.message}`);
+  }
+}
 
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
@@ -2707,6 +2760,12 @@ document.addEventListener('input', (e) => {
   if (out) out.textContent = `${r.value}${out.textContent.replace(/^[\d.]+/, '')}`;
 });
 document.addEventListener('change', (e) => {
+  if (e.target.name === 'owner' && e.target.closest('[data-car-add]')) {
+    const other = e.target.closest('form').querySelector('.car-other');
+    other.hidden = !!e.target.value;
+    if (!other.hidden) other.querySelector('input').focus();
+    return;
+  }
   const t = e.target;
   const r = t.closest('[data-slide]');
   if (r) {
@@ -2790,6 +2849,12 @@ function handleSettingsClick(t) {
     return true;
   }
   if (t.closest('[data-install]')) { promptInstall(); return true; }
+  const rm = t.closest('[data-car-remove]');
+  if (rm) {
+    const cars = parseCars(store.states.get(CARS_ENTITY)?.state).filter((c) => c.plate !== rm.dataset.carRemove);
+    saveCars(cars, `Removed ${rm.dataset.carRemove}`);
+    return true;
+  }
   if (t.closest('[data-forget-token]')) {
     saveSettings({ ...loadSettings(), token: '' });
     toast('Token forgotten on this screen');
@@ -2866,6 +2931,15 @@ document.addEventListener('submit', (e) => {
     input.value = '';
     return;
   }
+  if (e.target.matches('[data-car-add]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const owner = String(f.get('owner') || '') || String(f.get('other') || '');
+    const res = addCar(parseCars(store.states.get(CARS_ENTITY)?.state), { plate: f.get('plate'), owner });
+    if (res.error) { toast(res.error); return; }
+    saveCars(res.cars, `Saved ${cleanPlate(f.get('plate'))}`);
+    return;
+  }
   if (!e.target.matches('[data-conn]')) return;
   e.preventDefault();
   const f = new FormData(e.target);
@@ -2933,7 +3007,7 @@ async function start() {
       const f = energyFlow(store.states, energyIds(), {});
       learnSigns(f.raw, null, energyIds());
     }
-    if (ui.view === 'settings') return;
+    if (ui.view === 'settings') { if (entityId === CARS_ENTITY) redrawCars(); return; }
     // On Today a speaker only changes the Music card: redraw just that (speakers report every few seconds).
     if (ui.view === 'today' && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
     queueRefresh();
