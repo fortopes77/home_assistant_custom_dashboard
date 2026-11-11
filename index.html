@@ -1491,6 +1491,16 @@ small { font-size: 0.8em; }
 .cam-stage[data-phase="playing"] .cam-status { display: none; }
 .cam-stage[data-phase="failed"] .spinner { display: none; }
 .cam-stage[data-phase="still"] .cam-status { display: none; }
+/* Talk and Sound under the live video */
+.cam-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.cam-bar[hidden], .cam-bar [hidden] { display: none; }
+.cam-bar .btn { gap: 6px; }
+.cam-talk { min-width: 9.5em; justify-content: center; }
+.cam-bar .cam-talk.on { background: var(--danger, #d64545); border-color: var(--danger, #d64545); color: #fff; }
+.cam-bar .cam-talk.on .icon { animation: cam-talk-pulse 1.4s ease-in-out infinite; }
+@keyframes cam-talk-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .cam-bar .cam-talk.on .icon { animation: none; } }
+.cam-talk-note { flex: 1 1 100%; margin: 0; font-size: 0.85rem; }
 
 /* Settings forms, the floor plan editor, the month calendar and search boxes. */
 
@@ -1862,6 +1872,7 @@ const ICONS = {
   pause: 'M14,19H18V5H14M6,19H10V5H6V19Z',
   skipNext: 'M16,18H18V6H16M6,18L14.5,12L6,6V18Z',
   skipPrev: 'M6,18V6H8V18H6M9.5,12L18,6V18L9.5,12Z',
+  mic: 'M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z',
   volumeLow: 'M5,9V15H9L14,20V4L9,9H5M18.5,12C18.5,10.23 17.5,8.71 16,7.97V16C17.5,15.29 18.5,13.76 18.5,12Z',
   volumeHigh: 'M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z',
   volumeOff: 'M12,4L9.91,6.09L12,8.18M4.27,3L3,4.27L7.73,9H3V15H7L12,20V13.27L16.25,17.53C15.58,18.04 14.83,18.46 14,18.7V20.77C15.38,20.45 16.63,19.82 17.68,18.96L19.73,21L21,19.73L12,10.73M19,12C19,12.94 18.8,13.82 18.46,14.64L19.97,16.15C20.62,14.91 21,13.5 21,12C21,7.72 18,4.14 14,3.23V5.29C16.89,6.15 19,8.83 19,12M16.5,12C16.5,10.23 15.5,8.71 14,7.97V10.18L16.45,12.63C16.5,12.43 16.5,12.21 16.5,12Z',
@@ -4466,6 +4477,11 @@ async function importFloorPlan(file) {
 //    address works in a plain <img> without any headers.
 //  - Live video tries, in order, what the camera offers: WebRTC (go2rtc, Nest and others; lowest
 //    delay), then HLS (the stream integration), then the Motion JPEG proxy every camera has.
+//  - Talking back (two-way audio, Home Assistant 2026.11+): when Home Assistant says the camera can
+//    take audio (camera/capabilities two_way_audio, which needs the Labs "Two-way audio" switch and
+//    a WebRTC stream), the microphone goes to the camera as the audio track of the WebRTC call, the
+//    same way Home Assistant's own camera dialog does it. Browsers only give the microphone to
+//    pages opened over HTTPS (or localhost).
 
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js';
 const KIND_LABELS = { web_rtc: 'WebRTC', hls: 'HLS', mjpeg: 'MJPEG' };
@@ -4528,16 +4544,30 @@ class CameraPlayer {
     this.kind = null;
     this.media = null;
     this.muted = true;
+    this.canTalk = false; // Home Assistant says this camera takes audio back
+    this.mic = null; // the microphone track while talking
+    this.micSender = null; // where the microphone goes in the current call
+    this.talkState = 'off'; // off | connecting | on | denied
+    this.onTalk = null; // (state, message) => {}
+  }
+
+  /** Talking needs a secure page: browsers refuse the microphone over plain http. */
+  static get talkAllowed() {
+    return !!(window.isSecureContext && navigator.mediaDevices?.getUserMedia);
   }
 
   get video() {
     return this.media?.tagName === 'VIDEO' ? this.media : null;
   }
 
-  async start() {
-    this.stop();
-    const run = ++this.run;
-    const kinds = [...(await this._streamKinds()), 'mjpeg'];
+  async start({ keepMic = false } = {}) {
+    this.run++;
+    if (!keepMic) this._dropMic();
+    this._teardown();
+    const run = this.run;
+    let kinds = [...(await this._streamKinds()), 'mjpeg'];
+    if (run !== this.run) return;
+    if (this.mic) kinds = kinds.filter((k) => k === 'web_rtc'); // only WebRTC carries the voice
     let lastError = null;
     for (const kind of kinds) {
       if (run !== this.run) return;
@@ -4547,18 +4577,87 @@ class CameraPlayer {
         await this[`_${kind}`](run);
         if (run !== this.run) return;
         this.onState({ phase: 'playing', kind });
+        if (this.mic && this.micSender) this._setTalk('on');
         return;
       } catch (err) {
         lastError = err;
         this._teardown();
       }
     }
-    if (run === this.run) this.onState({ phase: 'failed', kind: null, message: lastError?.message || 'No live video' });
+    if (run !== this.run) return;
+    if (this.mic) {
+      // The camera wouldn't take the microphone: carry on watching without it.
+      this._dropMic();
+      this._setTalk('off', 'The camera would not take the microphone, so talking is off.');
+      this.start();
+      return;
+    }
+    this.onState({ phase: 'failed', kind: null, message: lastError?.message || 'No live video' });
   }
 
   stop() {
     this.run++;
+    this._dropMic();
     this._teardown();
+  }
+
+  /** Starts or stops sending the microphone to the camera. */
+  async toggleTalk() {
+    if (this.talkState === 'on' || this.talkState === 'connecting') {
+      this.talkRun = (this.talkRun || 0) + 1;
+      const restarting = this.talkState === 'connecting' && !!this.mic; // mid-way through the call with the microphone
+      this._dropMic();
+      this._setTalk('off');
+      if (restarting) this.start(); // cancel: back to the plain stream
+      return;
+    }
+    if (!this.canTalk) return;
+    if (!CameraPlayer.talkAllowed) {
+      this._setTalk('off', 'Talking needs Home Assistant opened over https, so the browser can use the microphone.');
+      return;
+    }
+    const talkRun = this.talkRun = (this.talkRun || 0) + 1;
+    this._setTalk('connecting');
+    let track;
+    try {
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      track = ms.getAudioTracks()[0];
+    } catch (err) {
+      if (talkRun !== this.talkRun) return;
+      const denied = err?.name === 'NotAllowedError' || err?.name === 'SecurityError';
+      this._setTalk(denied ? 'denied' : 'off', denied
+        ? 'The microphone is blocked. Allow it for this page in the browser or app settings, then try again.'
+        : `No microphone to use (${err?.message || err}).`);
+      return;
+    }
+    if (talkRun !== this.talkRun || !track) { track?.stop(); return; }
+    this.mic = track;
+    this.setMuted(false); // hear the visitor while talking
+    if (this.micSender && this.pc) {
+      // The call was set up with a microphone before: swap it straight back in.
+      try {
+        await this.micSender.replaceTrack(track);
+        if (talkRun === this.talkRun) this._setTalk('on');
+        return;
+      } catch { /* fall through and call again */ }
+    }
+    // Adding a microphone to a running call isn't supported everywhere (go2rtc answers with a
+    // new fingerprint), so like Home Assistant, start a new call that carries it.
+    this.start({ keepMic: true });
+  }
+
+  _dropMic() {
+    if (this.mic) {
+      this.mic.stop(); // stop, not mute, so the browser lets go of the microphone
+      this.mic = null;
+    }
+    this.micSender?.replaceTrack(null).catch(() => {});
+    if (this.talkState === 'on' || this.talkState === 'connecting') this._setTalk('off');
+  }
+
+  _setTalk(state, message) {
+    this.talkState = state;
+    this.onTalk?.(state, message);
   }
 
   setMuted(muted) {
@@ -4584,6 +4683,7 @@ class CameraPlayer {
     try {
       const res = await this.client.send({ type: 'camera/capabilities', entity_id: this.entityId });
       types = res?.frontend_stream_types;
+      this.canTalk = !!res?.two_way_audio && !!types?.includes('web_rtc');
     } catch {
       // Older Home Assistant: the camera says in its attributes, else try HLS and see.
       const attr = s?.attributes?.frontend_stream_type;
@@ -4600,6 +4700,7 @@ class CameraPlayer {
     }
     this.pc?.close();
     this.pc = null;
+    this.micSender = null;
     this.hls?.destroy();
     this.hls = null;
     const m = this.media;
@@ -4664,7 +4765,8 @@ class CameraPlayer {
     this.pc = pc;
     if (cfg.dataChannel) pc.createDataChannel(cfg.dataChannel);
     pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (this.mic) this.micSender = pc.addTransceiver(this.mic, { direction: 'sendrecv' }).sender;
+    else pc.addTransceiver('audio', { direction: 'recvonly' });
     const stream = new MediaStream();
     pc.addEventListener('track', (e) => stream.addTrack(e.track));
     const video = this._newVideo();
@@ -8625,7 +8727,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '10 Nov 2026, 21:05 (d25c436)';
+const DASH_BUILD = '12 Nov 2026, 09:33 (e60db54)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -10890,6 +10992,11 @@ function renderCameraSheet(s, sh) {
       <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span>
         <button type="button" class="btn" data-cam="retry">Try again</button></div>
       <span class="cam-kind"></span>
+    </div>
+    <div class="cam-bar" hidden>
+      <button type="button" class="btn cam-talk" data-cam="talk" hidden aria-pressed="false">${icon('mic')}<span>Talk</span></button>
+      <button type="button" class="btn cam-sound" data-cam="sound" hidden aria-pressed="false">${icon('volumeOff')}<span>Sound off</span></button>
+      <p class="cam-talk-note muted" hidden></p>
     </div>`;
   paintCameras(d);
   camPlayer = new CameraPlayer({
@@ -10900,9 +11007,43 @@ function renderCameraSheet(s, sh) {
       st.dataset.phase = phase;
       $('.cam-status-text', st).textContent = phase === 'failed' ? `No live video. ${message || ''}` : `Connecting${kind ? ` (${streamLabel(kind)})` : ''}…`;
       $('.cam-kind', st).textContent = phase === 'playing' ? `Live · ${streamLabel(kind)}` : '';
+      paintCamBar();
     },
   });
+  camTalkNote = '';
+  camPlayer.onTalk = (state, message) => {
+    if (message || state === 'on' || state === 'connecting') camTalkNote = message || '';
+    paintCamBar();
+  };
   camPlayer.start();
+}
+
+/** The buttons under the live video: Talk (when Home Assistant says the camera can take audio) and Sound. */
+let camTalkNote = ''; // why talking stopped or didn't start, shown under the buttons
+function paintCamBar() {
+  const bar = $('#sheet .cam-bar');
+  const p = camPlayer;
+  if (!bar || !p) return;
+  const phase = $('#sheet .cam-stage')?.dataset.phase;
+  const talk = $('.cam-talk', bar);
+  const sound = $('.cam-sound', bar);
+  const note = $('.cam-talk-note', bar);
+  const talking = p.talkState === 'on' || p.talkState === 'connecting';
+  talk.hidden = !p.canTalk;
+  talk.classList.toggle('on', talking);
+  talk.setAttribute('aria-pressed', String(talking));
+  talk.disabled = !talking && (phase !== 'playing' || p.talkState === 'denied');
+  $('span', talk).textContent = p.talkState === 'connecting' ? 'Connecting…' : talking ? 'Stop talking' : 'Talk';
+  sound.hidden = phase !== 'playing' || !p.hasAudio;
+  sound.setAttribute('aria-pressed', String(!p.muted));
+  sound.innerHTML = `${icon(p.muted ? 'volumeOff' : 'volumeHigh')}<span>${p.muted ? 'Sound off' : 'Sound on'}</span>`;
+  // Say why talking won't work before anyone presses it: no https means no microphone.
+  const insecure = p.canTalk && !CameraPlayer.talkAllowed;
+  const why = camTalkNote || (insecure ? 'Talking needs Home Assistant opened over https (its outside address), so the browser can use the microphone.' : '');
+  note.textContent = why;
+  note.hidden = !why;
+  if (insecure) talk.disabled = true;
+  bar.hidden = talk.hidden && sound.hidden && note.hidden;
 }
 
 function stopCamera() {
@@ -11227,6 +11368,8 @@ document.addEventListener('click', (e) => {
   const floor = t.closest('[data-floor]');
   if (floor) { planStore.floor = floor.dataset.floor; render(); return; }
   if (t.closest('[data-cam="retry"]')) { camPlayer?.start(); return; }
+  if (t.closest('[data-cam="talk"]')) { camPlayer?.toggleTalk(); paintCamBar(); return; }
+  if (t.closest('[data-cam="sound"]')) { camPlayer?.setMuted(!camPlayer.muted); paintCamBar(); return; }
 
   const a = t.closest('[data-act]');
   if (a) {
