@@ -5,6 +5,11 @@
 //    address works in a plain <img> without any headers.
 //  - Live video tries, in order, what the camera offers: WebRTC (go2rtc, Nest and others; lowest
 //    delay), then HLS (the stream integration), then the Motion JPEG proxy every camera has.
+//  - Talking back (two-way audio, Home Assistant 2026.11+): when Home Assistant says the camera can
+//    take audio (camera/capabilities two_way_audio, which needs the Labs "Two-way audio" switch and
+//    a WebRTC stream), the microphone goes to the camera as the audio track of the WebRTC call, the
+//    same way Home Assistant's own camera dialog does it. Browsers only give the microphone to
+//    pages opened over HTTPS (or localhost).
 
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js';
 const KIND_LABELS = { web_rtc: 'WebRTC', hls: 'HLS', mjpeg: 'MJPEG' };
@@ -67,16 +72,30 @@ export class CameraPlayer {
     this.kind = null;
     this.media = null;
     this.muted = true;
+    this.canTalk = false; // Home Assistant says this camera takes audio back
+    this.mic = null; // the microphone track while talking
+    this.micSender = null; // where the microphone goes in the current call
+    this.talkState = 'off'; // off | connecting | on | denied
+    this.onTalk = null; // (state, message) => {}
+  }
+
+  /** Talking needs a secure page: browsers refuse the microphone over plain http. */
+  static get talkAllowed() {
+    return !!(window.isSecureContext && navigator.mediaDevices?.getUserMedia);
   }
 
   get video() {
     return this.media?.tagName === 'VIDEO' ? this.media : null;
   }
 
-  async start() {
-    this.stop();
-    const run = ++this.run;
-    const kinds = [...(await this._streamKinds()), 'mjpeg'];
+  async start({ keepMic = false } = {}) {
+    this.run++;
+    if (!keepMic) this._dropMic();
+    this._teardown();
+    const run = this.run;
+    let kinds = [...(await this._streamKinds()), 'mjpeg'];
+    if (run !== this.run) return;
+    if (this.mic) kinds = kinds.filter((k) => k === 'web_rtc'); // only WebRTC carries the voice
     let lastError = null;
     for (const kind of kinds) {
       if (run !== this.run) return;
@@ -86,18 +105,87 @@ export class CameraPlayer {
         await this[`_${kind}`](run);
         if (run !== this.run) return;
         this.onState({ phase: 'playing', kind });
+        if (this.mic && this.micSender) this._setTalk('on');
         return;
       } catch (err) {
         lastError = err;
         this._teardown();
       }
     }
-    if (run === this.run) this.onState({ phase: 'failed', kind: null, message: lastError?.message || 'No live video' });
+    if (run !== this.run) return;
+    if (this.mic) {
+      // The camera wouldn't take the microphone: carry on watching without it.
+      this._dropMic();
+      this._setTalk('off', 'The camera would not take the microphone, so talking is off.');
+      this.start();
+      return;
+    }
+    this.onState({ phase: 'failed', kind: null, message: lastError?.message || 'No live video' });
   }
 
   stop() {
     this.run++;
+    this._dropMic();
     this._teardown();
+  }
+
+  /** Starts or stops sending the microphone to the camera. */
+  async toggleTalk() {
+    if (this.talkState === 'on' || this.talkState === 'connecting') {
+      this.talkRun = (this.talkRun || 0) + 1;
+      const restarting = this.talkState === 'connecting' && !!this.mic; // mid-way through the call with the microphone
+      this._dropMic();
+      this._setTalk('off');
+      if (restarting) this.start(); // cancel: back to the plain stream
+      return;
+    }
+    if (!this.canTalk) return;
+    if (!CameraPlayer.talkAllowed) {
+      this._setTalk('off', 'Talking needs Home Assistant opened over https, so the browser can use the microphone.');
+      return;
+    }
+    const talkRun = this.talkRun = (this.talkRun || 0) + 1;
+    this._setTalk('connecting');
+    let track;
+    try {
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      track = ms.getAudioTracks()[0];
+    } catch (err) {
+      if (talkRun !== this.talkRun) return;
+      const denied = err?.name === 'NotAllowedError' || err?.name === 'SecurityError';
+      this._setTalk(denied ? 'denied' : 'off', denied
+        ? 'The microphone is blocked. Allow it for this page in the browser or app settings, then try again.'
+        : `No microphone to use (${err?.message || err}).`);
+      return;
+    }
+    if (talkRun !== this.talkRun || !track) { track?.stop(); return; }
+    this.mic = track;
+    this.setMuted(false); // hear the visitor while talking
+    if (this.micSender && this.pc) {
+      // The call was set up with a microphone before: swap it straight back in.
+      try {
+        await this.micSender.replaceTrack(track);
+        if (talkRun === this.talkRun) this._setTalk('on');
+        return;
+      } catch { /* fall through and call again */ }
+    }
+    // Adding a microphone to a running call isn't supported everywhere (go2rtc answers with a
+    // new fingerprint), so like Home Assistant, start a new call that carries it.
+    this.start({ keepMic: true });
+  }
+
+  _dropMic() {
+    if (this.mic) {
+      this.mic.stop(); // stop, not mute, so the browser lets go of the microphone
+      this.mic = null;
+    }
+    this.micSender?.replaceTrack(null).catch(() => {});
+    if (this.talkState === 'on' || this.talkState === 'connecting') this._setTalk('off');
+  }
+
+  _setTalk(state, message) {
+    this.talkState = state;
+    this.onTalk?.(state, message);
   }
 
   setMuted(muted) {
@@ -123,6 +211,7 @@ export class CameraPlayer {
     try {
       const res = await this.client.send({ type: 'camera/capabilities', entity_id: this.entityId });
       types = res?.frontend_stream_types;
+      this.canTalk = !!res?.two_way_audio && !!types?.includes('web_rtc');
     } catch {
       // Older Home Assistant: the camera says in its attributes, else try HLS and see.
       const attr = s?.attributes?.frontend_stream_type;
@@ -139,6 +228,7 @@ export class CameraPlayer {
     }
     this.pc?.close();
     this.pc = null;
+    this.micSender = null;
     this.hls?.destroy();
     this.hls = null;
     const m = this.media;
@@ -203,7 +293,8 @@ export class CameraPlayer {
     this.pc = pc;
     if (cfg.dataChannel) pc.createDataChannel(cfg.dataChannel);
     pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (this.mic) this.micSender = pc.addTransceiver(this.mic, { direction: 'sendrecv' }).sender;
+    else pc.addTransceiver('audio', { direction: 'recvonly' });
     const stream = new MediaStream();
     pc.addEventListener('track', (e) => stream.addTrack(e.track));
     const video = this._newVideo();

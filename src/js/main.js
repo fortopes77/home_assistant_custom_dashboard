@@ -2305,6 +2305,11 @@ function renderCameraSheet(s, sh) {
       <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span>
         <button type="button" class="btn" data-cam="retry">Try again</button></div>
       <span class="cam-kind"></span>
+    </div>
+    <div class="cam-bar" hidden>
+      <button type="button" class="btn cam-talk" data-cam="talk" hidden aria-pressed="false">${icon('mic')}<span>Talk</span></button>
+      <button type="button" class="btn cam-sound" data-cam="sound" hidden aria-pressed="false">${icon('volumeOff')}<span>Sound off</span></button>
+      <p class="cam-talk-note muted" hidden></p>
     </div>`;
   paintCameras(d);
   camPlayer = new CameraPlayer({
@@ -2315,9 +2320,43 @@ function renderCameraSheet(s, sh) {
       st.dataset.phase = phase;
       $('.cam-status-text', st).textContent = phase === 'failed' ? `No live video. ${message || ''}` : `Connecting${kind ? ` (${streamLabel(kind)})` : ''}…`;
       $('.cam-kind', st).textContent = phase === 'playing' ? `Live · ${streamLabel(kind)}` : '';
+      paintCamBar();
     },
   });
+  camTalkNote = '';
+  camPlayer.onTalk = (state, message) => {
+    if (message || state === 'on' || state === 'connecting') camTalkNote = message || '';
+    paintCamBar();
+  };
   camPlayer.start();
+}
+
+/** The buttons under the live video: Talk (when Home Assistant says the camera can take audio) and Sound. */
+let camTalkNote = ''; // why talking stopped or didn't start, shown under the buttons
+function paintCamBar() {
+  const bar = $('#sheet .cam-bar');
+  const p = camPlayer;
+  if (!bar || !p) return;
+  const phase = $('#sheet .cam-stage')?.dataset.phase;
+  const talk = $('.cam-talk', bar);
+  const sound = $('.cam-sound', bar);
+  const note = $('.cam-talk-note', bar);
+  const talking = p.talkState === 'on' || p.talkState === 'connecting';
+  talk.hidden = !p.canTalk;
+  talk.classList.toggle('on', talking);
+  talk.setAttribute('aria-pressed', String(talking));
+  talk.disabled = !talking && (phase !== 'playing' || p.talkState === 'denied');
+  $('span', talk).textContent = p.talkState === 'connecting' ? 'Connecting…' : talking ? 'Stop talking' : 'Talk';
+  sound.hidden = phase !== 'playing' || !p.hasAudio;
+  sound.setAttribute('aria-pressed', String(!p.muted));
+  sound.innerHTML = `${icon(p.muted ? 'volumeOff' : 'volumeHigh')}<span>${p.muted ? 'Sound off' : 'Sound on'}</span>`;
+  // Say why talking won't work before anyone presses it: no https means no microphone.
+  const insecure = p.canTalk && !CameraPlayer.talkAllowed;
+  const why = camTalkNote || (insecure ? 'Talking needs Home Assistant opened over https (its outside address), so the browser can use the microphone.' : '');
+  note.textContent = why;
+  note.hidden = !why;
+  if (insecure) talk.disabled = true;
+  bar.hidden = talk.hidden && sound.hidden && note.hidden;
 }
 
 function stopCamera() {
@@ -2642,6 +2681,8 @@ document.addEventListener('click', (e) => {
   const floor = t.closest('[data-floor]');
   if (floor) { planStore.floor = floor.dataset.floor; render(); return; }
   if (t.closest('[data-cam="retry"]')) { camPlayer?.start(); return; }
+  if (t.closest('[data-cam="talk"]')) { camPlayer?.toggleTalk(); paintCamBar(); return; }
+  if (t.closest('[data-cam="sound"]')) { camPlayer?.setMuted(!camPlayer.muted); paintCamBar(); return; }
 
   const a = t.closest('[data-act]');
   if (a) {

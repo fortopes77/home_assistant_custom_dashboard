@@ -153,6 +153,12 @@ On Home, rooms glow when their lights are on and show temperature, open doors an
 
 Every `camera.*` entity shows on Home and in its room, with a picture that refreshes every 10 seconds. **Tap** a camera to watch it live. The dashboard tries WebRTC first (go2rtc, which Home Assistant includes), then HLS, then MJPEG, and the video says which one it got. HLS uses hls.js from cdn.jsdelivr.net, except on iPhones and iPads.
 
+**Talk** (two-way audio): when Home Assistant says a camera can take audio back, the live view gets a **Talk** button. Tap it to send your microphone to the camera's speaker, and tap **Stop talking** when you're done; the camera's sound turns on while you talk. **Sound** turns the camera's audio on or off. Talking needs:
+
+- Home Assistant 2026.11 or later with **Settings → System → Labs → Two-way audio** turned on.
+- A camera whose integration supports it and a WebRTC stream (go2rtc, which Home Assistant includes). For Reolink, the camera needs a speaker, a live stream (mains-powered cameras and doorbells; a battery doorbell connected straight to Home Assistant only gives snapshots) and the integration's **Protocol** option set to **RTSP**.
+- The dashboard opened over **https** (or on the Home Assistant machine itself), because browsers only allow the microphone on secure pages. Over plain http the button says so.
+
 ## Wall mode
 
 Turn on **Settings → Wall mode** on the tablet, or add `?wall` to the address.
