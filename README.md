@@ -51,7 +51,7 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 - **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings. It's also a **family calendar** you can add to, see [Family calendar](#family-calendar).
 - **Music:** what's playing, with its cover, play/pause/skip, volume, your playlists and the speakers to play on. See [Music and Spotify](#music-and-spotify).
 - **Shopping list:** your Home Assistant to-do list. Tap an item to tick it off, type to add one, and use **Clear ticked** to tidy up.
-- **Notifications:** Home Assistant's own notices, which you can dismiss, and what your automations sent to phones (`notify.*`). The **bell** in the top bar counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
+- **Notifications:** Home Assistant's own notices and what your automations sent to phones (`notify.*`). Tap **×** to dismiss one, or **Clear all** (tap twice) to empty the list on every screen; phone notifications drop off by themselves after a week. The **bell** in the top bar counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
 - **News:** Feedreader feeds work, but Home Assistant only keeps the latest story from each, so the dashboard collects stories as they arrive and shares them between screens. For a full list straight away, add a sensor from the HACS **feedparser** integration:
   ```yaml
   sensor:
