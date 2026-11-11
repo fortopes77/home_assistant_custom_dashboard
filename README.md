@@ -80,6 +80,8 @@ Then tap **This iPad** among the speakers on the card. If something is playing o
 - **One tap for sound:** iPads and iPhones only let a page make sound after the screen has been touched. After the page reloads (an update, or the nightly refresh on wall screens), the card shows **Tap to play on this iPad** until someone touches the screen.
 - The page reaches Music Assistant at the Home Assistant host on port **8927**, which the add-on opens. If Music Assistant runs somewhere else, put its address in **Settings → Music**. This only works when the dashboard is opened over `http` on your home network, because browsers block an `https` page from an `http` speaker connection.
 - It uses Music Assistant's own web player library (`@sendspin/sendspin-js`), which the page downloads from jsDelivr the first time.
+- **Open Spotify on a phone:** the card has a button for each Android phone with the Home Assistant app. Tapping one opens the Spotify app on that phone. On Android 10 and later, the Home Assistant app needs the **Display over other apps** permission for this. Without it, the phone gets a notification you tap to open Spotify. iPhones can't open apps this way. Turn the buttons off under **Settings → Music**.
+- **Phone players in Music Assistant:** Jellyfin app sessions on phones and browsers show up in Home Assistant as media players. They can't play Music Assistant's stream, so leave them out of Music Assistant's **Home Assistant MediaPlayers** provider.
 - **Without Music Assistant:** with Home Assistant's **Spotify** integration, the card controls your Spotify account and lists its Spotify Connect speakers. With neither, it controls whichever speaker or TV is playing. **Settings → Music** can take speakers off the card.
 
 ## Energy
