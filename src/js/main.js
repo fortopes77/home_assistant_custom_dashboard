@@ -1041,11 +1041,11 @@ function peopleMiniHtml() {
 
 function notesCardHtml({ limit = 5 } = {}) {
   if (!store.prefs.notifications) return '';
-  const items = noteItems(notes);
+  const items = shownNotes();
   return `<section class="card notes-card" id="notes">
     <h2 class="card-title">${icon('bell')}Notifications${items.length ? `<span class="count">${items.length}</span>` : ''}</h2>
     ${items.length ? notesList(items.slice(0, limit)) : '<p class="muted quiet">Nothing new. Notifications from Home Assistant and your automations show up here.</p>'}
-    ${items.length > limit ? `<button type="button" class="link-btn" data-open-notes>See all ${items.length}</button>` : ''}
+    ${items.length ? `<div class="notes-foot">${items.length > limit ? `<button type="button" class="link-btn" data-open-notes>See all ${items.length}</button>` : ''}${clearAllBtn()}</div>` : ''}
   </section>`;
 }
 
@@ -1057,7 +1057,7 @@ function notesList(items) {
       <p>${esc(n.message)}</p>
       <small class="muted">${esc([relativeTime(n.at), n.kind === 'sent' && n.to ? `to ${n.to}` : n.kind === 'ha' ? 'in Home Assistant' : ''].filter(Boolean).join(' · '))}</small>
     </div>
-    ${n.kind === 'ha' ? `<button type="button" class="icon-btn" data-dismiss="${esc(n.id)}" aria-label="Dismiss">${icon('close')}</button>` : ''}
+    <button type="button" class="icon-btn" data-dismiss="${esc(n.id)}" data-kind="${n.kind}" aria-label="Dismiss">${icon('close')}</button>
   </li>`).join('')}</ul>`;
 }
 
@@ -2273,9 +2273,9 @@ function renderSheet() {
     if (d.querySelector('[data-ev-form]')?.dataset.key === sh.id && d.open) return;
     setSheet(d, eventSheetHtml(sh));
   } else if (sh.kind === 'notes') {
-    const items = noteItems(notes);
+    const items = shownNotes();
     setSheet(d, `${sheetHead('Notifications', plural(items.length, 'notification'), { ic: 'bell' })}
-      <div class="sheet-body">${items.length ? notesList(items) : '<p class="muted">Nothing new.</p>'}</div>`);
+      <div class="sheet-body">${items.length ? `${notesList(items)}<div class="notes-foot">${clearAllBtn()}</div>` : '<p class="muted">Nothing new.</p>'}</div>`);
     markNotesSeen();
   }
 }
@@ -2376,10 +2376,58 @@ const NOTES_KEY = 'ha-dash.notify-log'; // shared with the old dashboard, so his
 const notes = { persistent: [], sent: readLocal(NOTES_KEY, []), canSeeSent: true };
 const ding = new Ding();
 const SEEN_KEY = 'ha-dash2.notes-seen';
+// What's been cleared from the sent list: everything up to `before`, plus single ones by id.
+// Shared between screens (Home Assistant user data), because each screen keeps its own copy of the
+// log and would otherwise bring cleared ones back the next time it merges.
+const CLEARED_KEY = 'ha-dash2.notes-cleared';
+let cleared = normCleared(readLocal(CLEARED_KEY, null));
+let clearArmed = 0; // "Clear all" needs a second tap within a few seconds
+
+function normCleared(c) {
+  return { before: Number(c?.before) || 0, ids: Array.isArray(c?.ids) ? c.ids.slice(-100) : [] };
+}
+function shownSent() {
+  return notes.sent.filter((n) => Date.parse(n.at || 0) > cleared.before && !cleared.ids.includes(n.id));
+}
+function shownNotes() {
+  return noteItems({ persistent: notes.persistent, sent: shownSent() });
+}
+function mergeCleared(other) {
+  const c = normCleared(other);
+  cleared = normCleared({ before: Math.max(cleared.before, c.before), ids: [...new Set([...cleared.ids, ...c.ids])] });
+}
+function saveCleared(next) {
+  mergeCleared(next);
+  // Ids older than the cut-off are covered by it.
+  cleared.ids = cleared.ids.filter((id) => notes.sent.some((n) => n.id === id && Date.parse(n.at || 0) > cleared.before));
+  writeLocal(CLEARED_KEY, cleared);
+  notes.sent = shownSent();
+  writeLocal(NOTES_KEY, notes.sent);
+  store.client?.send({ type: 'frontend/set_user_data', key: CLEARED_KEY, value: cleared }).catch(() => {});
+  store.client?.send({ type: 'frontend/set_user_data', key: NOTES_KEY, value: notes.sent }).catch(() => {});
+}
+function clearAllBtn() {
+  const armed = Date.now() - clearArmed < 4000;
+  return `<button type="button" class="link-btn${armed ? ' armed' : ''}" data-clear-notes>${armed ? 'Tap again to clear all' : 'Clear all'}</button>`;
+}
+function clearAllNotes() {
+  if (Date.now() - clearArmed > 4000) {
+    clearArmed = Date.now();
+    render(); renderSheet();
+    setTimeout(() => { if (clearArmed && Date.now() - clearArmed >= 4000) { clearArmed = 0; render(); renderSheet(); } }, 4100);
+    return;
+  }
+  clearArmed = 0;
+  if (notes.persistent.length) call('persistent_notification', 'dismiss_all', {});
+  notes.persistent = [];
+  saveCleared({ before: Date.now() });
+  toast('Notifications cleared');
+  render(); renderSheet();
+}
 
 function unseen() {
   const seen = Number(readLocal(SEEN_KEY, 0)) || 0;
-  return noteItems(notes).filter((n) => Date.parse(n.at || 0) > seen).length;
+  return shownNotes().filter((n) => Date.parse(n.at || 0) > seen).length;
 }
 function markNotesSeen() {
   writeLocal(SEEN_KEY, Date.now());
@@ -2420,8 +2468,9 @@ async function subscribeNotes(client) {
     if (arrived) noteArrived();
   }).catch(() => {});
 
-  const shared = await dataGet('user', NOTES_KEY);
+  const [shared, sharedCleared] = await Promise.all([dataGet('user', NOTES_KEY), dataGet('user', CLEARED_KEY)]);
   if (client !== store.client) return;
+  if (sharedCleared) { mergeCleared(sharedCleared); writeLocal(CLEARED_KEY, cleared); }
   notes.sent = noteMerge(notes.sent, Array.isArray(shared) ? shared : []);
   writeLocal(NOTES_KEY, notes.sent);
   try {
@@ -2429,12 +2478,14 @@ async function subscribeNotes(client) {
       const note = noteFromCall(event);
       if (!note) return;
       const fresh = !notes.sent.some((n) => n.id === note.id);
+      const [latest, latestCleared] = await Promise.all([dataGet('user', NOTES_KEY), dataGet('user', CLEARED_KEY)]);
+      if (latestCleared) mergeCleared(latestCleared);
       notes.sent = noteMerge(notes.sent, [note]);
       if (fresh) noteArrived();
       writeLocal(NOTES_KEY, notes.sent);
       queueRefresh();
-      const latest = await dataGet('user', NOTES_KEY);
       notes.sent = noteMerge(notes.sent, Array.isArray(latest) ? latest : []);
+      notes.sent = shownSent();
       client.send({ type: 'frontend/set_user_data', key: NOTES_KEY, value: notes.sent }).catch(() => {});
     });
   } catch {
@@ -2647,10 +2698,15 @@ document.addEventListener('click', (e) => {
     call('todo', 'remove_completed_items', {}, shop.id);
     return;
   }
+  if (t.closest('[data-clear-notes]')) { clearAllNotes(); return; }
   const dis = t.closest('[data-dismiss]');
   if (dis) {
-    notes.persistent = notes.persistent.filter((n) => n.id !== dis.dataset.dismiss);
-    call('persistent_notification', 'dismiss', { notification_id: dis.dataset.dismiss });
+    const id = dis.dataset.dismiss;
+    if (dis.dataset.kind === 'sent') saveCleared({ ids: [id] });
+    else {
+      notes.persistent = notes.persistent.filter((n) => n.id !== id);
+      call('persistent_notification', 'dismiss', { notification_id: id });
+    }
     render(); renderSheet();
     return;
   }

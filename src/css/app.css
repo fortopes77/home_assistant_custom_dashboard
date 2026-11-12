@@ -609,6 +609,9 @@ small { font-size: 0.8em; }
 .note-body p { font-size: 0.9rem; overflow-wrap: anywhere; }
 .note .icon-btn { width: 32px; height: 32px; margin: -4px -4px 0 0; }
 .note .icon-btn .icon { width: 18px; height: 18px; }
+.notes-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.notes-foot [data-clear-notes] { margin-left: auto; color: var(--muted); }
+.notes-foot [data-clear-notes].armed { color: var(--danger, #d33); }
 
 .news { display: grid; margin: 0; padding: 0; list-style: none; }
 .story + .story { border-top: 1px solid var(--border); }
