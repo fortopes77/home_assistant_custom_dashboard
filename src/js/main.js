@@ -945,7 +945,7 @@ function sleepInHtml() {
   const on = s.state === 'on';
   return `<span class="sleep-in-wrap" data-entity="${esc(s.entity_id)}"><button type="button" class="sleep-in${on ? ' on' : ''}" data-act="toggle" aria-pressed="${on}"
     title="${on ? 'Sleeping in: the bedroom blind stays shut until you open it. Turns off at noon.' : 'Sleep in: keep the bedroom blind shut in the morning'}">
-    ${icon('wxNight')}<span>${on ? 'Sleeping in' : 'Sleep in'}</span>
+    ${icon('wxNight')}<span>${on ? 'Sleeping in' : new Date().getHours() >= 17 ? 'Sleep in tomorrow?' : 'Sleep in'}</span>${on ? '<small>· blind stays shut</small>' : ''}
   </button></span>`;
 }
 
