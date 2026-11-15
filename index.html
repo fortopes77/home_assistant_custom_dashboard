@@ -353,6 +353,7 @@ small { font-size: 0.8em; }
 .notes-card { order: 5; }
 .people-mini { order: 6; }
 .news-card { order: 7; }
+.modes-card { order: 1; } /* right under the hero */
 .music-card { order: 1; } /* right under the hero */
 
 /* Music */
@@ -437,22 +438,53 @@ small { font-size: 0.8em; }
 .hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .hero-chips:empty { display: none; }
 .hero-chips .bins { margin-top: 0; }
-.sleep-in-wrap { display: contents; }
-.sleep-in {
+/* Modes: each has its own colour (--mode). */
+.mode-sleep { --mode: #5b5bd6; --mode-on: #5b5bd6; }
+.mode-holiday { --mode: #1f9e8f; --mode-on: #17897c; }
+.mode-other { --mode: var(--primary); --mode-on: var(--primary); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mode-sleep { --mode: #8b8cf5; --mode-on: #5f61e0; } :root:not([data-theme="light"]) .mode-holiday { --mode: #45c4b4; } }
+:root[data-theme="dark"] .mode-sleep { --mode: #8b8cf5; --mode-on: #5f61e0; }
+:root[data-theme="dark"] .mode-holiday { --mode: #45c4b4; }
+.modes { display: grid; gap: 10px; }
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid color-mix(in srgb, var(--mode) 35%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--mode) 8%, transparent);
+  color: var(--text);
+  text-align: left;
+}
+.mode-ic { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: color-mix(in srgb, var(--mode) 18%, transparent); }
+.mode-ic .icon { width: 24px; height: 24px; fill: var(--mode); }
+.mode-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.mode-text b { font-size: 1.02rem; }
+.mode-text small { color: var(--muted); font-size: 0.84rem; }
+.mode-btn .switch { pointer-events: none; }
+.mode.on .mode-btn { background: var(--mode-on); border-color: var(--mode-on); color: #fff; box-shadow: 0 2px 12px color-mix(in srgb, var(--mode-on) 35%, transparent); }
+.mode.on .mode-ic { background: rgb(255 255 255 / 0.2); }
+.mode.on .mode-ic .icon { fill: #fff; }
+.mode.on .mode-text small { color: rgb(255 255 255 / 0.88); }
+.mode.on .switch.on { background: rgb(255 255 255 / 0.35); }
+.mode-chip-wrap { display: contents; }
+.mode-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 11px 3px 8px;
-  min-height: 28px;
+  gap: 6px;
+  padding: 3px 12px 3px 8px;
+  min-height: 30px;
   border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 600;
+  background: var(--mode-on);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  white-space: nowrap;
 }
-.sleep-in .icon { width: 16px; height: 16px; fill: currentColor; }
-.sleep-in.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--text); }
+.mode-chip .icon { width: 17px; height: 17px; fill: #fff; }
 .bin-ic { width: 22px; height: 22px; }
 .bin-ic + .bin-ic { margin-left: -4px; }
 .hero-weather {
@@ -1932,6 +1964,7 @@ const ICONS = {
   speaker: 'M12,12A3,3 0 0,0 9,15A3,3 0 0,0 12,18A3,3 0 0,0 15,15A3,3 0 0,0 12,12M12,20A5,5 0 0,1 7,15A5,5 0 0,1 12,10A5,5 0 0,1 17,15A5,5 0 0,1 12,20M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8C10.89,8 10,7.1 10,6C10,4.89 10.89,4 12,4M17,2H7C5.89,2 5,2.89 5,4V20A2,2 0 0,0 7,22H17A2,2 0 0,0 19,20V4C19,2.89 18.1,2 17,2Z',
   tablet: 'M19,18H5V6H19M21,4H3C1.89,4 1,4.89 1,6V18A2,2 0 0,0 3,20H21A2,2 0 0,0 23,18V6C23,4.89 22.1,4 21,4Z',
   tv: 'M21,17H3V5H21M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V21H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3Z',
+  suitcase: 'M17,6H15V3A1,1 0 0,0 14,2H10A1,1 0 0,0 9,3V6H7A2,2 0 0,0 5,8V19A2,2 0 0,0 7,21A1,1 0 0,0 8,22A1,1 0 0,0 9,21H15A1,1 0 0,0 16,22A1,1 0 0,0 17,21A2,2 0 0,0 19,19V8A2,2 0 0,0 17,6M10.5,3.5H13.5V6H10.5V3.5M9,18H7.5V9H9V18M12.75,18H11.25V9H12.75V18M16.5,18H15V9H16.5V18Z',
   cctv: 'M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z',
 };
 
@@ -8749,7 +8782,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '16 Nov 2026, 09:03 (6e6c4f2)';
+const DASH_BUILD = '16 Nov 2026, 09:53 (aa931af)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -9638,24 +9671,56 @@ function binsHtml(now) {
   </button>`;
 }
 
-// Sleep in: a pill beside the bins that flips the sleep-in helper (homeassistant/sleep_in.yaml).
-// While it's on the morning routines leave the bedroom blind shut; HA turns it off again at noon.
-function sleepInEntity() {
-  const named = store.states.get('input_boolean.sleep_in');
-  if (named) return named;
-  for (const s of store.states.values()) if (s.entity_id.startsWith('input_boolean.') && /sleep_?in/.test(s.entity_id)) return s;
-  return null;
+// Modes: house-wide switches (input_booleans) in their own card on Today. Sleep in and holiday mode get their
+// own icon, colour and wording; any other input_boolean whose id ends in "_mode" (guest_mode...) shows too.
+// Sleep in (homeassistant/sleep_in.yaml) keeps the bedroom blind shut in the morning and turns off at noon.
+const MODES = [
+  { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
+    on: 'Bedroom blind stays shut. Turns off at noon.',
+    off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode',
+    on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
+];
+
+function modeList() {
+  const out = [];
+  for (const m of MODES) {
+    const s = [...store.states.values()].find((x) => m.match.test(x.entity_id));
+    if (s) out.push({ ...m, s });
+  }
+  for (const s of store.states.values()) {
+    if (!/^input_boolean\.\w+_mode$/.test(s.entity_id) || out.some((m) => m.s === s)) continue;
+    out.push({ key: 'other', icon: 'input_boolean', name: nameOf(s), on: 'On', off: () => 'Off', s });
+  }
+  return out.filter((m) => !['unknown', 'unavailable'].includes(m.s.state));
 }
 
-function sleepInHtml() {
-  const raw = sleepInEntity();
-  if (!raw || ['unknown', 'unavailable'].includes(raw.state)) return '';
-  const s = shown(raw);
-  const on = s.state === 'on';
-  return `<span class="sleep-in-wrap" data-entity="${esc(s.entity_id)}"><button type="button" class="sleep-in${on ? ' on' : ''}" data-act="toggle" aria-pressed="${on}"
-    title="${on ? 'Sleeping in: the bedroom blind stays shut until you open it. Turns off at noon.' : 'Sleep in: keep the bedroom blind shut in the morning'}">
-    ${icon('wxNight')}<span>${on ? 'Sleeping in' : 'Sleep in'}</span>
-  </button></span>`;
+function modesHtml() {
+  const modes = modeList();
+  if (!modes.length) return '';
+  const now = new Date();
+  return `<section class="card modes-card">
+    <h2 class="card-title">${icon('input_boolean')}Modes</h2>
+    <div class="modes">${modes.map((m) => {
+      const s = shown(m.s);
+      const on = s.state === 'on';
+      return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
+        <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
+          <span class="mode-ic">${icon(m.icon)}</span>
+          <span class="mode-text"><b>${esc(m.name)}</b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+// While a mode is on, a coloured chip beside the bins says so (tap to turn it off).
+function modeChipsHtml() {
+  return modeList().filter((m) => m.key !== 'other' && shown(m.s).state === 'on').map((m) =>
+    `<span class="mode-chip-wrap" data-entity="${esc(m.s.entity_id)}"><button type="button" class="mode-chip mode-${m.key}" data-act="toggle" title="Tap to turn ${esc(m.name.toLowerCase())} off">
+      ${icon(m.icon)}<span>${esc(m.key === 'sleep' ? 'Sleeping in' : m.name)}</span>
+    </button></span>`).join('');
 }
 
 function heroHtml() {
@@ -9676,7 +9741,7 @@ function heroHtml() {
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-        <div class="hero-chips">${binsHtml(now)}${sleepInHtml()}</div>
+        <div class="hero-chips">${binsHtml(now)}${modeChipsHtml()}</div>
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
@@ -10498,7 +10563,7 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}<div class="music-slot"></div></div>
+      <div class="col col-a">${heroHtml()}${modesHtml()}<div class="music-slot"></div></div>
       <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
       <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
