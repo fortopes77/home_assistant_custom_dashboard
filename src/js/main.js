@@ -929,6 +929,26 @@ function binsHtml(now) {
   </button>`;
 }
 
+// Sleep in: a pill beside the bins that flips the sleep-in helper (homeassistant/sleep_in.yaml).
+// While it's on the morning routines leave the bedroom blind shut; HA turns it off again at noon.
+function sleepInEntity() {
+  const named = store.states.get('input_boolean.sleep_in');
+  if (named) return named;
+  for (const s of store.states.values()) if (s.entity_id.startsWith('input_boolean.') && /sleep_?in/.test(s.entity_id)) return s;
+  return null;
+}
+
+function sleepInHtml() {
+  const raw = sleepInEntity();
+  if (!raw || ['unknown', 'unavailable'].includes(raw.state)) return '';
+  const s = shown(raw);
+  const on = s.state === 'on';
+  return `<span class="sleep-in-wrap" data-entity="${esc(s.entity_id)}"><button type="button" class="sleep-in${on ? ' on' : ''}" data-act="toggle" aria-pressed="${on}"
+    title="${on ? 'Sleeping in: the bedroom blind stays shut until you open it. Turns off at noon.' : 'Sleep in: keep the bedroom blind shut in the morning'}">
+    ${icon('wxNight')}<span>${on ? 'Sleeping in' : 'Sleep in'}</span>
+  </button></span>`;
+}
+
 function heroHtml() {
   const now = new Date();
   const w = weatherEntity();
@@ -947,7 +967,7 @@ function heroHtml() {
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-        ${binsHtml(now)}
+        <div class="hero-chips">${binsHtml(now)}${sleepInHtml()}</div>
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
