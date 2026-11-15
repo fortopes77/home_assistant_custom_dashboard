@@ -128,6 +128,10 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 Today then shows little bins with those coloured lids under the date: "Bins Thu" during the week, "Bins tomorrow" the day before and "Bins out tonight" on the night. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
 
+## Sleep in
+
+[`homeassistant/sleep_in.yaml`](homeassistant/sleep_in.yaml) adds a **Sleep in** switch (`input_boolean.sleep_in`) that turns itself off at noon. Today shows it as a "Sleep in" pill beside the date; tap it the night before and it reads "Sleeping in". Your morning routines decide what it does: the file shows how to leave the bedroom blind shut while it's on. Opening the blind yourself still works.
+
 ## Floor plan (Home)
 
 Each home sets up its own floor plan in **Settings → Floor plan**. Nothing about any one house is built in.

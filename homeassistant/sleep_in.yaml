@@ -1,0 +1,42 @@
+# Sleep in: a switch that keeps the bedroom blind shut in the morning. The dashboard shows it as a
+# "Sleep in" pill on Today, beside the date. It turns itself off at noon, so it only lasts one morning.
+# Put this file in /config/packages/ (see dashboard_update.yaml for turning packages on), then restart
+# once (or reload "Input booleans" and "Automations" in Developer tools → YAML).
+#
+# Then make your morning routines respect it. In an automation or script that opens the blinds, leave the
+# bedroom blind out while it's on, for example:
+#
+#   - if:
+#       - condition: state
+#         entity_id: input_boolean.sleep_in
+#         state: "off"
+#     then:
+#       - action: cover.open_cover
+#         target:
+#           entity_id: cover.bedroom_blind
+#
+# or, with a list of blinds in a template:
+#   {{ blinds | reject('eq', 'cover.bedroom_blind') | list if is_state('input_boolean.sleep_in', 'on') else blinds }}
+#
+# Opening the blind yourself (the dashboard, the app, voice) still works while sleeping in.
+
+input_boolean:
+  sleep_in:
+    name: Sleep in
+    icon: mdi:power-sleep
+
+automation:
+  - id: dashboard_sleep_in_reset
+    alias: "Sleep in: turn off at noon"
+    description: Sleep in only lasts one morning.
+    triggers:
+      - trigger: time
+        at: "12:00:00"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.sleep_in
+        state: "on"
+    actions:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.sleep_in
