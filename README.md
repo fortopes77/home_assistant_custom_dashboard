@@ -128,9 +128,15 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 Today then shows little bins with those coloured lids under the date: "Bins Thu" during the week, "Bins tomorrow" the day before and "Bins out tonight" on the night. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
 
-## Sleep in
+## Modes
 
-[`homeassistant/sleep_in.yaml`](homeassistant/sleep_in.yaml) adds a **Sleep in** switch (`input_boolean.sleep_in`) that turns itself off at noon. Today shows it as a "Sleep in" pill beside the date; tap it the night before and it reads "Sleeping in". Your morning routines decide what it does: the file shows how to leave the bedroom blind shut while it's on. Opening the blind yourself still works.
+Today has a **Modes** card under the greeting for house-wide switches. It shows:
+
+- **Sleep in** (`input_boolean.sleep_in`). [`homeassistant/sleep_in.yaml`](homeassistant/sleep_in.yaml) adds it and turns it off at noon. Your morning routines decide what it does: the file shows how to leave the bedroom blind shut while it's on. Opening the blind yourself still works.
+- **Holiday mode** (`input_boolean.holiday_mode`). Make it in Settings → Devices & services → Helpers → Toggle and use it in your own automations.
+- Any other toggle helper whose id ends in `_mode` (for example `input_boolean.guest_mode`).
+
+Tap a row to switch it. While Sleep in or Holiday mode is on, a coloured chip beside the date says so; tap it to turn that mode off. The card is hidden when none of these helpers exist.
 
 ## Floor plan (Home)
 
