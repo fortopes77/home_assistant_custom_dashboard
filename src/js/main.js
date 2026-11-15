@@ -929,24 +929,56 @@ function binsHtml(now) {
   </button>`;
 }
 
-// Sleep in: a pill beside the bins that flips the sleep-in helper (homeassistant/sleep_in.yaml).
-// While it's on the morning routines leave the bedroom blind shut; HA turns it off again at noon.
-function sleepInEntity() {
-  const named = store.states.get('input_boolean.sleep_in');
-  if (named) return named;
-  for (const s of store.states.values()) if (s.entity_id.startsWith('input_boolean.') && /sleep_?in/.test(s.entity_id)) return s;
-  return null;
+// Modes: house-wide switches (input_booleans) in their own card on Today. Sleep in and holiday mode get their
+// own icon, colour and wording; any other input_boolean whose id ends in "_mode" (guest_mode...) shows too.
+// Sleep in (homeassistant/sleep_in.yaml) keeps the bedroom blind shut in the morning and turns off at noon.
+const MODES = [
+  { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
+    on: 'Bedroom blind stays shut. Turns off at noon.',
+    off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode',
+    on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
+];
+
+function modeList() {
+  const out = [];
+  for (const m of MODES) {
+    const s = [...store.states.values()].find((x) => m.match.test(x.entity_id));
+    if (s) out.push({ ...m, s });
+  }
+  for (const s of store.states.values()) {
+    if (!/^input_boolean\.\w+_mode$/.test(s.entity_id) || out.some((m) => m.s === s)) continue;
+    out.push({ key: 'other', icon: 'input_boolean', name: nameOf(s), on: 'On', off: () => 'Off', s });
+  }
+  return out.filter((m) => !['unknown', 'unavailable'].includes(m.s.state));
 }
 
-function sleepInHtml() {
-  const raw = sleepInEntity();
-  if (!raw || ['unknown', 'unavailable'].includes(raw.state)) return '';
-  const s = shown(raw);
-  const on = s.state === 'on';
-  return `<span class="sleep-in-wrap" data-entity="${esc(s.entity_id)}"><button type="button" class="sleep-in${on ? ' on' : ''}" data-act="toggle" aria-pressed="${on}"
-    title="${on ? 'Sleeping in: the bedroom blind stays shut until you open it. Turns off at noon.' : 'Sleep in: keep the bedroom blind shut in the morning'}">
-    ${icon('wxNight')}<span>${on ? 'Sleeping in' : new Date().getHours() >= 17 ? 'Sleep in tomorrow?' : 'Sleep in'}</span>${on ? '<small>· blind stays shut</small>' : ''}
-  </button></span>`;
+function modesHtml() {
+  const modes = modeList();
+  if (!modes.length) return '';
+  const now = new Date();
+  return `<section class="card modes-card">
+    <h2 class="card-title">${icon('input_boolean')}Modes</h2>
+    <div class="modes">${modes.map((m) => {
+      const s = shown(m.s);
+      const on = s.state === 'on';
+      return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
+        <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
+          <span class="mode-ic">${icon(m.icon)}</span>
+          <span class="mode-text"><b>${esc(m.name)}</b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+// While a mode is on, a coloured chip beside the bins says so (tap to turn it off).
+function modeChipsHtml() {
+  return modeList().filter((m) => m.key !== 'other' && shown(m.s).state === 'on').map((m) =>
+    `<span class="mode-chip-wrap" data-entity="${esc(m.s.entity_id)}"><button type="button" class="mode-chip mode-${m.key}" data-act="toggle" title="Tap to turn ${esc(m.name.toLowerCase())} off">
+      ${icon(m.icon)}<span>${esc(m.key === 'sleep' ? 'Sleeping in' : m.name)}</span>
+    </button></span>`).join('');
 }
 
 function heroHtml() {
@@ -967,7 +999,7 @@ function heroHtml() {
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-        <div class="hero-chips">${binsHtml(now)}${sleepInHtml()}</div>
+        <div class="hero-chips">${binsHtml(now)}${modeChipsHtml()}</div>
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
@@ -1789,7 +1821,7 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}<div class="music-slot"></div></div>
+      <div class="col col-a">${heroHtml()}${modesHtml()}<div class="music-slot"></div></div>
       <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
       <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
