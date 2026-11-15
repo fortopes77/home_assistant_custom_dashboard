@@ -434,6 +434,25 @@ small { font-size: 0.8em; }
 }
 .bins.soon { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
 .bins-ic { display: inline-flex; }
+.hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.hero-chips:empty { display: none; }
+.hero-chips .bins { margin-top: 0; }
+.sleep-in-wrap { display: contents; }
+.sleep-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 11px 3px 8px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.sleep-in .icon { width: 16px; height: 16px; fill: currentColor; }
+.sleep-in.on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--text); }
 .bin-ic { width: 22px; height: 22px; }
 .bin-ic + .bin-ic { margin-left: -4px; }
 .hero-weather {
@@ -8730,7 +8749,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '12 Nov 2026, 12:52 (f5efe08)';
+const DASH_BUILD = '16 Nov 2026, 09:03 (6e6c4f2)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -9619,6 +9638,26 @@ function binsHtml(now) {
   </button>`;
 }
 
+// Sleep in: a pill beside the bins that flips the sleep-in helper (homeassistant/sleep_in.yaml).
+// While it's on the morning routines leave the bedroom blind shut; HA turns it off again at noon.
+function sleepInEntity() {
+  const named = store.states.get('input_boolean.sleep_in');
+  if (named) return named;
+  for (const s of store.states.values()) if (s.entity_id.startsWith('input_boolean.') && /sleep_?in/.test(s.entity_id)) return s;
+  return null;
+}
+
+function sleepInHtml() {
+  const raw = sleepInEntity();
+  if (!raw || ['unknown', 'unavailable'].includes(raw.state)) return '';
+  const s = shown(raw);
+  const on = s.state === 'on';
+  return `<span class="sleep-in-wrap" data-entity="${esc(s.entity_id)}"><button type="button" class="sleep-in${on ? ' on' : ''}" data-act="toggle" aria-pressed="${on}"
+    title="${on ? 'Sleeping in: the bedroom blind stays shut until you open it. Turns off at noon.' : 'Sleep in: keep the bedroom blind shut in the morning'}">
+    ${icon('wxNight')}<span>${on ? 'Sleeping in' : 'Sleep in'}</span>
+  </button></span>`;
+}
+
 function heroHtml() {
   const now = new Date();
   const w = weatherEntity();
@@ -9637,7 +9676,7 @@ function heroHtml() {
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-        ${binsHtml(now)}
+        <div class="hero-chips">${binsHtml(now)}${sleepInHtml()}</div>
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
