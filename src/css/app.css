@@ -338,7 +338,7 @@ small { font-size: 0.8em; }
 
 .v-today { display: grid; gap: var(--gap); }
 .v-today .col { display: contents; }
-/* Phone order: the day, energy, calendar, shopping, notifications, people, news. */
+/* Phone order: the day, right now, modes, energy, calendar, shopping, notifications, people, news. */
 .hero { order: 1; }
 .energy-mini { order: 2; }
 .agenda-card { order: 3; }
@@ -346,7 +346,8 @@ small { font-size: 0.8em; }
 .notes-card { order: 5; }
 .people-mini { order: 6; }
 .news-card { order: 7; }
-.modes-card { order: 1; } /* right under the hero */
+.now-card { order: 1; }   /* right under the hero */
+.modes-card { order: 1; }
 .music-card { order: 1; } /* right under the hero */
 
 /* Music */
@@ -455,6 +456,7 @@ small { font-size: 0.8em; }
 .mode-ic .icon { width: 24px; height: 24px; fill: var(--mode); }
 .mode-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .mode-text b { font-size: 1.02rem; }
+.mode-short { display: none; }
 .mode-text small { color: var(--muted); font-size: 0.84rem; }
 .mode-btn .switch { pointer-events: none; }
 .mode.on .mode-btn { background: var(--mode-on); border-color: var(--mode-on); color: #fff; box-shadow: 0 2px 12px color-mix(in srgb, var(--mode-on) 35%, transparent); }
@@ -512,7 +514,8 @@ small { font-size: 0.8em; }
 .hero-summary { margin-top: 14px; font-size: 1.05rem; line-height: 1.5; max-width: 60ch; }
 .hero-summary small { color: var(--muted); }
 
-.glance { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+.now-card { padding: 10px; }
+.glance { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .glance-item { display: flex; align-items: stretch; border-radius: 14px; background: var(--surface-2); overflow: hidden; }
 .glance-item > button {
   display: flex;
@@ -609,27 +612,18 @@ small { font-size: 0.8em; }
 .ev-title small { display: block; font-weight: 400; color: var(--muted); }
 
 .energy-mini:hover, .energy-mini:focus-visible { border-color: var(--primary); }
-.em-row { display: flex; align-items: center; gap: 18px; }
-.ring {
-  --size: 112px;
-  flex: none;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  background:
-    radial-gradient(closest-side, var(--surface) 80%, transparent 81%),
-    conic-gradient(var(--battery) calc(var(--p) * 1%), var(--surface-2) 0);
-}
-.ring b { font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
-.ring small { color: var(--muted); font-size: 0.72rem; font-weight: 600; text-align: center; max-width: 80px; }
-.em-stats { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 10px; margin: 0; }
-.em-stats dt { color: var(--muted); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
-.em-stats dd { margin: 0; font-size: 1.1rem; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
-.em-stats dd small.u { display: inline; font-size: 0.62em; }
-.em-stats dd small:not(.u) { display: block; color: var(--muted); font-weight: 500; font-size: 0.78rem; }
+.energy-mini { display: flex; align-items: center; gap: 14px; padding-top: 12px; padding-bottom: 12px; }
+.em-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.em-label .icon { width: 20px; height: 20px; }
+.em-soc { font-size: 1.7rem; font-weight: 600; line-height: 1; color: var(--battery); font-variant-numeric: tabular-nums; }
+.em-bar { flex: 1; min-width: 40px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.em-bar i { display: block; width: var(--p, 0%); height: 100%; border-radius: 4px; background: var(--battery); }
+.em-state { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.em-state i { flex: none; }
+.em-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--battery); }
+.em-state.pos i { background: var(--positive); }
+.em-state.neg i { background: var(--negative); }
+@media (max-width: 420px), (min-width: 700px) and (max-width: 999.98px) { .em-label span { display: none; } }
 .pos { color: var(--positive); }
 .neg { color: var(--negative); }
 
@@ -1013,58 +1007,87 @@ small { font-size: 0.8em; }
 
 @media (min-width: 700px) {
   /* The rail is fixed, not sticky: sticky came loose and scrolled away in some browsers (the HA app's frame). */
-  .main { margin-left: calc(var(--rail) + var(--safe-left)); }
-  .kiosk .main { margin-left: 0; }
+  /* The menu floats at the bottom as a dock; the bell, voice and connection sit in a small pill beside it. */
+  :root { --dock-h: 64px; --dock-space: calc(var(--dock-h) + 24px + var(--safe-bottom)); }
+  .main { padding-bottom: var(--dock-space); }
+  .kiosk .main { padding-bottom: 16px; }
   .nav {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: auto auto calc(12px + var(--safe-bottom)) calc(16px + var(--safe-left));
     box-sizing: border-box;
-    width: calc(var(--rail) + var(--safe-left));
-    overflow-y: auto;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 4px;
-    height: 100dvh;
-    padding: calc(14px + var(--safe-top)) 8px 14px calc(8px + var(--safe-left));
-    border-top: 0;
-    border-right: 1px solid var(--border);
-    background: var(--surface);
-    backdrop-filter: none;
+    width: auto;
+    height: var(--dock-h);
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 36px rgb(0 0 0 / 0.28);
   }
-  .nav .brand { display: grid; place-items: center; height: 44px; margin-bottom: 12px; color: var(--accent); }
-  .nav .brand .icon { width: 30px; height: 30px; }
-  .nav a { flex: none; height: 64px; border-radius: 16px; font-size: 0.72rem; }
-  .nav a[aria-current] { background: var(--surface-2); }
-  .nav .nav-settings { margin-top: auto; }
-  .main { padding-bottom: 16px; }
+  .nav a { flex: none; width: 78px; height: 100%; border-radius: 999px; font-size: 0.68rem; gap: 0; }
+  .nav a .icon { width: 22px; height: 22px; }
+  .nav a[aria-current] { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+  .nav .nav-settings { width: 56px; }
+  .nav .nav-settings span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .topbar-actions {
+    position: fixed;
+    z-index: 50;
+    right: calc(16px + var(--safe-right));
+    bottom: calc(12px + var(--safe-bottom));
+    height: var(--dock-h);
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 36px rgb(0 0 0 / 0.28);
+  }
+  .topbar-actions .icon-btn { width: 50px; height: 50px; }
   .view { padding: 4px 20px 16px; }
-  .topbar { padding-left: 20px; padding-right: calc(20px + var(--safe-right)); }
-  .toast { bottom: 24px; }
+  /* No blur on the title bar here: a backdrop filter would pin the fixed bell pill inside it. */
+  .topbar { padding-left: 20px; padding-right: calc(20px + var(--safe-right)); background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  /* Today shows the clock itself, so its title bar folds away. */
+  :root[data-view="today"] .topbar { padding: var(--safe-top) 0 0; min-height: 14px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-view="today"] .topbar-title { display: none; }
+  .toast { bottom: calc(var(--dock-space) + 8px); }
   .sheet { margin: auto; border-radius: 24px; padding-bottom: 16px; }
 
-  /* Today: the day on the left, energy and people, notifications and news. */
-  .v-today { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
-  .v-today .col { display: flex; flex-direction: column; gap: var(--gap); }
-  .v-today .col-c { grid-column: 2; }
-  .v-today .col-b { grid-column: 2; grid-row: 1; }
-  .v-today .col-a { grid-row: 1 / span 2; }
+  /* Today, two columns: the day, battery and calendar on the left; the map, right now, modes and shopping on
+     the right. Notifications live behind the bell and news on the phone layout only. */
+  .v-today { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  .v-today .col { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+  .v-today .notes-card, .v-today .news-card { display: none; }
+  .v-today .people-row { display: none; }
+  .v-today .hero-summary { max-width: none; }
+  .v-today .modes { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .v-today .modes-card { padding: 10px; }
+  .v-today .modes-card .card-title { display: none; }
+  .v-today .mode-btn { padding: 8px 12px; }
+  .v-today .mode-ic { width: 34px; height: 34px; }
+  .v-today .mode-text small, .v-today .mode-name { display: none; }
+  .v-today .mode-short { display: inline; white-space: nowrap; }
+  .v-today .col > * { order: 0; }
+  .v-today .shop-foot > span { display: none; }
+  .v-today .shop-foot:not(:has(button)) { display: none; }
+  .v-today .glance { grid-template-columns: 1fr; }
+  .v-today .glance-item small { display: inline; margin-left: 6px; }
+  .v-today .glance-item > button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
   .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .today-energy, .month-energy, .charts-card { grid-column: 1 / -1; }
 
   .v-places { grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); align-items: start; }
-  .pmap-slot.big .pmap { height: calc(100dvh - 120px); min-height: 360px; }
+  .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
   .people-card { position: sticky; top: 72px; }
 }
 
 @media (min-width: 1000px) {
-  .em-row { gap: 12px; }
-  .v-today { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); }
-  .v-today .col-a { grid-row: auto; }
-  .v-today .col-b { grid-column: 2; grid-row: auto; }
-  .v-today .col-c { grid-column: 3; }
-
-
   .v-home { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
   .v-home .home-plan { grid-row: span 2; }
   .v-home .rooms { grid-template-columns: 1fr; }
@@ -1072,6 +1095,9 @@ small { font-size: 0.8em; }
   .v-home:not(:has(.plan-card)) .rooms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
 
+@media (min-width: 1000px) {
+  .nav { left: 50%; transform: translateX(-50%); }
+}
 @media (min-width: 1200px) {
   .v-energy { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.2fr); }
   .today-energy { grid-column: 3; grid-row: 1; }
@@ -1089,8 +1115,6 @@ small { font-size: 0.8em; }
   .hero-summary { font-size: 0.98rem; margin-top: 10px; }
   .card { padding: 14px; }
   .card-title { margin-bottom: 8px; }
-  .ring { --size: 96px; }
-  .ring b { font-size: 1.45rem; }
   .pmap-slot.mini .pmap { height: 150px; }
 }
 @media (min-width: 700px) and (max-height: 640px) {
@@ -1100,6 +1124,20 @@ small { font-size: 0.8em; }
   .nav a { height: 54px; }
   .nav .brand { display: none; }
   .pmap-slot.mini .pmap { height: 120px; }
+}
+
+/* Tablets and desktops tall enough: Today fits the screen without scrolling. The calendar and the map take
+   whatever room is left; the calendar scrolls inside its card on a busy day. */
+@media (min-width: 700px) and (min-height: 680px) {
+  .v-today { height: calc(100dvh - var(--safe-top) - 34px - var(--dock-space)); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .kiosk .v-today { height: calc(100dvh - var(--safe-top) - 50px); }
+  .v-today .col { overflow-y: auto; scrollbar-width: none; }
+  .v-today .col > * { flex: none; }
+  .v-today .hero-summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+  .v-today .agenda-card { flex: 1 1 auto; min-height: 160px; overflow-y: auto; }
+  .v-today .people-mini { flex: 1 1 auto; min-height: 200px; display: flex; flex-direction: column; }
+  .v-today .people-mini .pmap-slot { flex: 1; min-height: 0; }
+  .v-today .pmap-slot.mini .pmap { height: 100%; min-height: 150px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

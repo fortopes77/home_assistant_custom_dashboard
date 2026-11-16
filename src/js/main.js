@@ -568,9 +568,13 @@ function calWhoSettingsHtml() {
  * The household for "Who": every person in Home Assistant except wall tablets, first names. Not the
  * Places list, so hiding someone from this screen's map (or their phone being off) doesn't drop them.
  */
+// Logins for screens (a wall tablet, a TV app) are persons in Home Assistant too, but not people.
+const SCREEN_NAME = /wall|display|kiosk|tablet|ipad|dashboard|\btv\b|tv$/i;
+const isScreenLogin = (p) => SCREEN_NAME.test(p.name) || SCREEN_NAME.test(p.id.split('.')[1] || '');
+
 function household() {
   return peopleOf(store.states)
-    .filter((p) => domainOf(p.id) === 'person' && !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name))
+    .filter((p) => domainOf(p.id) === 'person' && !isScreenLogin(p))
     .map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
 }
 
@@ -819,8 +823,8 @@ function shownPeople() {
   const hidden = store.prefs.hiddenPeople;
   return peopleOf(store.states).filter((p) => {
     if (p.unavailable && !p.located) return false;
-    if (hidden) return !hidden[p.id];
-    return !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name);
+    if (hidden && p.id in hidden) return !hidden[p.id];
+    return !isScreenLogin(p);
   });
 }
 
@@ -920,7 +924,8 @@ function summaryText() {
 // Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
 function binsHtml(now) {
   const b = binNight(store.states, now);
-  if (!b) return '';
+  // Only on bin day itself: the rest of the week the chip is just clutter (a reminder comes at 6 pm).
+  if (!b || b.when !== 'tonight') return '';
   const words = binWords(b.colours);
   const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
   return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
@@ -936,7 +941,7 @@ const MODES = [
   { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
     on: 'Bedroom blind stays shut. Turns off at noon.',
     off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
-  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode',
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode', short: 'Holiday',
     on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
 ];
 
@@ -965,7 +970,7 @@ function modesHtml() {
       return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
         <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
           <span class="mode-ic">${icon(m.icon)}</span>
-          <span class="mode-text"><b>${esc(m.name)}</b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="mode-text"><b><span class="mode-name">${esc(m.name)}</span><span class="mode-short">${esc(m.short || m.name)}</span></b><small>${esc(on ? m.on : m.off(now))}</small></span>
           <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
         </button>
       </div>`;
@@ -991,8 +996,6 @@ function heroHtml() {
   const name = (store.user?.name || '').split(/\s+/)[0];
   const warnings = [...store.states.values()].find((s) => domainOf(s.entity_id) === 'sensor' && /warnings?$/i.test(s.entity_id) && Number(s.state) > 0);
   const { text, by } = summaryText();
-  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
-    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
   return `<section class="card hero">
     <div class="hero-top">
       <div class="hero-when">
@@ -1009,6 +1012,15 @@ function heroHtml() {
     </div>
     ${warnings ? `<button type="button" class="warn-banner" data-open-entity="${esc(warnings.entity_id)}">${icon('alert')}${esc(plural(Number(warnings.state), 'weather warning'))} for your area</button>` : ''}
     ${store.prefs.brief ? `<p class="hero-summary">${esc(text)}${by ? `<small> · written by ${esc(by)}</small>` : ''}</p>` : ''}
+  </section>`;
+}
+
+// Right now: open doors, someone at a camera, appliances running, lights left on. Its own card, beside the map.
+function nowCardHtml() {
+  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
+    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
+  if (!glance.length) return '';
+  return `<section class="card now-card">
     ${glance.length ? `<ul class="glance" aria-label="Right now">${glance.map((g) => `
       <li class="glance-item tone-${g.tone}">
         <button type="button" ${g.open ? `data-open-entity="${esc(g.open)}"` : g.href ? `data-href="${esc(g.href === '#/solar' ? '#/energy' : g.href.replace('#/entities', '#/home'))}"` : 'disabled'}>
@@ -1042,7 +1054,7 @@ function agendaHtml() {
       : `${dayBlock(today, 'Today')}${dayBlock(calAddDays(today, 1), 'Tomorrow')}`;
   // "Everyone" or one person's events (with the shared ones); remembered on this screen.
   const filter = vw.people.length > 1 && writableCals().length ? `<div class="who-filter" role="group" aria-label="Whose events">
-      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">Everyone</button>
+      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">${vw.people.length === 2 ? 'Both' : 'Everyone'}</button>
       ${vw.people.map((p) => `<button type="button" data-cal-for="${esc(p.id)}" aria-pressed="${vw.forId === p.id}" style="--cal:${p.color}">${esc(p.name)}</button>`).join('')}
     </div>` : '';
   return `<section class="card agenda-card${month ? ' month' : ''}">
@@ -1057,25 +1069,21 @@ function agendaHtml() {
   </section>`;
 }
 
+// Energy on Today: just the battery level and what it's doing; the Energy page has the rest.
 function energyMiniHtml() {
   if (!store.prefs.energyTab) return '';
   const e = energyNow();
   if (!e.flow.found) return '';
   const f = e.flow;
   const soc = f.soc;
-  const state = f.charging > 0.05 ? `Charging ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Using ${energyPower(f.discharging)}` : soc >= 99.5 ? 'Full' : 'Resting';
-  const sold = e.today.sold?.kwh;
-  return `<a class="card energy-mini" href="#/energy">
-    <h2 class="card-title">${icon('solar')}Energy<span class="card-go">${icon('chevronRight')}</span></h2>
-    <div class="em-row">
-      ${soc != null ? `<div class="ring" style="--p:${Math.max(0, Math.min(100, soc))}"><b>${Math.round(soc)}%</b><small>${esc(state)}</small></div>` : ''}
-      <dl class="em-stats">
-        <div><dt>Solar</dt><dd>${energyPower(f.solar)}</dd></div>
-        <div><dt>${f.selling > 0.05 ? 'Selling' : f.buying > 0.05 ? 'Buying' : 'Grid'}</dt><dd class="${f.selling > 0.05 ? 'pos' : f.buying > 0.05 ? 'neg' : ''}">${energyPower(f.selling > 0.05 ? f.selling : f.buying || 0)}</dd></div>
-        ${sold != null ? `<div><dt>Sold</dt><dd class="pos">${sold.toFixed(1)}<small class="u"> kWh</small>${e.rates.feedIn ? `<small>${money(sold * e.rates.feedIn)}</small>` : ''}</dd></div>` : ''}
-        ${e.today.pv ? `<div><dt>Made</dt><dd>${e.today.pv.kwh.toFixed(1)}<small class="u"> kWh</small></dd></div>` : ''}
-      </dl>
-    </div>
+  const [tone, state] = f.buying > 0.05 ? ['neg', `Using grid · ${energyPower(f.buying)}`]
+    : f.charging > 0.05 ? ['pos', `Charging · ${energyPower(f.charging)}`]
+      : soc != null && soc >= 99.5 ? ['pos', f.selling > 0.05 ? `Full · selling ${energyPower(f.selling)}` : 'Full']
+        : f.discharging > 0.05 ? ['bat', 'Running the house'] : ['bat', f.selling > 0.05 ? `Selling ${energyPower(f.selling)}` : 'Resting'];
+  return `<a class="card energy-mini" href="#/energy" aria-label="Energy">
+    <span class="em-label">${icon('solar')}<span>Battery</span></span>
+    ${soc != null ? `<b class="em-soc">${Math.round(soc)}%</b><span class="em-bar" style="--p:${Math.max(0, Math.min(100, soc))}%"><i></i></span>` : `<b class="em-soc">${energyPower(f.solar)}</b><span class="em-bar"></span>`}
+    <span class="em-state ${tone}"><i></i>${esc(state)}</span>
   </a>`;
 }
 
@@ -1821,9 +1829,8 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}${modesHtml()}<div class="music-slot"></div></div>
-      <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
-      <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
   },
 
@@ -1963,7 +1970,7 @@ const VIEWS = {
     const embedded = store.authMode === 'embedded';
     const ids = store.states.size ? energyIds() : {};
     const people = peopleOf(store.states);
-    const hidden = (pp) => (p.hiddenPeople ? !!p.hiddenPeople[pp.id] : /wall|display|kiosk|tablet|ipad|dashboard/i.test(pp.name));
+    const hidden = (pp) => (p.hiddenPeople && pp.id in p.hiddenPeople ? !!p.hiddenPeople[pp.id] : isScreenLogin(pp));
     const { lists, events } = newsSources(store.states);
     const cals = calendarsOf(store.states);
     const colors = calColors();
@@ -2906,8 +2913,8 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.personShow) {
     const hidden = store.prefs.hiddenPeople || Object.fromEntries(peopleOf(store.states)
-      .filter((p) => /wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name)).map((p) => [p.id, true]));
-    if (t.checked) delete hidden[t.dataset.personShow]; else hidden[t.dataset.personShow] = true;
+      .filter(isScreenLogin).map((p) => [p.id, true]));
+    hidden[t.dataset.personShow] = !t.checked;
     store.prefs.hiddenPeople = hidden;
     writePrefs();
     return;
