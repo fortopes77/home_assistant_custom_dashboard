@@ -47,11 +47,12 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 ## Today
 
 - **Hero:** a greeting, a big clock, the date and the weather now (tap it for the forecast). Below that is a short **summary of the day**: the weather, what's on and where everyone is. If Home Assistant has an AI integration (Anthropic, OpenAI or Google Gemini) with an **AI Task**, the AI writes the summary; otherwise a plain one is shown. To pick who writes it, or turn it off, use **Settings → Today**.
+- **Layout:** on a tablet or computer, Today is two columns that fit the screen without scrolling: the day, a slim **battery** bar (level, and whether it's charging, running the house or using the grid) and the calendar on the left; the map, Right now, Modes and the shopping list on the right. The menu floats at the bottom, with the bell and voice beside it. Notifications open from the bell, and news shows on phones.
 - **Right now** lists open doors, someone at a camera, appliances running and lights left on, with quick actions.
 - **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings. It's also a **family calendar** you can add to, see [Family calendar](#family-calendar).
 - **Music:** what's playing, with its cover, play/pause/skip, volume, your playlists and the speakers to play on. See [Music and Spotify](#music-and-spotify).
 - **Shopping list:** your Home Assistant to-do list. Tap an item to tick it off, type to add one, and use **Clear ticked** to tidy up.
-- **Notifications:** Home Assistant's own notices and what your automations sent to phones (`notify.*`). Tap **×** to dismiss one, or **Clear all** (tap twice) to empty the list on every screen; phone notifications drop off by themselves after a week. The **bell** in the top bar counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
+- **Notifications:** Home Assistant's own notices and what your automations sent to phones (`notify.*`). Tap **×** to dismiss one, or **Clear all** (tap twice) to empty the list on every screen; phone notifications drop off by themselves after a week. The **bell** (top bar on phones, beside the menu on tablets) counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
 - **News:** Feedreader feeds work, but Home Assistant only keeps the latest story from each, so the dashboard collects stories as they arrive and shares them between screens. For a full list straight away, add a sensor from the HACS **feedparser** integration:
   ```yaml
   sensor:
@@ -124,9 +125,9 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 ## Bin night
 
-[`homeassistant/bin_night.yaml`](homeassistant/bin_night.yaml) is a package with a **Bin night** sensor and a 6 pm reminder on bin night, sent through the `notify_family` script. The sensor names the bins by colour ("Red and green"), alternating between two weeks, so it suits a fortnightly recycling and garden rotation. Set your bin night, a start date and each week's bins at the top of the file.
+[`homeassistant/bin_night.yaml`](homeassistant/bin_night.yaml) is a package with a **Bin night** sensor, a 6 pm reminder on bin night and a 6 pm "bring the bins in" reminder the next evening, sent through the `notify_family` script. The sensor names the bins by colour ("Red and green"), alternating between two weeks, so it suits a fortnightly recycling and garden rotation. Set your bin night, a start date and each week's bins at the top of the file.
 
-Today then shows little bins with those coloured lids under the date: "Bins Thu" during the week, "Bins tomorrow" the day before and "Bins out tonight" on the night. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
+On bin day, Today shows little bins with those coloured lids under the date ("Bins out tonight"); the rest of the week they stay out of the way. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
 
 ## Modes
 
