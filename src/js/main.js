@@ -569,9 +569,13 @@ function calWhoSettingsHtml() {
  * The household for "Who": every person in Home Assistant except wall tablets, first names. Not the
  * Places list, so hiding someone from this screen's map (or their phone being off) doesn't drop them.
  */
+// Logins for screens (a wall tablet, a TV app) are persons in Home Assistant too, but not people.
+const SCREEN_NAME = /wall|display|kiosk|tablet|ipad|dashboard|\btv\b|tv$/i;
+const isScreenLogin = (p) => SCREEN_NAME.test(p.name) || SCREEN_NAME.test(p.id.split('.')[1] || '');
+
 function household() {
   return peopleOf(store.states)
-    .filter((p) => domainOf(p.id) === 'person' && !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name))
+    .filter((p) => domainOf(p.id) === 'person' && !isScreenLogin(p))
     .map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
 }
 
@@ -820,8 +824,8 @@ function shownPeople() {
   const hidden = store.prefs.hiddenPeople;
   return peopleOf(store.states).filter((p) => {
     if (p.unavailable && !p.located) return false;
-    if (hidden) return !hidden[p.id];
-    return !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name);
+    if (hidden && p.id in hidden) return !hidden[p.id];
+    return !isScreenLogin(p);
   });
 }
 
@@ -921,13 +925,66 @@ function summaryText() {
 // Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
 function binsHtml(now) {
   const b = binNight(store.states, now);
-  if (!b) return '';
+  // Only on bin day itself: the rest of the week the chip is just clutter (a reminder comes at 6 pm).
+  if (!b || b.when !== 'tonight') return '';
   const words = binWords(b.colours);
   const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
   return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
     <span class="bins-ic">${b.colours.map((c) => binSvg(c.hex)).join('')}</span>
     <span class="bins-text">${esc(b.when === 'tonight' ? 'Bins out tonight' : b.when === 'tomorrow night' ? 'Bins tomorrow' : b.when ? `Bins ${b.when.slice(0, 3)}` : 'Bins')}</span>
   </button>`;
+}
+
+// Modes: house-wide switches (input_booleans) in their own card on Today. Sleep in and holiday mode get their
+// own icon, colour and wording; any other input_boolean whose id ends in "_mode" (guest_mode...) shows too.
+// Sleep in (homeassistant/sleep_in.yaml) keeps the bedroom blind shut in the morning and turns off at noon.
+const MODES = [
+  { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
+    on: 'Bedroom blind stays shut. Turns off at noon.',
+    off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode', short: 'Holiday',
+    on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
+];
+
+function modeList() {
+  const out = [];
+  for (const m of MODES) {
+    const s = [...store.states.values()].find((x) => m.match.test(x.entity_id));
+    if (s) out.push({ ...m, s });
+  }
+  for (const s of store.states.values()) {
+    if (!/^input_boolean\.\w+_mode$/.test(s.entity_id) || out.some((m) => m.s === s)) continue;
+    out.push({ key: 'other', icon: 'input_boolean', name: nameOf(s), on: 'On', off: () => 'Off', s });
+  }
+  return out.filter((m) => !['unknown', 'unavailable'].includes(m.s.state));
+}
+
+function modesHtml() {
+  const modes = modeList();
+  if (!modes.length) return '';
+  const now = new Date();
+  return `<section class="card modes-card">
+    <h2 class="card-title">${icon('input_boolean')}Modes</h2>
+    <div class="modes">${modes.map((m) => {
+      const s = shown(m.s);
+      const on = s.state === 'on';
+      return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
+        <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
+          <span class="mode-ic">${icon(m.icon)}</span>
+          <span class="mode-text"><b><span class="mode-name">${esc(m.name)}</span><span class="mode-short">${esc(m.short || m.name)}</span></b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+// While a mode is on, a coloured chip beside the bins says so (tap to turn it off).
+function modeChipsHtml() {
+  return modeList().filter((m) => m.key !== 'other' && shown(m.s).state === 'on').map((m) =>
+    `<span class="mode-chip-wrap" data-entity="${esc(m.s.entity_id)}"><button type="button" class="mode-chip mode-${m.key}" data-act="toggle" title="Tap to turn ${esc(m.name.toLowerCase())} off">
+      ${icon(m.icon)}<span>${esc(m.key === 'sleep' ? 'Sleeping in' : m.name)}</span>
+    </button></span>`).join('');
 }
 
 function heroHtml() {
@@ -940,15 +997,13 @@ function heroHtml() {
   const name = (store.user?.name || '').split(/\s+/)[0];
   const warnings = [...store.states.values()].find((s) => domainOf(s.entity_id) === 'sensor' && /warnings?$/i.test(s.entity_id) && Number(s.state) > 0);
   const { text, by } = summaryText();
-  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
-    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
   return `<section class="card hero">
     <div class="hero-top">
       <div class="hero-when">
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-        ${binsHtml(now)}
+        <div class="hero-chips">${binsHtml(now)}${modeChipsHtml()}</div>
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
@@ -958,6 +1013,15 @@ function heroHtml() {
     </div>
     ${warnings ? `<button type="button" class="warn-banner" data-open-entity="${esc(warnings.entity_id)}">${icon('alert')}${esc(plural(Number(warnings.state), 'weather warning'))} for your area</button>` : ''}
     ${store.prefs.brief ? `<p class="hero-summary">${esc(text)}${by ? `<small> · written by ${esc(by)}</small>` : ''}</p>` : ''}
+  </section>`;
+}
+
+// Right now: open doors, someone at a camera, appliances running, lights left on. Its own card, beside the map.
+function nowCardHtml() {
+  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
+    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
+  if (!glance.length) return '';
+  return `<section class="card now-card">
     ${glance.length ? `<ul class="glance" aria-label="Right now">${glance.map((g) => `
       <li class="glance-item tone-${g.tone}">
         <button type="button" ${g.open ? `data-open-entity="${esc(g.open)}"` : g.href ? `data-href="${esc(g.href === '#/solar' ? '#/energy' : g.href.replace('#/entities', '#/home'))}"` : 'disabled'}>
@@ -991,7 +1055,7 @@ function agendaHtml() {
       : `${dayBlock(today, 'Today')}${dayBlock(calAddDays(today, 1), 'Tomorrow')}`;
   // "Everyone" or one person's events (with the shared ones); remembered on this screen.
   const filter = vw.people.length > 1 && writableCals().length ? `<div class="who-filter" role="group" aria-label="Whose events">
-      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">Everyone</button>
+      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">${vw.people.length === 2 ? 'Both' : 'Everyone'}</button>
       ${vw.people.map((p) => `<button type="button" data-cal-for="${esc(p.id)}" aria-pressed="${vw.forId === p.id}" style="--cal:${p.color}">${esc(p.name)}</button>`).join('')}
     </div>` : '';
   return `<section class="card agenda-card${month ? ' month' : ''}">
@@ -1006,25 +1070,21 @@ function agendaHtml() {
   </section>`;
 }
 
+// Energy on Today: just the battery level and what it's doing; the Energy page has the rest.
 function energyMiniHtml() {
   if (!store.prefs.energyTab) return '';
   const e = energyNow();
   if (!e.flow.found) return '';
   const f = e.flow;
   const soc = f.soc;
-  const state = f.charging > 0.05 ? `Charging ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Using ${energyPower(f.discharging)}` : soc >= 99.5 ? 'Full' : 'Resting';
-  const sold = e.today.sold?.kwh;
-  return `<a class="card energy-mini" href="#/energy">
-    <h2 class="card-title">${icon('solar')}Energy<span class="card-go">${icon('chevronRight')}</span></h2>
-    <div class="em-row">
-      ${soc != null ? `<div class="ring" style="--p:${Math.max(0, Math.min(100, soc))}"><b>${Math.round(soc)}%</b><small>${esc(state)}</small></div>` : ''}
-      <dl class="em-stats">
-        <div><dt>Solar</dt><dd>${energyPower(f.solar)}</dd></div>
-        <div><dt>${f.selling > 0.05 ? 'Selling' : f.buying > 0.05 ? 'Buying' : 'Grid'}</dt><dd class="${f.selling > 0.05 ? 'pos' : f.buying > 0.05 ? 'neg' : ''}">${energyPower(f.selling > 0.05 ? f.selling : f.buying || 0)}</dd></div>
-        ${sold != null ? `<div><dt>Sold</dt><dd class="pos">${sold.toFixed(1)}<small class="u"> kWh</small>${e.rates.feedIn ? `<small>${money(sold * e.rates.feedIn)}</small>` : ''}</dd></div>` : ''}
-        ${e.today.pv ? `<div><dt>Made</dt><dd>${e.today.pv.kwh.toFixed(1)}<small class="u"> kWh</small></dd></div>` : ''}
-      </dl>
-    </div>
+  const [tone, state] = f.buying > 0.05 ? ['neg', `Using grid · ${energyPower(f.buying)}`]
+    : f.charging > 0.05 ? ['pos', `Charging · ${energyPower(f.charging)}`]
+      : soc != null && soc >= 99.5 ? ['pos', f.selling > 0.05 ? `Full · selling ${energyPower(f.selling)}` : 'Full']
+        : f.discharging > 0.05 ? ['bat', 'Running the house'] : ['bat', f.selling > 0.05 ? `Selling ${energyPower(f.selling)}` : 'Resting'];
+  return `<a class="card energy-mini" href="#/energy" aria-label="Energy">
+    <span class="em-label">${icon('solar')}<span>Battery</span></span>
+    ${soc != null ? `<b class="em-soc">${Math.round(soc)}%</b><span class="em-bar" style="--p:${Math.max(0, Math.min(100, soc))}%"><i></i></span>` : `<b class="em-soc">${energyPower(f.solar)}</b><span class="em-bar"></span>`}
+    <span class="em-state ${tone}"><i></i>${esc(state)}</span>
   </a>`;
 }
 
@@ -1042,11 +1102,11 @@ function peopleMiniHtml() {
 
 function notesCardHtml({ limit = 5 } = {}) {
   if (!store.prefs.notifications) return '';
-  const items = noteItems(notes);
+  const items = shownNotes();
   return `<section class="card notes-card" id="notes">
     <h2 class="card-title">${icon('bell')}Notifications${items.length ? `<span class="count">${items.length}</span>` : ''}</h2>
     ${items.length ? notesList(items.slice(0, limit)) : '<p class="muted quiet">Nothing new. Notifications from Home Assistant and your automations show up here.</p>'}
-    ${items.length > limit ? `<button type="button" class="link-btn" data-open-notes>See all ${items.length}</button>` : ''}
+    ${items.length ? `<div class="notes-foot">${items.length > limit ? `<button type="button" class="link-btn" data-open-notes>See all ${items.length}</button>` : ''}${clearAllBtn()}</div>` : ''}
   </section>`;
 }
 
@@ -1058,7 +1118,7 @@ function notesList(items) {
       <p>${esc(n.message)}</p>
       <small class="muted">${esc([relativeTime(n.at), n.kind === 'sent' && n.to ? `to ${n.to}` : n.kind === 'ha' ? 'in Home Assistant' : ''].filter(Boolean).join(' · '))}</small>
     </div>
-    ${n.kind === 'ha' ? `<button type="button" class="icon-btn" data-dismiss="${esc(n.id)}" aria-label="Dismiss">${icon('close')}</button>` : ''}
+    <button type="button" class="icon-btn" data-dismiss="${esc(n.id)}" data-kind="${n.kind}" aria-label="Dismiss">${icon('close')}</button>
   </li>`).join('')}</ul>`;
 }
 
@@ -1642,7 +1702,8 @@ function camEditAct(act) {
 
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
-const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
+// Only the Music card shows the speaker on Today, so only it is redrawn there.
+const screenSpeaker = new ScreenSpeaker(() => (ui.view === 'today' ? queueMusicPaint() : queueRefresh()));
 
 function musicName() {
   return (store.prefs.musicName || '').trim() || (store.prefs.wall || urlWall ? (IS_IPAD ? 'Wall iPad' : 'Wall screen') : 'Dashboard');
@@ -1678,7 +1739,7 @@ async function loadMusicLists(players, main) {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
   }
-  queueRefresh();
+  if (ui.view === 'today') queueMusicPaint(); else queueRefresh();
 }
 
 function musicHtml() {
@@ -1726,15 +1787,16 @@ function musicPick(id) {
   if (players.kind === 'mass' && main && main.entity_id !== id && main.state === 'playing') {
     call('music_assistant', 'transfer_queue', { source_player: main.entity_id, auto_play: true }, id);
   }
-  render();
+  if (ui.view === 'today') { music.html = ''; paintMusic(); } else render();
 }
 
 function musicPlay(i) {
   const l = music.lists?.[i];
   const { main } = musicState();
   if (!l || !main) return;
-  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id)
-    .then(() => toast(`Playing ${l.title}`));
+  // Say so straight away: Music Assistant takes a few seconds to fetch a Spotify playlist.
+  toast(`Starting ${l.title} on ${nameOf(main)}…`);
+  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id);
 }
 
 function musicSettingsHtml(check) {
@@ -1768,9 +1830,8 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}<div class="music-slot"></div></div>
-      <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
-      <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
   },
 
@@ -1910,7 +1971,7 @@ const VIEWS = {
     const embedded = store.authMode === 'embedded';
     const ids = store.states.size ? energyIds() : {};
     const people = peopleOf(store.states);
-    const hidden = (pp) => (p.hiddenPeople ? !!p.hiddenPeople[pp.id] : /wall|display|kiosk|tablet|ipad|dashboard/i.test(pp.name));
+    const hidden = (pp) => (p.hiddenPeople && pp.id in p.hiddenPeople ? !!p.hiddenPeople[pp.id] : isScreenLogin(pp));
     const { lists, events } = newsSources(store.states);
     const cals = calendarsOf(store.states);
     const colors = calColors();
@@ -2324,9 +2385,9 @@ function renderSheet() {
     if (d.querySelector('[data-ev-form]')?.dataset.key === sh.id && d.open) return;
     setSheet(d, eventSheetHtml(sh));
   } else if (sh.kind === 'notes') {
-    const items = noteItems(notes);
+    const items = shownNotes();
     setSheet(d, `${sheetHead('Notifications', plural(items.length, 'notification'), { ic: 'bell' })}
-      <div class="sheet-body">${items.length ? notesList(items) : '<p class="muted">Nothing new.</p>'}</div>`);
+      <div class="sheet-body">${items.length ? `${notesList(items)}<div class="notes-foot">${clearAllBtn()}</div>` : '<p class="muted">Nothing new.</p>'}</div>`);
     markNotesSeen();
   }
 }
@@ -2356,6 +2417,11 @@ function renderCameraSheet(s, sh) {
       <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span>
         <button type="button" class="btn" data-cam="retry">Try again</button></div>
       <span class="cam-kind"></span>
+    </div>
+    <div class="cam-bar" hidden>
+      <button type="button" class="btn cam-talk" data-cam="talk" hidden aria-pressed="false">${icon('mic')}<span>Talk</span></button>
+      <button type="button" class="btn cam-sound" data-cam="sound" hidden aria-pressed="false">${icon('volumeOff')}<span>Sound off</span></button>
+      <p class="cam-talk-note muted" hidden></p>
     </div>`;
   paintCameras(d);
   camPlayer = new CameraPlayer({
@@ -2366,9 +2432,43 @@ function renderCameraSheet(s, sh) {
       st.dataset.phase = phase;
       $('.cam-status-text', st).textContent = phase === 'failed' ? `No live video. ${message || ''}` : `Connecting${kind ? ` (${streamLabel(kind)})` : ''}…`;
       $('.cam-kind', st).textContent = phase === 'playing' ? `Live · ${streamLabel(kind)}` : '';
+      paintCamBar();
     },
   });
+  camTalkNote = '';
+  camPlayer.onTalk = (state, message) => {
+    if (message || state === 'on' || state === 'connecting') camTalkNote = message || '';
+    paintCamBar();
+  };
   camPlayer.start();
+}
+
+/** The buttons under the live video: Talk (when Home Assistant says the camera can take audio) and Sound. */
+let camTalkNote = ''; // why talking stopped or didn't start, shown under the buttons
+function paintCamBar() {
+  const bar = $('#sheet .cam-bar');
+  const p = camPlayer;
+  if (!bar || !p) return;
+  const phase = $('#sheet .cam-stage')?.dataset.phase;
+  const talk = $('.cam-talk', bar);
+  const sound = $('.cam-sound', bar);
+  const note = $('.cam-talk-note', bar);
+  const talking = p.talkState === 'on' || p.talkState === 'connecting';
+  talk.hidden = !p.canTalk;
+  talk.classList.toggle('on', talking);
+  talk.setAttribute('aria-pressed', String(talking));
+  talk.disabled = !talking && (phase !== 'playing' || p.talkState === 'denied');
+  $('span', talk).textContent = p.talkState === 'connecting' ? 'Connecting…' : talking ? 'Stop talking' : 'Talk';
+  sound.hidden = phase !== 'playing' || !p.hasAudio;
+  sound.setAttribute('aria-pressed', String(!p.muted));
+  sound.innerHTML = `${icon(p.muted ? 'volumeOff' : 'volumeHigh')}<span>${p.muted ? 'Sound off' : 'Sound on'}</span>`;
+  // Say why talking won't work before anyone presses it: no https means no microphone.
+  const insecure = p.canTalk && !CameraPlayer.talkAllowed;
+  const why = camTalkNote || (insecure ? 'Talking needs Home Assistant opened over https (its outside address), so the browser can use the microphone.' : '');
+  note.textContent = why;
+  note.hidden = !why;
+  if (insecure) talk.disabled = true;
+  bar.hidden = talk.hidden && sound.hidden && note.hidden;
 }
 
 function stopCamera() {
@@ -2388,10 +2488,58 @@ const NOTES_KEY = 'ha-dash.notify-log'; // shared with the old dashboard, so his
 const notes = { persistent: [], sent: readLocal(NOTES_KEY, []), canSeeSent: true };
 const ding = new Ding();
 const SEEN_KEY = 'ha-dash2.notes-seen';
+// What's been cleared from the sent list: everything up to `before`, plus single ones by id.
+// Shared between screens (Home Assistant user data), because each screen keeps its own copy of the
+// log and would otherwise bring cleared ones back the next time it merges.
+const CLEARED_KEY = 'ha-dash2.notes-cleared';
+let cleared = normCleared(readLocal(CLEARED_KEY, null));
+let clearArmed = 0; // "Clear all" needs a second tap within a few seconds
+
+function normCleared(c) {
+  return { before: Number(c?.before) || 0, ids: Array.isArray(c?.ids) ? c.ids.slice(-100) : [] };
+}
+function shownSent() {
+  return notes.sent.filter((n) => Date.parse(n.at || 0) > cleared.before && !cleared.ids.includes(n.id));
+}
+function shownNotes() {
+  return noteItems({ persistent: notes.persistent, sent: shownSent() });
+}
+function mergeCleared(other) {
+  const c = normCleared(other);
+  cleared = normCleared({ before: Math.max(cleared.before, c.before), ids: [...new Set([...cleared.ids, ...c.ids])] });
+}
+function saveCleared(next) {
+  mergeCleared(next);
+  // Ids older than the cut-off are covered by it.
+  cleared.ids = cleared.ids.filter((id) => notes.sent.some((n) => n.id === id && Date.parse(n.at || 0) > cleared.before));
+  writeLocal(CLEARED_KEY, cleared);
+  notes.sent = shownSent();
+  writeLocal(NOTES_KEY, notes.sent);
+  store.client?.send({ type: 'frontend/set_user_data', key: CLEARED_KEY, value: cleared }).catch(() => {});
+  store.client?.send({ type: 'frontend/set_user_data', key: NOTES_KEY, value: notes.sent }).catch(() => {});
+}
+function clearAllBtn() {
+  const armed = Date.now() - clearArmed < 4000;
+  return `<button type="button" class="link-btn${armed ? ' armed' : ''}" data-clear-notes>${armed ? 'Tap again to clear all' : 'Clear all'}</button>`;
+}
+function clearAllNotes() {
+  if (Date.now() - clearArmed > 4000) {
+    clearArmed = Date.now();
+    render(); renderSheet();
+    setTimeout(() => { if (clearArmed && Date.now() - clearArmed >= 4000) { clearArmed = 0; render(); renderSheet(); } }, 4100);
+    return;
+  }
+  clearArmed = 0;
+  if (notes.persistent.length) call('persistent_notification', 'dismiss_all', {});
+  notes.persistent = [];
+  saveCleared({ before: Date.now() });
+  toast('Notifications cleared');
+  render(); renderSheet();
+}
 
 function unseen() {
   const seen = Number(readLocal(SEEN_KEY, 0)) || 0;
-  return noteItems(notes).filter((n) => Date.parse(n.at || 0) > seen).length;
+  return shownNotes().filter((n) => Date.parse(n.at || 0) > seen).length;
 }
 function markNotesSeen() {
   writeLocal(SEEN_KEY, Date.now());
@@ -2432,8 +2580,9 @@ async function subscribeNotes(client) {
     if (arrived) noteArrived();
   }).catch(() => {});
 
-  const shared = await dataGet('user', NOTES_KEY);
+  const [shared, sharedCleared] = await Promise.all([dataGet('user', NOTES_KEY), dataGet('user', CLEARED_KEY)]);
   if (client !== store.client) return;
+  if (sharedCleared) { mergeCleared(sharedCleared); writeLocal(CLEARED_KEY, cleared); }
   notes.sent = noteMerge(notes.sent, Array.isArray(shared) ? shared : []);
   writeLocal(NOTES_KEY, notes.sent);
   try {
@@ -2441,12 +2590,14 @@ async function subscribeNotes(client) {
       const note = noteFromCall(event);
       if (!note) return;
       const fresh = !notes.sent.some((n) => n.id === note.id);
+      const [latest, latestCleared] = await Promise.all([dataGet('user', NOTES_KEY), dataGet('user', CLEARED_KEY)]);
+      if (latestCleared) mergeCleared(latestCleared);
       notes.sent = noteMerge(notes.sent, [note]);
       if (fresh) noteArrived();
       writeLocal(NOTES_KEY, notes.sent);
       queueRefresh();
-      const latest = await dataGet('user', NOTES_KEY);
       notes.sent = noteMerge(notes.sent, Array.isArray(latest) ? latest : []);
+      notes.sent = shownSent();
       client.send({ type: 'frontend/set_user_data', key: NOTES_KEY, value: notes.sent }).catch(() => {});
     });
   } catch {
@@ -2659,10 +2810,15 @@ document.addEventListener('click', (e) => {
     call('todo', 'remove_completed_items', {}, shop.id);
     return;
   }
+  if (t.closest('[data-clear-notes]')) { clearAllNotes(); return; }
   const dis = t.closest('[data-dismiss]');
   if (dis) {
-    notes.persistent = notes.persistent.filter((n) => n.id !== dis.dataset.dismiss);
-    call('persistent_notification', 'dismiss', { notification_id: dis.dataset.dismiss });
+    const id = dis.dataset.dismiss;
+    if (dis.dataset.kind === 'sent') saveCleared({ ids: [id] });
+    else {
+      notes.persistent = notes.persistent.filter((n) => n.id !== id);
+      call('persistent_notification', 'dismiss', { notification_id: id });
+    }
     render(); renderSheet();
     return;
   }
@@ -2693,6 +2849,8 @@ document.addEventListener('click', (e) => {
   const floor = t.closest('[data-floor]');
   if (floor) { planStore.floor = floor.dataset.floor; render(); return; }
   if (t.closest('[data-cam="retry"]')) { camPlayer?.start(); return; }
+  if (t.closest('[data-cam="talk"]')) { camPlayer?.toggleTalk(); paintCamBar(); return; }
+  if (t.closest('[data-cam="sound"]')) { camPlayer?.setMuted(!camPlayer.muted); paintCamBar(); return; }
 
   const a = t.closest('[data-act]');
   if (a) {
@@ -2814,8 +2972,8 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.personShow) {
     const hidden = store.prefs.hiddenPeople || Object.fromEntries(peopleOf(store.states)
-      .filter((p) => /wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name)).map((p) => [p.id, true]));
-    if (t.checked) delete hidden[t.dataset.personShow]; else hidden[t.dataset.personShow] = true;
+      .filter(isScreenLogin).map((p) => [p.id, true]));
+    hidden[t.dataset.personShow] = !t.checked;
     store.prefs.hiddenPeople = hidden;
     writePrefs();
     return;

@@ -345,7 +345,7 @@ small { font-size: 0.8em; }
 
 .v-today { display: grid; gap: var(--gap); }
 .v-today .col { display: contents; }
-/* Phone order: the day, energy, calendar, shopping, notifications, people, news. */
+/* Phone order: the day, right now, modes, energy, calendar, shopping, notifications, people, news. */
 .hero { order: 1; }
 .energy-mini { order: 2; }
 .agenda-card { order: 3; }
@@ -353,6 +353,8 @@ small { font-size: 0.8em; }
 .notes-card { order: 5; }
 .people-mini { order: 6; }
 .news-card { order: 7; }
+.now-card { order: 1; }   /* right under the hero */
+.modes-card { order: 1; }
 .music-card { order: 1; } /* right under the hero */
 
 /* Music */
@@ -434,6 +436,57 @@ small { font-size: 0.8em; }
 }
 .bins.soon { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
 .bins-ic { display: inline-flex; }
+.hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.hero-chips:empty { display: none; }
+.hero-chips .bins { margin-top: 0; }
+/* Modes: each has its own colour (--mode). */
+.mode-sleep { --mode: #5b5bd6; --mode-on: #5b5bd6; }
+.mode-holiday { --mode: #1f9e8f; --mode-on: #17897c; }
+.mode-other { --mode: var(--primary); --mode-on: var(--primary); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mode-sleep { --mode: #8b8cf5; --mode-on: #5f61e0; } :root:not([data-theme="light"]) .mode-holiday { --mode: #45c4b4; } }
+:root[data-theme="dark"] .mode-sleep { --mode: #8b8cf5; --mode-on: #5f61e0; }
+:root[data-theme="dark"] .mode-holiday { --mode: #45c4b4; }
+.modes { display: grid; gap: 10px; }
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid color-mix(in srgb, var(--mode) 35%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--mode) 8%, transparent);
+  color: var(--text);
+  text-align: left;
+}
+.mode-ic { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: color-mix(in srgb, var(--mode) 18%, transparent); }
+.mode-ic .icon { width: 24px; height: 24px; fill: var(--mode); }
+.mode-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.mode-text b { font-size: 1.02rem; }
+.mode-short { display: none; }
+.mode-text small { color: var(--muted); font-size: 0.84rem; }
+.mode-btn .switch { pointer-events: none; }
+.mode.on .mode-btn { background: var(--mode-on); border-color: var(--mode-on); color: #fff; box-shadow: 0 2px 12px color-mix(in srgb, var(--mode-on) 35%, transparent); }
+.mode.on .mode-ic { background: rgb(255 255 255 / 0.2); }
+.mode.on .mode-ic .icon { fill: #fff; }
+.mode.on .mode-text small { color: rgb(255 255 255 / 0.88); }
+.mode.on .switch.on { background: rgb(255 255 255 / 0.35); }
+.mode-chip-wrap { display: contents; }
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px 3px 8px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mode-on);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.mode-chip .icon { width: 17px; height: 17px; fill: #fff; }
 .bin-ic { width: 22px; height: 22px; }
 .bin-ic + .bin-ic { margin-left: -4px; }
 .hero-weather {
@@ -468,7 +521,8 @@ small { font-size: 0.8em; }
 .hero-summary { margin-top: 14px; font-size: 1.05rem; line-height: 1.5; max-width: 60ch; }
 .hero-summary small { color: var(--muted); }
 
-.glance { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+.now-card { padding: 10px; }
+.glance { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .glance-item { display: flex; align-items: stretch; border-radius: 14px; background: var(--surface-2); overflow: hidden; }
 .glance-item > button {
   display: flex;
@@ -565,27 +619,18 @@ small { font-size: 0.8em; }
 .ev-title small { display: block; font-weight: 400; color: var(--muted); }
 
 .energy-mini:hover, .energy-mini:focus-visible { border-color: var(--primary); }
-.em-row { display: flex; align-items: center; gap: 18px; }
-.ring {
-  --size: 112px;
-  flex: none;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  background:
-    radial-gradient(closest-side, var(--surface) 80%, transparent 81%),
-    conic-gradient(var(--battery) calc(var(--p) * 1%), var(--surface-2) 0);
-}
-.ring b { font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
-.ring small { color: var(--muted); font-size: 0.72rem; font-weight: 600; text-align: center; max-width: 80px; }
-.em-stats { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 10px; margin: 0; }
-.em-stats dt { color: var(--muted); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
-.em-stats dd { margin: 0; font-size: 1.1rem; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
-.em-stats dd small.u { display: inline; font-size: 0.62em; }
-.em-stats dd small:not(.u) { display: block; color: var(--muted); font-weight: 500; font-size: 0.78rem; }
+.energy-mini { display: flex; align-items: center; gap: 14px; padding-top: 12px; padding-bottom: 12px; }
+.em-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.em-label .icon { width: 20px; height: 20px; }
+.em-soc { font-size: 1.7rem; font-weight: 600; line-height: 1; color: var(--battery); font-variant-numeric: tabular-nums; }
+.em-bar { flex: 1; min-width: 40px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.em-bar i { display: block; width: var(--p, 0%); height: 100%; border-radius: 4px; background: var(--battery); }
+.em-state { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.em-state i { flex: none; }
+.em-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--battery); }
+.em-state.pos i { background: var(--positive); }
+.em-state.neg i { background: var(--negative); }
+@media (max-width: 420px), (min-width: 700px) and (max-width: 999.98px) { .em-label span { display: none; } }
 .pos { color: var(--positive); }
 .neg { color: var(--negative); }
 
@@ -616,6 +661,9 @@ small { font-size: 0.8em; }
 .note-body p { font-size: 0.9rem; overflow-wrap: anywhere; }
 .note .icon-btn { width: 32px; height: 32px; margin: -4px -4px 0 0; }
 .note .icon-btn .icon { width: 18px; height: 18px; }
+.notes-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.notes-foot [data-clear-notes] { margin-left: auto; color: var(--muted); }
+.notes-foot [data-clear-notes].armed { color: var(--danger, #d33); }
 
 .news { display: grid; margin: 0; padding: 0; list-style: none; }
 .story + .story { border-top: 1px solid var(--border); }
@@ -966,58 +1014,87 @@ small { font-size: 0.8em; }
 
 @media (min-width: 700px) {
   /* The rail is fixed, not sticky: sticky came loose and scrolled away in some browsers (the HA app's frame). */
-  .main { margin-left: calc(var(--rail) + var(--safe-left)); }
-  .kiosk .main { margin-left: 0; }
+  /* The menu floats at the bottom as a dock; the bell, voice and connection sit in a small pill beside it. */
+  :root { --dock-h: 64px; --dock-space: calc(var(--dock-h) + 24px + var(--safe-bottom)); }
+  .main { padding-bottom: var(--dock-space); }
+  .kiosk .main { padding-bottom: 16px; }
   .nav {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: auto auto calc(12px + var(--safe-bottom)) calc(16px + var(--safe-left));
     box-sizing: border-box;
-    width: calc(var(--rail) + var(--safe-left));
-    overflow-y: auto;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 4px;
-    height: 100dvh;
-    padding: calc(14px + var(--safe-top)) 8px 14px calc(8px + var(--safe-left));
-    border-top: 0;
-    border-right: 1px solid var(--border);
-    background: var(--surface);
-    backdrop-filter: none;
+    width: auto;
+    height: var(--dock-h);
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 36px rgb(0 0 0 / 0.28);
   }
-  .nav .brand { display: grid; place-items: center; height: 44px; margin-bottom: 12px; color: var(--accent); }
-  .nav .brand .icon { width: 30px; height: 30px; }
-  .nav a { flex: none; height: 64px; border-radius: 16px; font-size: 0.72rem; }
-  .nav a[aria-current] { background: var(--surface-2); }
-  .nav .nav-settings { margin-top: auto; }
-  .main { padding-bottom: 16px; }
+  .nav a { flex: none; width: 78px; height: 100%; border-radius: 999px; font-size: 0.68rem; gap: 0; }
+  .nav a .icon { width: 22px; height: 22px; }
+  .nav a[aria-current] { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+  .nav .nav-settings { width: 56px; }
+  .nav .nav-settings span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .topbar-actions {
+    position: fixed;
+    z-index: 50;
+    right: calc(16px + var(--safe-right));
+    bottom: calc(12px + var(--safe-bottom));
+    height: var(--dock-h);
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 36px rgb(0 0 0 / 0.28);
+  }
+  .topbar-actions .icon-btn { width: 50px; height: 50px; }
   .view { padding: 4px 20px 16px; }
-  .topbar { padding-left: 20px; padding-right: calc(20px + var(--safe-right)); }
-  .toast { bottom: 24px; }
+  /* No blur on the title bar here: a backdrop filter would pin the fixed bell pill inside it. */
+  .topbar { padding-left: 20px; padding-right: calc(20px + var(--safe-right)); background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  /* Today shows the clock itself, so its title bar folds away. */
+  :root[data-view="today"] .topbar { padding: var(--safe-top) 0 0; min-height: 14px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-view="today"] .topbar-title { display: none; }
+  .toast { bottom: calc(var(--dock-space) + 8px); }
   .sheet { margin: auto; border-radius: 24px; padding-bottom: 16px; }
 
-  /* Today: the day on the left, energy and people, notifications and news. */
-  .v-today { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
-  .v-today .col { display: flex; flex-direction: column; gap: var(--gap); }
-  .v-today .col-c { grid-column: 2; }
-  .v-today .col-b { grid-column: 2; grid-row: 1; }
-  .v-today .col-a { grid-row: 1 / span 2; }
+  /* Today, two columns: the day, battery and calendar on the left; the map, right now, modes and shopping on
+     the right. Notifications live behind the bell and news on the phone layout only. */
+  .v-today { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  .v-today .col { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+  .v-today .notes-card, .v-today .news-card { display: none; }
+  .v-today .people-row { display: none; }
+  .v-today .hero-summary { max-width: none; }
+  .v-today .modes { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .v-today .modes-card { padding: 10px; }
+  .v-today .modes-card .card-title { display: none; }
+  .v-today .mode-btn { padding: 8px 12px; }
+  .v-today .mode-ic { width: 34px; height: 34px; }
+  .v-today .mode-text small, .v-today .mode-name { display: none; }
+  .v-today .mode-short { display: inline; white-space: nowrap; }
+  .v-today .col > * { order: 0; }
+  .v-today .shop-foot > span { display: none; }
+  .v-today .shop-foot:not(:has(button)) { display: none; }
+  .v-today .glance { grid-template-columns: 1fr; }
+  .v-today .glance-item small { display: inline; margin-left: 6px; }
+  .v-today .glance-item > button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
   .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .today-energy, .month-energy, .charts-card { grid-column: 1 / -1; }
 
   .v-places { grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); align-items: start; }
-  .pmap-slot.big .pmap { height: calc(100dvh - 120px); min-height: 360px; }
+  .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
   .people-card { position: sticky; top: 72px; }
 }
 
 @media (min-width: 1000px) {
-  .em-row { gap: 12px; }
-  .v-today { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); }
-  .v-today .col-a { grid-row: auto; }
-  .v-today .col-b { grid-column: 2; grid-row: auto; }
-  .v-today .col-c { grid-column: 3; }
-
-
   .v-home { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
   .v-home .home-plan { grid-row: span 2; }
   .v-home .rooms { grid-template-columns: 1fr; }
@@ -1025,6 +1102,9 @@ small { font-size: 0.8em; }
   .v-home:not(:has(.plan-card)) .rooms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
 
+@media (min-width: 1000px) {
+  .nav { left: 50%; transform: translateX(-50%); }
+}
 @media (min-width: 1200px) {
   .v-energy { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.2fr); }
   .today-energy { grid-column: 3; grid-row: 1; }
@@ -1042,8 +1122,6 @@ small { font-size: 0.8em; }
   .hero-summary { font-size: 0.98rem; margin-top: 10px; }
   .card { padding: 14px; }
   .card-title { margin-bottom: 8px; }
-  .ring { --size: 96px; }
-  .ring b { font-size: 1.45rem; }
   .pmap-slot.mini .pmap { height: 150px; }
 }
 @media (min-width: 700px) and (max-height: 640px) {
@@ -1053,6 +1131,20 @@ small { font-size: 0.8em; }
   .nav a { height: 54px; }
   .nav .brand { display: none; }
   .pmap-slot.mini .pmap { height: 120px; }
+}
+
+/* Tablets and desktops tall enough: Today fits the screen without scrolling. The calendar and the map take
+   whatever room is left; the calendar scrolls inside its card on a busy day. */
+@media (min-width: 700px) and (min-height: 680px) {
+  .v-today { height: calc(100dvh - var(--safe-top) - 34px - var(--dock-space)); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .kiosk .v-today { height: calc(100dvh - var(--safe-top) - 50px); }
+  .v-today .col { overflow-y: auto; scrollbar-width: none; }
+  .v-today .col > * { flex: none; }
+  .v-today .hero-summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+  .v-today .agenda-card { flex: 1 1 auto; min-height: 160px; overflow-y: auto; }
+  .v-today .people-mini { flex: 1 1 auto; min-height: 200px; display: flex; flex-direction: column; }
+  .v-today .people-mini .pmap-slot { flex: 1; min-height: 0; }
+  .v-today .pmap-slot.mini .pmap { height: 100%; min-height: 150px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1491,6 +1583,16 @@ small { font-size: 0.8em; }
 .cam-stage[data-phase="playing"] .cam-status { display: none; }
 .cam-stage[data-phase="failed"] .spinner { display: none; }
 .cam-stage[data-phase="still"] .cam-status { display: none; }
+/* Talk and Sound under the live video */
+.cam-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.cam-bar[hidden], .cam-bar [hidden] { display: none; }
+.cam-bar .btn { gap: 6px; }
+.cam-talk { min-width: 9.5em; justify-content: center; }
+.cam-bar .cam-talk.on { background: var(--danger, #d64545); border-color: var(--danger, #d64545); color: #fff; }
+.cam-bar .cam-talk.on .icon { animation: cam-talk-pulse 1.4s ease-in-out infinite; }
+@keyframes cam-talk-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .cam-bar .cam-talk.on .icon { animation: none; } }
+.cam-talk-note { flex: 1 1 100%; margin: 0; font-size: 0.85rem; }
 
 /* Settings forms, the floor plan editor, the month calendar and search boxes. */
 
@@ -1862,6 +1964,7 @@ const ICONS = {
   pause: 'M14,19H18V5H14M6,19H10V5H6V19Z',
   skipNext: 'M16,18H18V6H16M6,18L14.5,12L6,6V18Z',
   skipPrev: 'M6,18V6H8V18H6M9.5,12L18,6V18L9.5,12Z',
+  mic: 'M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z',
   volumeLow: 'M5,9V15H9L14,20V4L9,9H5M18.5,12C18.5,10.23 17.5,8.71 16,7.97V16C17.5,15.29 18.5,13.76 18.5,12Z',
   volumeHigh: 'M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z',
   volumeOff: 'M12,4L9.91,6.09L12,8.18M4.27,3L3,4.27L7.73,9H3V15H7L12,20V13.27L16.25,17.53C15.58,18.04 14.83,18.46 14,18.7V20.77C15.38,20.45 16.63,19.82 17.68,18.96L19.73,21L21,19.73L12,10.73M19,12C19,12.94 18.8,13.82 18.46,14.64L19.97,16.15C20.62,14.91 21,13.5 21,12C21,7.72 18,4.14 14,3.23V5.29C16.89,6.15 19,8.83 19,12M16.5,12C16.5,10.23 15.5,8.71 14,7.97V10.18L16.45,12.63C16.5,12.43 16.5,12.21 16.5,12Z',
@@ -1899,6 +2002,7 @@ const ICONS = {
   speaker: 'M12,12A3,3 0 0,0 9,15A3,3 0 0,0 12,18A3,3 0 0,0 15,15A3,3 0 0,0 12,12M12,20A5,5 0 0,1 7,15A5,5 0 0,1 12,10A5,5 0 0,1 17,15A5,5 0 0,1 12,20M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8C10.89,8 10,7.1 10,6C10,4.89 10.89,4 12,4M17,2H7C5.89,2 5,2.89 5,4V20A2,2 0 0,0 7,22H17A2,2 0 0,0 19,20V4C19,2.89 18.1,2 17,2Z',
   tablet: 'M19,18H5V6H19M21,4H3C1.89,4 1,4.89 1,6V18A2,2 0 0,0 3,20H21A2,2 0 0,0 23,18V6C23,4.89 22.1,4 21,4Z',
   tv: 'M21,17H3V5H21M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V21H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3Z',
+  suitcase: 'M17,6H15V3A1,1 0 0,0 14,2H10A1,1 0 0,0 9,3V6H7A2,2 0 0,0 5,8V19A2,2 0 0,0 7,21A1,1 0 0,0 8,22A1,1 0 0,0 9,21H15A1,1 0 0,0 16,22A1,1 0 0,0 17,21A2,2 0 0,0 19,19V8A2,2 0 0,0 17,6M10.5,3.5H13.5V6H10.5V3.5M9,18H7.5V9H9V18M12.75,18H11.25V9H12.75V18M16.5,18H15V9H16.5V18Z',
   cctv: 'M6.03 12.03L8.03 15.5L5.5 18.68L2 12.62L6.03 12.03M17 18V15.29C17.88 14.9 18.5 14.03 18.5 13C18.5 12.43 18.3 11.9 17.97 11.5L19.94 10.35C20.95 9.76 21.3 8.47 20.71 7.46L19.33 5.06C18.74 4.05 17.45 3.7 16.44 4.28L8.31 9C7.36 9.53 7.03 10.75 7.58 11.71L9.08 14.31C9.63 15.26 10.86 15.59 11.81 15.04L13.69 13.96C13.94 14.55 14.41 15.03 15 15.29V18C15 19.1 15.9 20 17 20H22V18H17Z',
 };
 
@@ -4466,6 +4570,11 @@ async function importFloorPlan(file) {
 //    address works in a plain <img> without any headers.
 //  - Live video tries, in order, what the camera offers: WebRTC (go2rtc, Nest and others; lowest
 //    delay), then HLS (the stream integration), then the Motion JPEG proxy every camera has.
+//  - Talking back (two-way audio, Home Assistant 2026.11+): when Home Assistant says the camera can
+//    take audio (camera/capabilities two_way_audio, which needs the Labs "Two-way audio" switch and
+//    a WebRTC stream), the microphone goes to the camera as the audio track of the WebRTC call, the
+//    same way Home Assistant's own camera dialog does it. Browsers only give the microphone to
+//    pages opened over HTTPS (or localhost).
 
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js';
 const KIND_LABELS = { web_rtc: 'WebRTC', hls: 'HLS', mjpeg: 'MJPEG' };
@@ -4528,16 +4637,30 @@ class CameraPlayer {
     this.kind = null;
     this.media = null;
     this.muted = true;
+    this.canTalk = false; // Home Assistant says this camera takes audio back
+    this.mic = null; // the microphone track while talking
+    this.micSender = null; // where the microphone goes in the current call
+    this.talkState = 'off'; // off | connecting | on | denied
+    this.onTalk = null; // (state, message) => {}
+  }
+
+  /** Talking needs a secure page: browsers refuse the microphone over plain http. */
+  static get talkAllowed() {
+    return !!(window.isSecureContext && navigator.mediaDevices?.getUserMedia);
   }
 
   get video() {
     return this.media?.tagName === 'VIDEO' ? this.media : null;
   }
 
-  async start() {
-    this.stop();
-    const run = ++this.run;
-    const kinds = [...(await this._streamKinds()), 'mjpeg'];
+  async start({ keepMic = false } = {}) {
+    this.run++;
+    if (!keepMic) this._dropMic();
+    this._teardown();
+    const run = this.run;
+    let kinds = [...(await this._streamKinds()), 'mjpeg'];
+    if (run !== this.run) return;
+    if (this.mic) kinds = kinds.filter((k) => k === 'web_rtc'); // only WebRTC carries the voice
     let lastError = null;
     for (const kind of kinds) {
       if (run !== this.run) return;
@@ -4547,18 +4670,87 @@ class CameraPlayer {
         await this[`_${kind}`](run);
         if (run !== this.run) return;
         this.onState({ phase: 'playing', kind });
+        if (this.mic && this.micSender) this._setTalk('on');
         return;
       } catch (err) {
         lastError = err;
         this._teardown();
       }
     }
-    if (run === this.run) this.onState({ phase: 'failed', kind: null, message: lastError?.message || 'No live video' });
+    if (run !== this.run) return;
+    if (this.mic) {
+      // The camera wouldn't take the microphone: carry on watching without it.
+      this._dropMic();
+      this._setTalk('off', 'The camera would not take the microphone, so talking is off.');
+      this.start();
+      return;
+    }
+    this.onState({ phase: 'failed', kind: null, message: lastError?.message || 'No live video' });
   }
 
   stop() {
     this.run++;
+    this._dropMic();
     this._teardown();
+  }
+
+  /** Starts or stops sending the microphone to the camera. */
+  async toggleTalk() {
+    if (this.talkState === 'on' || this.talkState === 'connecting') {
+      this.talkRun = (this.talkRun || 0) + 1;
+      const restarting = this.talkState === 'connecting' && !!this.mic; // mid-way through the call with the microphone
+      this._dropMic();
+      this._setTalk('off');
+      if (restarting) this.start(); // cancel: back to the plain stream
+      return;
+    }
+    if (!this.canTalk) return;
+    if (!CameraPlayer.talkAllowed) {
+      this._setTalk('off', 'Talking needs Home Assistant opened over https, so the browser can use the microphone.');
+      return;
+    }
+    const talkRun = this.talkRun = (this.talkRun || 0) + 1;
+    this._setTalk('connecting');
+    let track;
+    try {
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      track = ms.getAudioTracks()[0];
+    } catch (err) {
+      if (talkRun !== this.talkRun) return;
+      const denied = err?.name === 'NotAllowedError' || err?.name === 'SecurityError';
+      this._setTalk(denied ? 'denied' : 'off', denied
+        ? 'The microphone is blocked. Allow it for this page in the browser or app settings, then try again.'
+        : `No microphone to use (${err?.message || err}).`);
+      return;
+    }
+    if (talkRun !== this.talkRun || !track) { track?.stop(); return; }
+    this.mic = track;
+    this.setMuted(false); // hear the visitor while talking
+    if (this.micSender && this.pc) {
+      // The call was set up with a microphone before: swap it straight back in.
+      try {
+        await this.micSender.replaceTrack(track);
+        if (talkRun === this.talkRun) this._setTalk('on');
+        return;
+      } catch { /* fall through and call again */ }
+    }
+    // Adding a microphone to a running call isn't supported everywhere (go2rtc answers with a
+    // new fingerprint), so like Home Assistant, start a new call that carries it.
+    this.start({ keepMic: true });
+  }
+
+  _dropMic() {
+    if (this.mic) {
+      this.mic.stop(); // stop, not mute, so the browser lets go of the microphone
+      this.mic = null;
+    }
+    this.micSender?.replaceTrack(null).catch(() => {});
+    if (this.talkState === 'on' || this.talkState === 'connecting') this._setTalk('off');
+  }
+
+  _setTalk(state, message) {
+    this.talkState = state;
+    this.onTalk?.(state, message);
   }
 
   setMuted(muted) {
@@ -4584,6 +4776,7 @@ class CameraPlayer {
     try {
       const res = await this.client.send({ type: 'camera/capabilities', entity_id: this.entityId });
       types = res?.frontend_stream_types;
+      this.canTalk = !!res?.two_way_audio && !!types?.includes('web_rtc');
     } catch {
       // Older Home Assistant: the camera says in its attributes, else try HLS and see.
       const attr = s?.attributes?.frontend_stream_type;
@@ -4600,6 +4793,7 @@ class CameraPlayer {
     }
     this.pc?.close();
     this.pc = null;
+    this.micSender = null;
     this.hls?.destroy();
     this.hls = null;
     const m = this.media;
@@ -4664,7 +4858,8 @@ class CameraPlayer {
     this.pc = pc;
     if (cfg.dataChannel) pc.createDataChannel(cfg.dataChannel);
     pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (this.mic) this.micSender = pc.addTransceiver(this.mic, { direction: 'sendrecv' }).sender;
+    else pc.addTransceiver('audio', { direction: 'recvonly' });
     const stream = new MediaStream();
     pc.addEventListener('track', (e) => stream.addTrack(e.track));
     const video = this._newVideo();
@@ -8346,10 +8541,12 @@ function musicPlayers(states, { ok = () => true, platform = () => '', hidden = {
 function musicMain(players, picked = '', hereId = '') {
   if (players.account) return players.account;
   const sp = players.speakers;
+  // This screen's own speaker comes before whatever else is playing, so a tap on a playlist plays here
+  // (another speaker reporting "playing", such as a phone app, mustn't steal the card).
   return sp.find((s) => s.entity_id === picked)
+    || sp.find((s) => s.entity_id === hereId)
     || sp.find((s) => s.state === 'playing')
     || sp.find((s) => s.state === 'paused')
-    || sp.find((s) => s.entity_id === hereId)
     || sp[0] || null;
 }
 
@@ -8599,15 +8796,14 @@ class ScreenSpeaker {
   /** Call straight from a tap: wakes the audio before anything else is awaited. */
   unlock() {
     const p = this.player;
-    if (!p) return;
-    const before = this.needsTap;
+    if (!p || !this.needsTap) return; // already making sound: leave every other tap alone
     try {
-      p.unlock().then(() => this.onChange?.(), () => {});
+      p.unlock().then(() => { if (!this.needsTap) this.onChange?.(); }, () => {});
       // Audio that started before the first tap left its <audio> element paused; start it in the gesture.
       const el = p.scheduler?.audioElement;
       if (el?.paused && (el.srcObject || el.src)) el.play().catch(() => {});
     } catch { /* not ready */ }
-    if (before) setTimeout(() => this.onChange?.(), 300);
+    setTimeout(() => { if (!this.needsTap) this.onChange?.(); }, 300);
   }
 
   _set(patch) {
@@ -8624,7 +8820,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '10 Nov 2026, 20:37 (1bc5fa9)';
+const DASH_BUILD = '16 Nov 2026, 11:10 (ff01dd4)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -9152,9 +9348,13 @@ function calWhoSettingsHtml() {
  * The household for "Who": every person in Home Assistant except wall tablets, first names. Not the
  * Places list, so hiding someone from this screen's map (or their phone being off) doesn't drop them.
  */
+// Logins for screens (a wall tablet, a TV app) are persons in Home Assistant too, but not people.
+const SCREEN_NAME = /wall|display|kiosk|tablet|ipad|dashboard|\btv\b|tv$/i;
+const isScreenLogin = (p) => SCREEN_NAME.test(p.name) || SCREEN_NAME.test(p.id.split('.')[1] || '');
+
 function household() {
   return peopleOf(store.states)
-    .filter((p) => domainOf(p.id) === 'person' && !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name))
+    .filter((p) => domainOf(p.id) === 'person' && !isScreenLogin(p))
     .map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
 }
 
@@ -9403,8 +9603,8 @@ function shownPeople() {
   const hidden = store.prefs.hiddenPeople;
   return peopleOf(store.states).filter((p) => {
     if (p.unavailable && !p.located) return false;
-    if (hidden) return !hidden[p.id];
-    return !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name);
+    if (hidden && p.id in hidden) return !hidden[p.id];
+    return !isScreenLogin(p);
   });
 }
 
@@ -9504,13 +9704,66 @@ function summaryText() {
 // Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
 function binsHtml(now) {
   const b = binNight(store.states, now);
-  if (!b) return '';
+  // Only on bin day itself: the rest of the week the chip is just clutter (a reminder comes at 6 pm).
+  if (!b || b.when !== 'tonight') return '';
   const words = binWords(b.colours);
   const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
   return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
     <span class="bins-ic">${b.colours.map((c) => binSvg(c.hex)).join('')}</span>
     <span class="bins-text">${esc(b.when === 'tonight' ? 'Bins out tonight' : b.when === 'tomorrow night' ? 'Bins tomorrow' : b.when ? `Bins ${b.when.slice(0, 3)}` : 'Bins')}</span>
   </button>`;
+}
+
+// Modes: house-wide switches (input_booleans) in their own card on Today. Sleep in and holiday mode get their
+// own icon, colour and wording; any other input_boolean whose id ends in "_mode" (guest_mode...) shows too.
+// Sleep in (homeassistant/sleep_in.yaml) keeps the bedroom blind shut in the morning and turns off at noon.
+const MODES = [
+  { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
+    on: 'Bedroom blind stays shut. Turns off at noon.',
+    off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode', short: 'Holiday',
+    on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
+];
+
+function modeList() {
+  const out = [];
+  for (const m of MODES) {
+    const s = [...store.states.values()].find((x) => m.match.test(x.entity_id));
+    if (s) out.push({ ...m, s });
+  }
+  for (const s of store.states.values()) {
+    if (!/^input_boolean\.\w+_mode$/.test(s.entity_id) || out.some((m) => m.s === s)) continue;
+    out.push({ key: 'other', icon: 'input_boolean', name: nameOf(s), on: 'On', off: () => 'Off', s });
+  }
+  return out.filter((m) => !['unknown', 'unavailable'].includes(m.s.state));
+}
+
+function modesHtml() {
+  const modes = modeList();
+  if (!modes.length) return '';
+  const now = new Date();
+  return `<section class="card modes-card">
+    <h2 class="card-title">${icon('input_boolean')}Modes</h2>
+    <div class="modes">${modes.map((m) => {
+      const s = shown(m.s);
+      const on = s.state === 'on';
+      return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
+        <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
+          <span class="mode-ic">${icon(m.icon)}</span>
+          <span class="mode-text"><b><span class="mode-name">${esc(m.name)}</span><span class="mode-short">${esc(m.short || m.name)}</span></b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
+        </button>
+      </div>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+// While a mode is on, a coloured chip beside the bins says so (tap to turn it off).
+function modeChipsHtml() {
+  return modeList().filter((m) => m.key !== 'other' && shown(m.s).state === 'on').map((m) =>
+    `<span class="mode-chip-wrap" data-entity="${esc(m.s.entity_id)}"><button type="button" class="mode-chip mode-${m.key}" data-act="toggle" title="Tap to turn ${esc(m.name.toLowerCase())} off">
+      ${icon(m.icon)}<span>${esc(m.key === 'sleep' ? 'Sleeping in' : m.name)}</span>
+    </button></span>`).join('');
 }
 
 function heroHtml() {
@@ -9523,15 +9776,13 @@ function heroHtml() {
   const name = (store.user?.name || '').split(/\s+/)[0];
   const warnings = [...store.states.values()].find((s) => domainOf(s.entity_id) === 'sensor' && /warnings?$/i.test(s.entity_id) && Number(s.state) > 0);
   const { text, by } = summaryText();
-  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
-    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
   return `<section class="card hero">
     <div class="hero-top">
       <div class="hero-when">
         <p class="hero-greet">${esc(greetingFor(now))}${name ? `, ${esc(name)}` : ''}</p>
         <p class="hero-time">${esc(fmtTime(now).replace(/\s?[ap]\.?m\.?$/i, ''))}</p>
         <p class="hero-date">${esc(now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
-        ${binsHtml(now)}
+        <div class="hero-chips">${binsHtml(now)}${modeChipsHtml()}</div>
       </div>
       ${w ? `<button type="button" class="hero-weather" data-open-entity="${esc(w.entity_id)}" aria-label="Weather">
         <span class="wx-now">${icon('weather')}<b>${deg(a.temperature)}</b></span>
@@ -9541,6 +9792,15 @@ function heroHtml() {
     </div>
     ${warnings ? `<button type="button" class="warn-banner" data-open-entity="${esc(warnings.entity_id)}">${icon('alert')}${esc(plural(Number(warnings.state), 'weather warning'))} for your area</button>` : ''}
     ${store.prefs.brief ? `<p class="hero-summary">${esc(text)}${by ? `<small> · written by ${esc(by)}</small>` : ''}</p>` : ''}
+  </section>`;
+}
+
+// Right now: open doors, someone at a camera, appliances running, lights left on. Its own card, beside the map.
+function nowCardHtml() {
+  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
+    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
+  if (!glance.length) return '';
+  return `<section class="card now-card">
     ${glance.length ? `<ul class="glance" aria-label="Right now">${glance.map((g) => `
       <li class="glance-item tone-${g.tone}">
         <button type="button" ${g.open ? `data-open-entity="${esc(g.open)}"` : g.href ? `data-href="${esc(g.href === '#/solar' ? '#/energy' : g.href.replace('#/entities', '#/home'))}"` : 'disabled'}>
@@ -9574,7 +9834,7 @@ function agendaHtml() {
       : `${dayBlock(today, 'Today')}${dayBlock(calAddDays(today, 1), 'Tomorrow')}`;
   // "Everyone" or one person's events (with the shared ones); remembered on this screen.
   const filter = vw.people.length > 1 && writableCals().length ? `<div class="who-filter" role="group" aria-label="Whose events">
-      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">Everyone</button>
+      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">${vw.people.length === 2 ? 'Both' : 'Everyone'}</button>
       ${vw.people.map((p) => `<button type="button" data-cal-for="${esc(p.id)}" aria-pressed="${vw.forId === p.id}" style="--cal:${p.color}">${esc(p.name)}</button>`).join('')}
     </div>` : '';
   return `<section class="card agenda-card${month ? ' month' : ''}">
@@ -9589,25 +9849,21 @@ function agendaHtml() {
   </section>`;
 }
 
+// Energy on Today: just the battery level and what it's doing; the Energy page has the rest.
 function energyMiniHtml() {
   if (!store.prefs.energyTab) return '';
   const e = energyNow();
   if (!e.flow.found) return '';
   const f = e.flow;
   const soc = f.soc;
-  const state = f.charging > 0.05 ? `Charging ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Using ${energyPower(f.discharging)}` : soc >= 99.5 ? 'Full' : 'Resting';
-  const sold = e.today.sold?.kwh;
-  return `<a class="card energy-mini" href="#/energy">
-    <h2 class="card-title">${icon('solar')}Energy<span class="card-go">${icon('chevronRight')}</span></h2>
-    <div class="em-row">
-      ${soc != null ? `<div class="ring" style="--p:${Math.max(0, Math.min(100, soc))}"><b>${Math.round(soc)}%</b><small>${esc(state)}</small></div>` : ''}
-      <dl class="em-stats">
-        <div><dt>Solar</dt><dd>${energyPower(f.solar)}</dd></div>
-        <div><dt>${f.selling > 0.05 ? 'Selling' : f.buying > 0.05 ? 'Buying' : 'Grid'}</dt><dd class="${f.selling > 0.05 ? 'pos' : f.buying > 0.05 ? 'neg' : ''}">${energyPower(f.selling > 0.05 ? f.selling : f.buying || 0)}</dd></div>
-        ${sold != null ? `<div><dt>Sold</dt><dd class="pos">${sold.toFixed(1)}<small class="u"> kWh</small>${e.rates.feedIn ? `<small>${money(sold * e.rates.feedIn)}</small>` : ''}</dd></div>` : ''}
-        ${e.today.pv ? `<div><dt>Made</dt><dd>${e.today.pv.kwh.toFixed(1)}<small class="u"> kWh</small></dd></div>` : ''}
-      </dl>
-    </div>
+  const [tone, state] = f.buying > 0.05 ? ['neg', `Using grid · ${energyPower(f.buying)}`]
+    : f.charging > 0.05 ? ['pos', `Charging · ${energyPower(f.charging)}`]
+      : soc != null && soc >= 99.5 ? ['pos', f.selling > 0.05 ? `Full · selling ${energyPower(f.selling)}` : 'Full']
+        : f.discharging > 0.05 ? ['bat', 'Running the house'] : ['bat', f.selling > 0.05 ? `Selling ${energyPower(f.selling)}` : 'Resting'];
+  return `<a class="card energy-mini" href="#/energy" aria-label="Energy">
+    <span class="em-label">${icon('solar')}<span>Battery</span></span>
+    ${soc != null ? `<b class="em-soc">${Math.round(soc)}%</b><span class="em-bar" style="--p:${Math.max(0, Math.min(100, soc))}%"><i></i></span>` : `<b class="em-soc">${energyPower(f.solar)}</b><span class="em-bar"></span>`}
+    <span class="em-state ${tone}"><i></i>${esc(state)}</span>
   </a>`;
 }
 
@@ -9625,11 +9881,11 @@ function peopleMiniHtml() {
 
 function notesCardHtml({ limit = 5 } = {}) {
   if (!store.prefs.notifications) return '';
-  const items = noteItems(notes);
+  const items = shownNotes();
   return `<section class="card notes-card" id="notes">
     <h2 class="card-title">${icon('bell')}Notifications${items.length ? `<span class="count">${items.length}</span>` : ''}</h2>
     ${items.length ? notesList(items.slice(0, limit)) : '<p class="muted quiet">Nothing new. Notifications from Home Assistant and your automations show up here.</p>'}
-    ${items.length > limit ? `<button type="button" class="link-btn" data-open-notes>See all ${items.length}</button>` : ''}
+    ${items.length ? `<div class="notes-foot">${items.length > limit ? `<button type="button" class="link-btn" data-open-notes>See all ${items.length}</button>` : ''}${clearAllBtn()}</div>` : ''}
   </section>`;
 }
 
@@ -9641,7 +9897,7 @@ function notesList(items) {
       <p>${esc(n.message)}</p>
       <small class="muted">${esc([relativeTime(n.at), n.kind === 'sent' && n.to ? `to ${n.to}` : n.kind === 'ha' ? 'in Home Assistant' : ''].filter(Boolean).join(' · '))}</small>
     </div>
-    ${n.kind === 'ha' ? `<button type="button" class="icon-btn" data-dismiss="${esc(n.id)}" aria-label="Dismiss">${icon('close')}</button>` : ''}
+    <button type="button" class="icon-btn" data-dismiss="${esc(n.id)}" data-kind="${n.kind}" aria-label="Dismiss">${icon('close')}</button>
   </li>`).join('')}</ul>`;
 }
 
@@ -10225,7 +10481,8 @@ function camEditAct(act) {
 
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
-const screenSpeaker = new ScreenSpeaker(() => queueRefresh());
+// Only the Music card shows the speaker on Today, so only it is redrawn there.
+const screenSpeaker = new ScreenSpeaker(() => (ui.view === 'today' ? queueMusicPaint() : queueRefresh()));
 
 function musicName() {
   return (store.prefs.musicName || '').trim() || (store.prefs.wall || urlWall ? (IS_IPAD ? 'Wall iPad' : 'Wall screen') : 'Dashboard');
@@ -10261,7 +10518,7 @@ async function loadMusicLists(players, main) {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
   }
-  queueRefresh();
+  if (ui.view === 'today') queueMusicPaint(); else queueRefresh();
 }
 
 function musicHtml() {
@@ -10309,15 +10566,16 @@ function musicPick(id) {
   if (players.kind === 'mass' && main && main.entity_id !== id && main.state === 'playing') {
     call('music_assistant', 'transfer_queue', { source_player: main.entity_id, auto_play: true }, id);
   }
-  render();
+  if (ui.view === 'today') { music.html = ''; paintMusic(); } else render();
 }
 
 function musicPlay(i) {
   const l = music.lists?.[i];
   const { main } = musicState();
   if (!l || !main) return;
-  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id)
-    .then(() => toast(`Playing ${l.title}`));
+  // Say so straight away: Music Assistant takes a few seconds to fetch a Spotify playlist.
+  toast(`Starting ${l.title} on ${nameOf(main)}…`);
+  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id);
 }
 
 function musicSettingsHtml(check) {
@@ -10351,9 +10609,8 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}<div class="music-slot"></div></div>
-      <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
-      <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
   },
 
@@ -10493,7 +10750,7 @@ const VIEWS = {
     const embedded = store.authMode === 'embedded';
     const ids = store.states.size ? energyIds() : {};
     const people = peopleOf(store.states);
-    const hidden = (pp) => (p.hiddenPeople ? !!p.hiddenPeople[pp.id] : /wall|display|kiosk|tablet|ipad|dashboard/i.test(pp.name));
+    const hidden = (pp) => (p.hiddenPeople && pp.id in p.hiddenPeople ? !!p.hiddenPeople[pp.id] : isScreenLogin(pp));
     const { lists, events } = newsSources(store.states);
     const cals = calendarsOf(store.states);
     const colors = calColors();
@@ -10855,9 +11112,9 @@ function renderSheet() {
     if (d.querySelector('[data-ev-form]')?.dataset.key === sh.id && d.open) return;
     setSheet(d, eventSheetHtml(sh));
   } else if (sh.kind === 'notes') {
-    const items = noteItems(notes);
+    const items = shownNotes();
     setSheet(d, `${sheetHead('Notifications', plural(items.length, 'notification'), { ic: 'bell' })}
-      <div class="sheet-body">${items.length ? notesList(items) : '<p class="muted">Nothing new.</p>'}</div>`);
+      <div class="sheet-body">${items.length ? `${notesList(items)}<div class="notes-foot">${clearAllBtn()}</div>` : '<p class="muted">Nothing new.</p>'}</div>`);
     markNotesSeen();
   }
 }
@@ -10887,6 +11144,11 @@ function renderCameraSheet(s, sh) {
       <div class="cam-status"><div class="spinner"></div><span class="cam-status-text">Connecting…</span>
         <button type="button" class="btn" data-cam="retry">Try again</button></div>
       <span class="cam-kind"></span>
+    </div>
+    <div class="cam-bar" hidden>
+      <button type="button" class="btn cam-talk" data-cam="talk" hidden aria-pressed="false">${icon('mic')}<span>Talk</span></button>
+      <button type="button" class="btn cam-sound" data-cam="sound" hidden aria-pressed="false">${icon('volumeOff')}<span>Sound off</span></button>
+      <p class="cam-talk-note muted" hidden></p>
     </div>`;
   paintCameras(d);
   camPlayer = new CameraPlayer({
@@ -10897,9 +11159,43 @@ function renderCameraSheet(s, sh) {
       st.dataset.phase = phase;
       $('.cam-status-text', st).textContent = phase === 'failed' ? `No live video. ${message || ''}` : `Connecting${kind ? ` (${streamLabel(kind)})` : ''}…`;
       $('.cam-kind', st).textContent = phase === 'playing' ? `Live · ${streamLabel(kind)}` : '';
+      paintCamBar();
     },
   });
+  camTalkNote = '';
+  camPlayer.onTalk = (state, message) => {
+    if (message || state === 'on' || state === 'connecting') camTalkNote = message || '';
+    paintCamBar();
+  };
   camPlayer.start();
+}
+
+/** The buttons under the live video: Talk (when Home Assistant says the camera can take audio) and Sound. */
+let camTalkNote = ''; // why talking stopped or didn't start, shown under the buttons
+function paintCamBar() {
+  const bar = $('#sheet .cam-bar');
+  const p = camPlayer;
+  if (!bar || !p) return;
+  const phase = $('#sheet .cam-stage')?.dataset.phase;
+  const talk = $('.cam-talk', bar);
+  const sound = $('.cam-sound', bar);
+  const note = $('.cam-talk-note', bar);
+  const talking = p.talkState === 'on' || p.talkState === 'connecting';
+  talk.hidden = !p.canTalk;
+  talk.classList.toggle('on', talking);
+  talk.setAttribute('aria-pressed', String(talking));
+  talk.disabled = !talking && (phase !== 'playing' || p.talkState === 'denied');
+  $('span', talk).textContent = p.talkState === 'connecting' ? 'Connecting…' : talking ? 'Stop talking' : 'Talk';
+  sound.hidden = phase !== 'playing' || !p.hasAudio;
+  sound.setAttribute('aria-pressed', String(!p.muted));
+  sound.innerHTML = `${icon(p.muted ? 'volumeOff' : 'volumeHigh')}<span>${p.muted ? 'Sound off' : 'Sound on'}</span>`;
+  // Say why talking won't work before anyone presses it: no https means no microphone.
+  const insecure = p.canTalk && !CameraPlayer.talkAllowed;
+  const why = camTalkNote || (insecure ? 'Talking needs Home Assistant opened over https (its outside address), so the browser can use the microphone.' : '');
+  note.textContent = why;
+  note.hidden = !why;
+  if (insecure) talk.disabled = true;
+  bar.hidden = talk.hidden && sound.hidden && note.hidden;
 }
 
 function stopCamera() {
@@ -10919,10 +11215,58 @@ const NOTES_KEY = 'ha-dash.notify-log'; // shared with the old dashboard, so his
 const notes = { persistent: [], sent: readLocal(NOTES_KEY, []), canSeeSent: true };
 const ding = new Ding();
 const SEEN_KEY = 'ha-dash2.notes-seen';
+// What's been cleared from the sent list: everything up to `before`, plus single ones by id.
+// Shared between screens (Home Assistant user data), because each screen keeps its own copy of the
+// log and would otherwise bring cleared ones back the next time it merges.
+const CLEARED_KEY = 'ha-dash2.notes-cleared';
+let cleared = normCleared(readLocal(CLEARED_KEY, null));
+let clearArmed = 0; // "Clear all" needs a second tap within a few seconds
+
+function normCleared(c) {
+  return { before: Number(c?.before) || 0, ids: Array.isArray(c?.ids) ? c.ids.slice(-100) : [] };
+}
+function shownSent() {
+  return notes.sent.filter((n) => Date.parse(n.at || 0) > cleared.before && !cleared.ids.includes(n.id));
+}
+function shownNotes() {
+  return noteItems({ persistent: notes.persistent, sent: shownSent() });
+}
+function mergeCleared(other) {
+  const c = normCleared(other);
+  cleared = normCleared({ before: Math.max(cleared.before, c.before), ids: [...new Set([...cleared.ids, ...c.ids])] });
+}
+function saveCleared(next) {
+  mergeCleared(next);
+  // Ids older than the cut-off are covered by it.
+  cleared.ids = cleared.ids.filter((id) => notes.sent.some((n) => n.id === id && Date.parse(n.at || 0) > cleared.before));
+  writeLocal(CLEARED_KEY, cleared);
+  notes.sent = shownSent();
+  writeLocal(NOTES_KEY, notes.sent);
+  store.client?.send({ type: 'frontend/set_user_data', key: CLEARED_KEY, value: cleared }).catch(() => {});
+  store.client?.send({ type: 'frontend/set_user_data', key: NOTES_KEY, value: notes.sent }).catch(() => {});
+}
+function clearAllBtn() {
+  const armed = Date.now() - clearArmed < 4000;
+  return `<button type="button" class="link-btn${armed ? ' armed' : ''}" data-clear-notes>${armed ? 'Tap again to clear all' : 'Clear all'}</button>`;
+}
+function clearAllNotes() {
+  if (Date.now() - clearArmed > 4000) {
+    clearArmed = Date.now();
+    render(); renderSheet();
+    setTimeout(() => { if (clearArmed && Date.now() - clearArmed >= 4000) { clearArmed = 0; render(); renderSheet(); } }, 4100);
+    return;
+  }
+  clearArmed = 0;
+  if (notes.persistent.length) call('persistent_notification', 'dismiss_all', {});
+  notes.persistent = [];
+  saveCleared({ before: Date.now() });
+  toast('Notifications cleared');
+  render(); renderSheet();
+}
 
 function unseen() {
   const seen = Number(readLocal(SEEN_KEY, 0)) || 0;
-  return noteItems(notes).filter((n) => Date.parse(n.at || 0) > seen).length;
+  return shownNotes().filter((n) => Date.parse(n.at || 0) > seen).length;
 }
 function markNotesSeen() {
   writeLocal(SEEN_KEY, Date.now());
@@ -10963,8 +11307,9 @@ async function subscribeNotes(client) {
     if (arrived) noteArrived();
   }).catch(() => {});
 
-  const shared = await dataGet('user', NOTES_KEY);
+  const [shared, sharedCleared] = await Promise.all([dataGet('user', NOTES_KEY), dataGet('user', CLEARED_KEY)]);
   if (client !== store.client) return;
+  if (sharedCleared) { mergeCleared(sharedCleared); writeLocal(CLEARED_KEY, cleared); }
   notes.sent = noteMerge(notes.sent, Array.isArray(shared) ? shared : []);
   writeLocal(NOTES_KEY, notes.sent);
   try {
@@ -10972,12 +11317,14 @@ async function subscribeNotes(client) {
       const note = noteFromCall(event);
       if (!note) return;
       const fresh = !notes.sent.some((n) => n.id === note.id);
+      const [latest, latestCleared] = await Promise.all([dataGet('user', NOTES_KEY), dataGet('user', CLEARED_KEY)]);
+      if (latestCleared) mergeCleared(latestCleared);
       notes.sent = noteMerge(notes.sent, [note]);
       if (fresh) noteArrived();
       writeLocal(NOTES_KEY, notes.sent);
       queueRefresh();
-      const latest = await dataGet('user', NOTES_KEY);
       notes.sent = noteMerge(notes.sent, Array.isArray(latest) ? latest : []);
+      notes.sent = shownSent();
       client.send({ type: 'frontend/set_user_data', key: NOTES_KEY, value: notes.sent }).catch(() => {});
     });
   } catch {
@@ -11190,10 +11537,15 @@ document.addEventListener('click', (e) => {
     call('todo', 'remove_completed_items', {}, shop.id);
     return;
   }
+  if (t.closest('[data-clear-notes]')) { clearAllNotes(); return; }
   const dis = t.closest('[data-dismiss]');
   if (dis) {
-    notes.persistent = notes.persistent.filter((n) => n.id !== dis.dataset.dismiss);
-    call('persistent_notification', 'dismiss', { notification_id: dis.dataset.dismiss });
+    const id = dis.dataset.dismiss;
+    if (dis.dataset.kind === 'sent') saveCleared({ ids: [id] });
+    else {
+      notes.persistent = notes.persistent.filter((n) => n.id !== id);
+      call('persistent_notification', 'dismiss', { notification_id: id });
+    }
     render(); renderSheet();
     return;
   }
@@ -11224,6 +11576,8 @@ document.addEventListener('click', (e) => {
   const floor = t.closest('[data-floor]');
   if (floor) { planStore.floor = floor.dataset.floor; render(); return; }
   if (t.closest('[data-cam="retry"]')) { camPlayer?.start(); return; }
+  if (t.closest('[data-cam="talk"]')) { camPlayer?.toggleTalk(); paintCamBar(); return; }
+  if (t.closest('[data-cam="sound"]')) { camPlayer?.setMuted(!camPlayer.muted); paintCamBar(); return; }
 
   const a = t.closest('[data-act]');
   if (a) {
@@ -11339,8 +11693,8 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.personShow) {
     const hidden = store.prefs.hiddenPeople || Object.fromEntries(peopleOf(store.states)
-      .filter((p) => /wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name)).map((p) => [p.id, true]));
-    if (t.checked) delete hidden[t.dataset.personShow]; else hidden[t.dataset.personShow] = true;
+      .filter(isScreenLogin).map((p) => [p.id, true]));
+    hidden[t.dataset.personShow] = !t.checked;
     store.prefs.hiddenPeople = hidden;
     writePrefs();
     return;

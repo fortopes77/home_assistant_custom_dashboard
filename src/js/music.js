@@ -42,10 +42,12 @@ export function musicPlayers(states, { ok = () => true, platform = () => '', hid
 export function musicMain(players, picked = '', hereId = '') {
   if (players.account) return players.account;
   const sp = players.speakers;
+  // This screen's own speaker comes before whatever else is playing, so a tap on a playlist plays here
+  // (another speaker reporting "playing", such as a phone app, mustn't steal the card).
   return sp.find((s) => s.entity_id === picked)
+    || sp.find((s) => s.entity_id === hereId)
     || sp.find((s) => s.state === 'playing')
     || sp.find((s) => s.state === 'paused')
-    || sp.find((s) => s.entity_id === hereId)
     || sp[0] || null;
 }
 
@@ -295,15 +297,14 @@ export class ScreenSpeaker {
   /** Call straight from a tap: wakes the audio before anything else is awaited. */
   unlock() {
     const p = this.player;
-    if (!p) return;
-    const before = this.needsTap;
+    if (!p || !this.needsTap) return; // already making sound: leave every other tap alone
     try {
-      p.unlock().then(() => this.onChange?.(), () => {});
+      p.unlock().then(() => { if (!this.needsTap) this.onChange?.(); }, () => {});
       // Audio that started before the first tap left its <audio> element paused; start it in the gesture.
       const el = p.scheduler?.audioElement;
       if (el?.paused && (el.srcObject || el.src)) el.play().catch(() => {});
     } catch { /* not ready */ }
-    if (before) setTimeout(() => this.onChange?.(), 300);
+    setTimeout(() => { if (!this.needsTap) this.onChange?.(); }, 300);
   }
 
   _set(patch) {
