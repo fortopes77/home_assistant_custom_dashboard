@@ -47,11 +47,12 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 ## Today
 
 - **Hero:** a greeting, a big clock, the date and the weather now (tap it for the forecast). Below that is a short **summary of the day**: the weather, what's on and where everyone is. If Home Assistant has an AI integration (Anthropic, OpenAI or Google Gemini) with an **AI Task**, the AI writes the summary; otherwise a plain one is shown. To pick who writes it, or turn it off, use **Settings → Today**.
+- **Layout:** on a tablet or computer, Today is two columns that fit the screen without scrolling: the day, a slim **battery** bar (level, and whether it's charging, running the house or using the grid) and the calendar on the left; the map, Right now, Modes and the shopping list on the right. The menu floats at the bottom, with the bell and voice beside it. Notifications open from the bell, and news shows on phones.
 - **Right now** lists open doors, someone at a camera, appliances running and lights left on, with quick actions.
 - **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings. It's also a **family calendar** you can add to, see [Family calendar](#family-calendar).
 - **Music:** what's playing, with its cover, play/pause/skip, volume, your playlists and the speakers to play on. See [Music and Spotify](#music-and-spotify).
 - **Shopping list:** your Home Assistant to-do list. Tap an item to tick it off, type to add one, and use **Clear ticked** to tidy up.
-- **Notifications:** Home Assistant's own notices and what your automations sent to phones (`notify.*`). Tap **×** to dismiss one, or **Clear all** (tap twice) to empty the list on every screen; phone notifications drop off by themselves after a week. The **bell** in the top bar counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
+- **Notifications:** Home Assistant's own notices and what your automations sent to phones (`notify.*`). Tap **×** to dismiss one, or **Clear all** (tap twice) to empty the list on every screen; phone notifications drop off by themselves after a week. The **bell** (top bar on phones, beside the menu on tablets) counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
 - **News:** Feedreader feeds work, but Home Assistant only keeps the latest story from each, so the dashboard collects stories as they arrive and shares them between screens. For a full list straight away, add a sensor from the HACS **feedparser** integration:
   ```yaml
   sensor:
@@ -80,11 +81,13 @@ Then tap **This iPad** among the speakers on the card. If something is playing o
 - **One tap for sound:** iPads and iPhones only let a page make sound after the screen has been touched. After the page reloads (an update, or the nightly refresh on wall screens), the card shows **Tap to play on this iPad** until someone touches the screen.
 - The page reaches Music Assistant at the Home Assistant host on port **8927**, which the add-on opens. If Music Assistant runs somewhere else, put its address in **Settings → Music**. This only works when the dashboard is opened over `http` on your home network, because browsers block an `https` page from an `http` speaker connection.
 - It uses Music Assistant's own web player library (`@sendspin/sendspin-js`), which the page downloads from jsDelivr the first time.
+- **Open Spotify on a phone:** the card has a button for each Android phone with the Home Assistant app. Tapping one opens the Spotify app on that phone. On Android 10 and later, the Home Assistant app needs the **Display over other apps** permission for this. Without it, the phone gets a notification you tap to open Spotify. iPhones can't open apps this way. Turn the buttons off under **Settings → Music**.
+- **Phone players in Music Assistant:** Jellyfin app sessions on phones and browsers show up in Home Assistant as media players. They can't play Music Assistant's stream, so leave them out of Music Assistant's **Home Assistant MediaPlayers** provider.
 - **Without Music Assistant:** with Home Assistant's **Spotify** integration, the card controls your Spotify account and lists its Spotify Connect speakers. With neither, it controls whichever speaker or TV is playing. **Settings → Music** can take speakers off the card.
 
 ## Energy
 
-The Energy page shows a live power-flow diagram: solar, grid, house and battery, with a battery gauge and how long it will last. It also shows today's totals, money earned from selling to the grid, monthly and yearly exports, and 24-hour charts.
+The Energy page shows a live power-flow diagram: solar, grid, house and battery, with a battery gauge and how long it will last. It also shows today's totals, money earned from selling to the grid, and one 24-hour chart at a time (tap **Solar**, **Grid** or **Battery**). Monthly and yearly exports open from **This month** on the Today card. When the inverter has an on-grid/off-grid sensor (Sigenergy local Modbus: `sensor.sigen_plant_grid_connection_status`), the battery card shows **On grid** or **Off grid**. On a tablet or computer the page fits on one screen: battery and live flow on the left, today and the chart on the right.
 
 - Sensors are found by name. That works with the Sigenergy integrations and most others. If it picks the wrong ones, choose them under **Settings → Energy → Sensors and directions**.
 - Integrations disagree on whether a positive grid number means buying or selling, and whether a positive battery number means charging or discharging. The dashboard works this out from readings that add up. If an arrow points the wrong way, set it there yourself.
@@ -96,7 +99,7 @@ The Energy page shows a live power-flow diagram: solar, grid, house and battery,
 
 ## Places
 
-A map with everyone's phones and your zones, plus a card per person. Each card shows where they are and since when, their address, distance from home and phone battery. A person's sheet has **Show on the map** and **Directions**. Wall tablets that are set up as people are hidden from the map by default; choose who shows under **Settings → People and the map**.
+A map with everyone's phones and your zones, plus a card per person. Each card shows where they are and since when, their address, distance from home and phone battery. Beside the map are a **Garage door** card with an Open/Close button (any cover with device class `garage` or `gate`) and **Today**, a list of who left and arrived where since midnight, read from each person's history. A person's sheet has **Show on the map** and **Directions**. Wall tablets that are set up as people are hidden from the map by default; choose who shows under **Settings → People and the map**.
 
 The map library (Leaflet) comes from cdn.jsdelivr.net and the map pictures from OpenStreetMap, so the map needs internet.
 
@@ -124,9 +127,11 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 ## Bin night
 
-[`homeassistant/bin_night.yaml`](homeassistant/bin_night.yaml) is a package with a **Bin night** sensor and a 6 pm reminder on bin night, sent through the `notify_family` script. The sensor names the bins by colour ("Red and green"), alternating between two weeks, so it suits a fortnightly recycling and garden rotation. Set your bin night, a start date and each week's bins at the top of the file.
+[`homeassistant/bin_night.yaml`](homeassistant/bin_night.yaml) is a package with a **Bin night** sensor, a 6 pm reminder on bin night and a 6 pm "bring the bins in" reminder the next evening, sent through the `notify_family` script. The sensor names the bins by colour ("Red and green"), alternating between two weeks, so it suits a fortnightly recycling and garden rotation. Set your bin night, a start date and each week's bins at the top of the file.
 
-Today then shows little bins with those coloured lids under the date: "Bins Thu" during the week, "Bins tomorrow" the day before and "Bins out tonight" on the night. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
+On bin day, Today shows little bins with those coloured lids under the date ("Bins out tonight"); the rest of the week they stay out of the way. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
+
+[`homeassistant/car_arrivals.yaml`](homeassistant/car_arrivals.yaml) is a package that says **"Andrew is home"** when a family car pulls into the driveway. When a Reolink camera sees a vehicle, it asks the AI task (Gemini) to read the number plate from the snapshot. The family's plates are typed in on the dashboard under **Settings → Family cars**, with whose car each one is (a person, or any name), and kept in the package's `input_text.family_cars` helper so every screen and the automation share them. A matching plate (one misread character is allowed) sends "<owner> is home" with the photo through `notify_family`, but only if that person wasn't already home, so a car leaving isn't announced. Any other car gets a "Car in the driveway" alert with its plate. Take the driveway vehicle sensors out of the camera alert automation so cars aren't announced twice.
 
 ## Modes
 
@@ -137,6 +142,10 @@ Today has a **Modes** card under the greeting for house-wide switches. It shows:
 - Any other toggle helper whose id ends in `_mode` (for example `input_boolean.guest_mode`).
 
 Tap a row to switch it. While Sleep in or Holiday mode is on, a coloured chip beside the date says so; tap it to turn that mode off. The card is hidden when none of these helpers exist.
+
+## Quick controls (Home)
+
+A row across the top of Home: how many lights are on with **All off**, each garage door with **Open/Close**, open blinds with **Close** (flagged after dark), and any open doors. Status lights (notification, indicator, night light) and appliance doors are left out, as on Today.
 
 ## Floor plan (Home)
 

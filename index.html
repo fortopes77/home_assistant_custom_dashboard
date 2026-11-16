@@ -345,7 +345,7 @@ small { font-size: 0.8em; }
 
 .v-today { display: grid; gap: var(--gap); }
 .v-today .col { display: contents; }
-/* Phone order: the day, energy, calendar, shopping, notifications, people, news. */
+/* Phone order: the day, right now, modes, energy, calendar, shopping, notifications, people, news. */
 .hero { order: 1; }
 .energy-mini { order: 2; }
 .agenda-card { order: 3; }
@@ -353,7 +353,8 @@ small { font-size: 0.8em; }
 .notes-card { order: 5; }
 .people-mini { order: 6; }
 .news-card { order: 7; }
-.modes-card { order: 1; } /* right under the hero */
+.now-card { order: 1; }   /* right under the hero */
+.modes-card { order: 1; }
 .music-card { order: 1; } /* right under the hero */
 
 /* Music */
@@ -381,6 +382,9 @@ small { font-size: 0.8em; }
 .music-vol { margin: 6px 0 10px; }
 .music-speakers { margin: 4px 0 10px; }
 .music-speakers .chip { cursor: pointer; }
+.music-phones { margin: 8px 0 0; align-items: center; }
+.music-phones > .muted { font-size: .85em; margin-right: 2px; }
+.music-phones .chip { cursor: pointer; }
 .music-lists { display: flex; gap: 10px; overflow-x: auto; margin: 2px -4px 0; padding: 2px 4px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .music-lists::-webkit-scrollbar { display: none; }
 .music-list { flex: none; display: grid; gap: 6px; width: 92px; padding: 0; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
@@ -462,6 +466,7 @@ small { font-size: 0.8em; }
 .mode-ic .icon { width: 24px; height: 24px; fill: var(--mode); }
 .mode-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .mode-text b { font-size: 1.02rem; }
+.mode-short { display: none; }
 .mode-text small { color: var(--muted); font-size: 0.84rem; }
 .mode-btn .switch { pointer-events: none; }
 .mode.on .mode-btn { background: var(--mode-on); border-color: var(--mode-on); color: #fff; box-shadow: 0 2px 12px color-mix(in srgb, var(--mode-on) 35%, transparent); }
@@ -519,7 +524,8 @@ small { font-size: 0.8em; }
 .hero-summary { margin-top: 14px; font-size: 1.05rem; line-height: 1.5; max-width: 60ch; }
 .hero-summary small { color: var(--muted); }
 
-.glance { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+.now-card { padding: 10px; }
+.glance { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .glance-item { display: flex; align-items: stretch; border-radius: 14px; background: var(--surface-2); overflow: hidden; }
 .glance-item > button {
   display: flex;
@@ -616,27 +622,18 @@ small { font-size: 0.8em; }
 .ev-title small { display: block; font-weight: 400; color: var(--muted); }
 
 .energy-mini:hover, .energy-mini:focus-visible { border-color: var(--primary); }
-.em-row { display: flex; align-items: center; gap: 18px; }
-.ring {
-  --size: 112px;
-  flex: none;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  background:
-    radial-gradient(closest-side, var(--surface) 80%, transparent 81%),
-    conic-gradient(var(--battery) calc(var(--p) * 1%), var(--surface-2) 0);
-}
-.ring b { font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
-.ring small { color: var(--muted); font-size: 0.72rem; font-weight: 600; text-align: center; max-width: 80px; }
-.em-stats { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 10px; margin: 0; }
-.em-stats dt { color: var(--muted); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
-.em-stats dd { margin: 0; font-size: 1.1rem; white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; }
-.em-stats dd small.u { display: inline; font-size: 0.62em; }
-.em-stats dd small:not(.u) { display: block; color: var(--muted); font-weight: 500; font-size: 0.78rem; }
+.energy-mini { display: flex; align-items: center; gap: 14px; padding-top: 12px; padding-bottom: 12px; }
+.em-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.em-label .icon { width: 20px; height: 20px; }
+.em-soc { font-size: 1.7rem; font-weight: 600; line-height: 1; color: var(--battery); font-variant-numeric: tabular-nums; }
+.em-bar { flex: 1; min-width: 40px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.em-bar i { display: block; width: var(--p, 0%); height: 100%; border-radius: 4px; background: var(--battery); }
+.em-state { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.em-state i { flex: none; }
+.em-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--battery); }
+.em-state.pos i { background: var(--positive); }
+.em-state.neg i { background: var(--negative); }
+@media (max-width: 420px), (min-width: 700px) and (max-width: 999.98px) { .em-label span { display: none; } }
 .pos { color: var(--positive); }
 .neg { color: var(--negative); }
 
@@ -694,6 +691,13 @@ small { font-size: 0.8em; }
 /* ---------- Energy ---------- */
 
 .v-energy { display: grid; gap: var(--gap); }
+.v-energy .col, .places-side { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+.title-link { margin-left: auto; padding: 4px 2px; border: 0; background: none; color: var(--primary); font: inherit; font-size: 0.82rem; font-weight: 600; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.title-chips { display: flex; gap: 6px; margin-left: auto; }
+.title-chips .chip { padding: 4px 10px; font-size: 0.78rem; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.grid-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 5px 12px; border-radius: 999px; font-weight: 600; font-size: 0.84rem; background: color-mix(in srgb, var(--positive) 16%, transparent); color: var(--positive); }
+.grid-pill i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.grid-pill.off { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
 .bat { display: flex; align-items: center; gap: 18px; }
 .bat-gauge {
   position: relative;
@@ -855,6 +859,19 @@ small { font-size: 0.8em; }
 
 .v-places { display: grid; gap: var(--gap); }
 .map-card { padding: 0; overflow: hidden; }
+.garage-card { display: grid; gap: 10px; }
+.garage-row { display: flex; align-items: center; gap: 12px; }
+.garage-ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2); flex: none; }
+.garage-row.open .garage-ic { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+.garage-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.garage-text small { font-size: 0.8rem; }
+.garage-go { margin: 0; padding: 10px 18px; border-radius: 999px; }
+.moves { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.moves li { display: flex; align-items: center; gap: 10px; font-size: 0.92rem; }
+.moves li > span:last-child { display: grid; gap: 1px; }
+.moves b { font-weight: 600; }
+.moves small { font-size: 0.78rem; }
+.pavatar.sm { width: 28px; height: 28px; font-size: 0.7rem; flex: none; }
 .pmap-slot.big .pmap { height: 56dvh; }
 .people-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .person-card {
@@ -879,6 +896,16 @@ small { font-size: 0.8em; }
 /* ---------- Home: plan, rooms, devices ---------- */
 
 .v-home { display: grid; gap: var(--gap); }
+.quick-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px; padding: 2px; }
+.quick-row::-webkit-scrollbar { display: none; }
+.qchip { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.qchip > .icon { width: 22px; height: 22px; color: var(--muted); }
+.qchip-text { display: grid; gap: 1px; max-width: 180px; }
+.qchip-text b { font-size: 0.92rem; }
+.qchip-text small { font-size: 0.78rem; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.qchip.warn { border-color: color-mix(in srgb, var(--warning) 50%, transparent); background: color-mix(in srgb, var(--warning) 10%, var(--surface)); }
+.qchip.warn > .icon { color: var(--warning); }
+.qchip-btn { margin-left: 4px; padding: 7px 13px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--primary); font: inherit; font-weight: 700; font-size: 0.84rem; cursor: pointer; }
 .home-plan { display: grid; gap: var(--gap); min-width: 0; }
 .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .room { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 16px; background: var(--surface-2); }
@@ -1020,70 +1047,102 @@ small { font-size: 0.8em; }
 
 @media (min-width: 700px) {
   /* The rail is fixed, not sticky: sticky came loose and scrolled away in some browsers (the HA app's frame). */
-  .main { margin-left: calc(var(--rail) + var(--safe-left)); }
-  .kiosk .main { margin-left: 0; }
+  /* The menu floats at the bottom as a dock; the bell, voice and connection sit in a small pill beside it. */
+  :root { --dock-h: 64px; --dock-space: calc(var(--dock-h) + 24px + var(--safe-bottom)); }
+  .main { padding-bottom: var(--dock-space); }
+  .kiosk .main { padding-bottom: 16px; }
   .nav {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: auto auto calc(12px + var(--safe-bottom)) calc(16px + var(--safe-left));
     box-sizing: border-box;
-    width: calc(var(--rail) + var(--safe-left));
-    overflow-y: auto;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 4px;
-    height: 100dvh;
-    padding: calc(14px + var(--safe-top)) 8px 14px calc(8px + var(--safe-left));
-    border-top: 0;
-    border-right: 1px solid var(--border);
-    background: var(--surface);
-    backdrop-filter: none;
+    width: auto;
+    height: var(--dock-h);
+    flex-direction: row;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 36px rgb(0 0 0 / 0.28);
   }
-  .nav .brand { display: grid; place-items: center; height: 44px; margin-bottom: 12px; color: var(--accent); }
-  .nav .brand .icon { width: 30px; height: 30px; }
-  .nav a { flex: none; height: 64px; border-radius: 16px; font-size: 0.72rem; }
-  .nav a[aria-current] { background: var(--surface-2); }
-  .nav .nav-settings { margin-top: auto; }
-  .main { padding-bottom: 16px; }
+  .nav a { flex: none; width: 78px; height: 100%; border-radius: 999px; font-size: 0.68rem; gap: 0; }
+  .nav a .icon { width: 22px; height: 22px; }
+  .nav a[aria-current] { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+  .nav .nav-settings { width: 56px; }
+  .nav .nav-settings span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .topbar-actions {
+    position: fixed;
+    z-index: 50;
+    right: calc(16px + var(--safe-right));
+    bottom: calc(12px + var(--safe-bottom));
+    height: var(--dock-h);
+    box-sizing: border-box;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 10px 36px rgb(0 0 0 / 0.28);
+  }
+  .topbar-actions .icon-btn { width: 50px; height: 50px; }
   .view { padding: 4px 20px 16px; }
-  .topbar { padding-left: 20px; padding-right: calc(20px + var(--safe-right)); }
-  .toast { bottom: 24px; }
+  /* No blur on the title bar here: a backdrop filter would pin the fixed bell pill inside it. */
+  .topbar { padding-left: 20px; padding-right: calc(20px + var(--safe-right)); background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  /* Today shows the clock itself, so its title bar folds away. */
+  :root[data-view="today"] .topbar { padding: var(--safe-top) 0 0; min-height: 14px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root[data-view="today"] .topbar-title { display: none; }
+  .toast { bottom: calc(var(--dock-space) + 8px); }
   .sheet { margin: auto; border-radius: 24px; padding-bottom: 16px; }
 
-  /* Today: the day on the left, energy and people, notifications and news. */
-  .v-today { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
-  .v-today .col { display: flex; flex-direction: column; gap: var(--gap); }
-  .v-today .col-c { grid-column: 2; }
-  .v-today .col-b { grid-column: 2; grid-row: 1; }
-  .v-today .col-a { grid-row: 1 / span 2; }
+  /* Today, two columns: the day, battery and calendar on the left; the map, right now, modes and shopping on
+     the right. Notifications live behind the bell and news on the phone layout only. */
+  .v-today { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  .v-today .col { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+  .v-today .notes-card, .v-today .news-card { display: none; }
+  .v-today .people-row { display: none; }
+  .v-today .hero-summary { max-width: none; }
+  .v-today .modes { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .v-today .modes-card { padding: 10px; }
+  .v-today .modes-card .card-title { display: none; }
+  .v-today .mode-btn { padding: 8px 12px; }
+  .v-today .mode-ic { width: 34px; height: 34px; }
+  .v-today .mode-text small, .v-today .mode-name { display: none; }
+  .v-today .mode-short { display: inline; white-space: nowrap; }
+  .v-today .col > * { order: 0; }
+  .v-today .shop-foot > span { display: none; }
+  .v-today .shop-foot:not(:has(button)) { display: none; }
+  .v-today .glance { grid-template-columns: 1fr; }
+  .v-today .glance-item small { display: inline; margin-left: 6px; }
+  .v-today .glance-item > button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-  .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-  .today-energy, .month-energy, .charts-card { grid-column: 1 / -1; }
+  /* Energy: battery and the live flow on the left; today, the month and one 24-hour chart on the right. */
+  .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
 
-  .v-places { grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); align-items: start; }
-  .pmap-slot.big .pmap { height: calc(100dvh - 120px); min-height: 360px; }
-  .people-card { position: sticky; top: 72px; }
+  .v-places { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); align-items: start; }
+  .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
+  .places-side { position: sticky; top: 72px; max-height: calc(100dvh - 72px - var(--dock-space)); overflow-y: auto; scrollbar-width: none; }
+
+  .v-home .quick-row { grid-column: 1 / -1; }
 }
 
 @media (min-width: 1000px) {
-  .em-row { gap: 12px; }
-  .v-today { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr); }
-  .v-today .col-a { grid-row: auto; }
-  .v-today .col-b { grid-column: 2; grid-row: auto; }
-  .v-today .col-c { grid-column: 3; }
-
-
   .v-home { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
   .v-home .home-plan { grid-row: span 2; }
+  .v-home .home-plan .cams { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .today-energy .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .v-home .quick-row .qchip { flex: 1 1 0; min-width: 0; }
+  .v-home .quick-row .qchip-text { min-width: 0; max-width: none; flex: 1; }
   .v-home .rooms { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) .rooms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
 
-@media (min-width: 1200px) {
-  .v-energy { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.2fr); }
-  .today-energy { grid-column: 3; grid-row: 1; }
-  .month-energy { grid-column: 1; }
-  .charts-card, .month-energy + .charts-card { grid-column: 2 / -1; }
+@media (min-width: 1000px) {
+  .nav { left: 50%; transform: translateX(-50%); }
 }
 @media (min-width: 1400px) {
   .view { max-width: 1680px; margin: 0 auto; }
@@ -1096,9 +1155,8 @@ small { font-size: 0.8em; }
   .hero-summary { font-size: 0.98rem; margin-top: 10px; }
   .card { padding: 14px; }
   .card-title { margin-bottom: 8px; }
-  .ring { --size: 96px; }
-  .ring b { font-size: 1.45rem; }
   .pmap-slot.mini .pmap { height: 150px; }
+  .v-energy .flow { zoom: 0.8; }
 }
 @media (min-width: 700px) and (max-height: 640px) {
   .hero-time { font-size: 3.2rem; }
@@ -1107,6 +1165,20 @@ small { font-size: 0.8em; }
   .nav a { height: 54px; }
   .nav .brand { display: none; }
   .pmap-slot.mini .pmap { height: 120px; }
+}
+
+/* Tablets and desktops tall enough: Today fits the screen without scrolling. The calendar and the map take
+   whatever room is left; the calendar scrolls inside its card on a busy day. */
+@media (min-width: 700px) and (min-height: 680px) {
+  .v-today { height: calc(100dvh - var(--safe-top) - 34px - var(--dock-space)); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .kiosk .v-today { height: calc(100dvh - var(--safe-top) - 50px); }
+  .v-today .col { overflow-y: auto; scrollbar-width: none; }
+  .v-today .col > * { flex: none; }
+  .v-today .hero-summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
+  .v-today .agenda-card { flex: 1 1 auto; min-height: 160px; overflow-y: auto; }
+  .v-today .people-mini { flex: 1 1 auto; min-height: 200px; display: flex; flex-direction: column; }
+  .v-today .people-mini .pmap-slot { flex: 1; min-height: 0; }
+  .v-today .pmap-slot.mini .pmap { height: 100%; min-height: 150px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1757,6 +1829,14 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 .htimeline { position: relative; height: 28px; border-radius: 8px; background: var(--surface-2); overflow: hidden; }
 .htimeline span { position: absolute; top: 0; bottom: 0; background: var(--accent); }
 
+/* Settings → Family cars */
+.car-add { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; margin-top: 12px; }
+.car-add label { display: grid; gap: 4px; font-weight: 600; font-size: 0.9rem; }
+.car-add input, .car-add select { min-height: 42px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: inherit; width: 100%; }
+.car-add input[name="plate"] { text-transform: uppercase; letter-spacing: 0.06em; }
+.car-add [hidden] { display: none; }
+.car-add input::placeholder { text-transform: none; letter-spacing: normal; }
+
 /* Live sky background, the wall clock screen, dimming and the full screen button. */
 
 .sky { display: none; }
@@ -1870,6 +1950,7 @@ const ICONS = {
   binary_sensor: 'M10,0.2C9,0.2 8.2,1 8.2,2C8.2,3 9,3.8 10,3.8C11,3.8 11.8,3 11.8,2C11.8,1 11,0.2 10,0.2M15.67,1A7.33,7.33 0 0,0 23,8.33V7A6,6 0 0,1 17,1H15.67M18.33,1C18.33,3.58 20.42,5.67 23,5.67V4.33C21.16,4.33 19.67,2.84 19.67,1H18.33M21,1A2,2 0 0,0 23,3V1H21M7.92,4.03C7.75,4.03 7.58,4.06 7.42,4.11L2,5.8V11H3.8V7.33L5.91,6.67L2,22H3.8L6.67,13.89L9,17V22H10.8V15.59L8.31,11.05L9.04,8.18L10.12,10H15V8.2H11.38L9.38,4.87C9.08,4.37 8.54,4.03 7.92,4.03Z',
   blindOpen: 'M3 4H21V8H19V20H17V8H7V20H5V8H3V4M8 9H16V11H8V9Z',
   garage: 'M22,9V20H20V11H4V20H2V9L12,5L22,9M19,12H5V14H19V12M19,18H5V20H19V18M19,15H5V17H19V15Z',
+  car: 'M5,11L6.5,6.5H17.5L19,11M17.5,16A1.5,1.5 0 0,1 16,14.5A1.5,1.5 0 0,1 17.5,13A1.5,1.5 0 0,1 19,14.5A1.5,1.5 0 0,1 17.5,16M6.5,16A1.5,1.5 0 0,1 5,14.5A1.5,1.5 0 0,1 6.5,13A1.5,1.5 0 0,1 8,14.5A1.5,1.5 0 0,1 6.5,16M18.92,6C18.72,5.42 18.16,5 17.5,5H6.5C5.84,5 5.28,5.42 5.08,6L3,12V20A1,1 0 0,0 4,21H5A1,1 0 0,0 6,20V19H18V20A1,1 0 0,0 19,21H20A1,1 0 0,0 21,20V12L18.92,6Z',
   garageOpen: 'M22,9V20H20V11H4V20H2V9L12,5L22,9M19,12H5V14H19V12Z',
   arrowUp: 'M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z',
   arrowDown: 'M11,4H13V16L18.5,10.5L19.92,11.92L12,19.84L4.08,11.92L5.5,10.5L11,16V4Z',
@@ -1962,6 +2043,7 @@ const ICONS = {
   wxHail: 'M6,14A1,1 0 0,1 7,15A1,1 0 0,1 6,16A5,5 0 0,1 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12A4,4 0 0,1 19,16H18A1,1 0 0,1 17,15A1,1 0 0,1 18,14H19A2,2 0 0,0 21,12A2,2 0 0,0 19,10H17V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11A3,3 0 0,0 6,14M10,18A2,2 0 0,1 12,20A2,2 0 0,1 10,22A2,2 0 0,1 8,20A2,2 0 0,1 10,18M14.5,16A1.5,1.5 0 0,1 16,17.5A1.5,1.5 0 0,1 14.5,19A1.5,1.5 0 0,1 13,17.5A1.5,1.5 0 0,1 14.5,16M10.5,12A1.5,1.5 0 0,1 12,13.5A1.5,1.5 0 0,1 10.5,15A1.5,1.5 0 0,1 9,13.5A1.5,1.5 0 0,1 10.5,12Z',
   music: 'M21,3V15.5A3.5,3.5 0 0,1 17.5,19A3.5,3.5 0 0,1 14,15.5A3.5,3.5 0 0,1 17.5,12C18.04,12 18.55,12.12 19,12.34V6.47L9,8.6V17.5A3.5,3.5 0 0,1 5.5,21A3.5,3.5 0 0,1 2,17.5A3.5,3.5 0 0,1 5.5,14C6.04,14 6.55,14.12 7,14.34V6L21,3Z',
   speaker: 'M12,12A3,3 0 0,0 9,15A3,3 0 0,0 12,18A3,3 0 0,0 15,15A3,3 0 0,0 12,12M12,20A5,5 0 0,1 7,15A5,5 0 0,1 12,10A5,5 0 0,1 17,15A5,5 0 0,1 12,20M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8C10.89,8 10,7.1 10,6C10,4.89 10.89,4 12,4M17,2H7C5.89,2 5,2.89 5,4V20A2,2 0 0,0 7,22H17A2,2 0 0,0 19,20V4C19,2.89 18.1,2 17,2Z',
+  phone: 'M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z',
   tablet: 'M19,18H5V6H19M21,4H3C1.89,4 1,4.89 1,6V18A2,2 0 0,0 3,20H21A2,2 0 0,0 23,18V6C23,4.89 22.1,4 21,4Z',
   tv: 'M21,17H3V5H21M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V21H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3Z',
   suitcase: 'M17,6H15V3A1,1 0 0,0 14,2H10A1,1 0 0,0 9,3V6H7A2,2 0 0,0 5,8V19A2,2 0 0,0 7,21A1,1 0 0,0 8,22A1,1 0 0,0 9,21H15A1,1 0 0,0 16,22A1,1 0 0,0 17,21A2,2 0 0,0 19,19V8A2,2 0 0,0 17,6M10.5,3.5H13.5V6H10.5V3.5M9,18H7.5V9H9V18M12.75,18H11.25V9H12.75V18M16.5,18H15V9H16.5V18Z',
@@ -2796,7 +2878,14 @@ class HAClient extends EventTarget {
         platform: e.pl || '',
       });
     }
-    return { areas: areas || [], entityInfo };
+    // Android phones with the Home Assistant app: it can open apps on them (e.g. Spotify from the Music card).
+    // Their notify action is named after the device's original name: "Azelia's Phone" -> mobile_app_azelia_s_phone.
+    const slug = (t) => String(t).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const phones = (devices || [])
+      .filter((d) => (d.identifiers || []).some((i) => i[0] === 'mobile_app') && !/apple/i.test(d.manufacturer || '')
+        && !/\btv\b|streamer|television/i.test(`${d.model || ''} ${d.name || ''} ${d.name_by_user || ''}`))
+      .map((d) => ({ name: d.name_by_user || d.name, service: `mobile_app_${slug(d.name)}` }));
+    return { areas: areas || [], entityInfo, phones };
   }
 
   _startPing() {
@@ -5337,7 +5426,7 @@ const ENERGY_ROLES = [
 
 const ENERGY_MATCH = {
   solar: { test: /\b(pv|solar|photovoltaic)\b/, skip: /string|mppt|daily|today|total|month|annual|year|lifetime|third.?party|rated|max/ },
-  grid: { test: /\bgrid\b/, skip: /phase|frequency|voltage|current|reactive|limit|max|rated|daily|today|total/ },
+  grid: { test: /\bgrid\b/, skip: /import|export|phase|frequency|voltage|current|reactive|limit|max|rated|daily|today|total/ },
   battery: { test: /\b(battery|bat|ess)\b/, skip: /available|max|rated|limit|capacity|daily|today|total|evdc|dc.?charger/ },
   home: { test: /\b(load|consumption|consumed|house|home)\b/, skip: /daily|today|total|month|annual|limit/ },
 };
@@ -8461,6 +8550,39 @@ function binWords(colours) {
   return binCap(n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0]);
 }
 
+// ---- cars.js ----
+// Family cars: the number plates that homeassistant/car_arrivals.yaml announces as "<owner> is home".
+// They're kept in Home Assistant (input_text.family_cars) so every screen and the automation share them.
+// The text is "PLATE=owner;PLATE=owner", where owner is a person entity (person.andy) or a plain name.
+
+const CARS_ENTITY = 'input_text.family_cars';
+const CARS_MAX = 255; // input_text's limit
+
+/** "abc 123" → "ABC123": what's stored and compared. */
+const cleanPlate = (p) => String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const cleanOwner = (o) => String(o || '').replace(/[=;]/g, ' ').trim();
+
+/** The cars in the helper's text, as [{ plate, owner }]. */
+function parseCars(text) {
+  return String(text || '').split(';').map((part) => {
+    const i = part.indexOf('=');
+    return i < 0 ? null : { plate: cleanPlate(part.slice(0, i)), owner: cleanOwner(part.slice(i + 1)) };
+  }).filter((c) => c && c.plate && c.owner);
+}
+
+const serializeCars = (cars) => cars.map((c) => `${cleanPlate(c.plate)}=${cleanOwner(c.owner)}`).join(';');
+
+/** The list with `car` added, replacing any car with the same plate; or an error message. */
+function addCar(cars, car) {
+  const plate = cleanPlate(car.plate);
+  const owner = cleanOwner(car.owner);
+  if (plate.length < 2) return { error: 'Type the number plate first' };
+  if (!owner) return { error: 'Pick whose car it is' };
+  const list = [...cars.filter((c) => c.plate !== plate), { plate, owner }];
+  if (serializeCars(list).length > CARS_MAX) return { error: 'That’s as many cars as Home Assistant can hold' };
+  return { cars: list };
+}
+
 // ---- music.js ----
 // Music on Today: Spotify (or anything Home Assistant can play) on the house's speakers and on this
 // screen itself.
@@ -8491,12 +8613,32 @@ function musicPlayers(states, { ok = () => true, platform = () => '', hidden = {
   const pf = (s) => platform(s.entity_id);
   // Music Assistant's players are listed whether or not they're exposed to Assist: they're the speakers.
   const mass = all.filter((s) => isMassPlayer(s, pf(s)) && !isUnavailable(s));
-  if (mass.length) return { kind: 'mass', speakers: mass, account: null };
+  if (mass.length) return { kind: 'mass', speakers: dedupeSpeakers(mass), account: null };
   const account = all.find((s) => isSpotifyAccount(s, pf(s)) && s.state !== 'unavailable') || null;
   if (account) return { kind: 'spotify', speakers: [], account };
   const speakers = all.filter((s) => !isUnavailable(s) && ok(s.entity_id)
     && (mpHas(s, MF.PAUSE) || mpHas(s, MF.PLAY) || mpHas(s, MF.VOLUME_SET)) && !NOT_A_SPEAKER.test(nameOf(s)));
   return { kind: 'plain', speakers, account: null };
+}
+
+// Music Assistant's own players carry mass_player_type. Its "Home Assistant MediaPlayers" provider can
+// add a second copy of the same speaker (wrapping Home Assistant's Google Cast entity) that has none,
+// and that copy can't browse the library, so keep one chip per speaker name: the native one.
+const isNativeMass = (s) => s.attributes?.mass_player_type != null;
+function dedupeSpeakers(list) {
+  const byName = new Map();
+  for (const s of list) {
+    const k = nameOf(s).trim().toLowerCase();
+    const had = byName.get(k);
+    if (!had || (!isNativeMass(had) && isNativeMass(s))) byName.set(k, s);
+  }
+  return list.filter((s) => byName.get(nameOf(s).trim().toLowerCase()) === s);
+}
+
+/** The player to read Music Assistant's library from: a native one, since they all share it. */
+function musicLibraryPlayer(players, main) {
+  if (players.kind !== 'mass') return main;
+  return (main && isNativeMass(main) ? main : players.speakers.find(isNativeMass)) || main;
 }
 
 /** Which player the card shows: Spotify's account, else the one picked here, else whatever is playing. */
@@ -8532,17 +8674,18 @@ function musicPosition(s, now = Date.now()) {
 
 /**
  * The card. opts: lists (playlists [{ title, thumb, id, type }] or null), art(url) for a full address,
- * here ({ on, entity, needsTap, status, pin }) for this screen's own player.
+ * here ({ on, entity, needsTap, status, pin }) for this screen's own player, phones ([{ name, service }])
+ * to open the Spotify app on.
  */
-function musicCardHtml(players, main, { lists = null, art = (u) => u, here = null, hereLabel = 'This screen' } = {}) {
+function musicCardHtml(players, main, { lists = null, art = (u) => u, here = null, hereLabel = 'This screen', phones = [] } = {}) {
   const hereOn = here?.on;
-  if (!main && !hereOn) return '';
+  if (!main && !hereOn && !phones.length) return '';
   const { kind } = players;
   const a = main?.attributes || {};
   const live = main && ['playing', 'paused', 'buffering'].includes(main.state) && a.media_title;
   const playing = main && (main.state === 'playing' || main.state === 'buffering');
   const isHere = main && here?.entity && main.entity_id === here.entity.entity_id;
-  const where = !main ? hereLabel : kind === 'spotify' ? a.source || '' : isHere ? hereLabel : nameOf(main);
+  const where = !main ? (hereOn ? hereLabel : '') : kind === 'spotify' ? a.source || '' : isHere ? hereLabel : nameOf(main);
   const pic = live && (a.entity_picture_local || a.entity_picture);
   const sub = [a.media_artist || a.media_album_artist || (a.app_name && a.app_name !== a.media_title ? a.app_name : ''), a.media_album_name]
     .filter(Boolean).join(' · ');
@@ -8590,6 +8733,12 @@ function musicCardHtml(players, main, { lists = null, art = (u) => u, here = nul
     else if (here.needsTap) hereNote = `<button type="button" class="btn primary music-here-tap" data-music-unlock>${icon('volumeHigh')}<span>Tap to play on ${esc(hereLabel.replace(/^This/, 'this'))}</span></button>`;
   }
 
+  // Open the Spotify app on a phone (the Home Assistant app on Android can launch apps).
+  const phonesHtml = phones.length
+    ? `<div class="chips music-phones" aria-label="Open Spotify on a phone"><span class="muted">Open Spotify on</span>${phones.map((ph) =>
+      `<button type="button" class="chip" data-spotify-phone="${esc(ph.service)}">${icon('phone')}${esc(ph.name)}</button>`).join('')}</div>`
+    : '';
+
   const hint = kind === 'plain' && !live
     ? '<p class="muted quiet music-hint">Add Music Assistant to Home Assistant to play Spotify playlists here and on your speakers.</p>' : '';
 
@@ -8608,6 +8757,7 @@ function musicCardHtml(players, main, { lists = null, art = (u) => u, here = nul
     ${vol}
     ${chips ? `<div class="chips music-speakers" aria-label="Speakers">${chips}</div>` : ''}
     ${listsHtml}
+    ${phonesHtml}
     ${hint}
   </section>`;
 }
@@ -8619,7 +8769,9 @@ async function loadPlaylists(client, entityId, limit = 12) {
   const kids = root?.children || [];
   const folder = kids.find((c) => c.can_expand && /playlist/i.test(`${c.title} ${c.media_content_id} ${c.media_content_type}`));
   const page = folder ? await browse({ media_content_id: folder.media_content_id, media_content_type: folder.media_content_type }) : root;
-  return (page?.children || []).filter((c) => c.can_play).slice(0, limit)
+  // Spotify's Liked Songs first: it's the one people reach for.
+  const liked = (c) => (/^liked songs\b/i.test(c.title || '') ? 0 : 1);
+  return (page?.children || []).filter((c) => c.can_play).sort((x, y) => liked(x) - liked(y)).slice(0, limit)
     .map((c) => ({ title: c.title, thumb: c.thumbnail || '', id: c.media_content_id, type: c.media_content_type }));
 }
 
@@ -8782,7 +8934,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '16 Nov 2026, 09:53 (aa931af)';
+const DASH_BUILD = '16 Nov 2026, 14:10 (5e034da)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8819,6 +8971,7 @@ const DEFAULT_PREFS = {
   musicServer: '',       // Music Assistant's player address; empty = this Home Assistant's host, port 8927
   musicPlayer: '',       // the speaker this screen's card controls; empty = whatever is playing
   musicHidden: {},       // media_player ids left off the card
+  musicPhones: true,     // "Open Spotify on" buttons for the family's Android phones
   peopleMap: true,       // the Places page and the map on Today
   showHidden: false,     // hidden and diagnostic entities
   showUnavailable: false,
@@ -8876,6 +9029,8 @@ const ui = {
   dragging: false,
   refreshTimer: 0,
   lastRender: 0,
+  energyChart: 'solar',    // the one 24-hour chart shown on Energy: solar | grid | soc
+  energyMonth: false,      // "This month" opened on Energy
 };
 
 // ---------- helpers ----------
@@ -9310,9 +9465,13 @@ function calWhoSettingsHtml() {
  * The household for "Who": every person in Home Assistant except wall tablets, first names. Not the
  * Places list, so hiding someone from this screen's map (or their phone being off) doesn't drop them.
  */
+// Logins for screens (a wall tablet, a TV app) are persons in Home Assistant too, but not people.
+const SCREEN_NAME = /wall|display|kiosk|tablet|ipad|dashboard|\btv\b|tv$/i;
+const isScreenLogin = (p) => SCREEN_NAME.test(p.name) || SCREEN_NAME.test(p.id.split('.')[1] || '');
+
 function household() {
   return peopleOf(store.states)
-    .filter((p) => domainOf(p.id) === 'person' && !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name))
+    .filter((p) => domainOf(p.id) === 'person' && !isScreenLogin(p))
     .map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
 }
 
@@ -9561,8 +9720,8 @@ function shownPeople() {
   const hidden = store.prefs.hiddenPeople;
   return peopleOf(store.states).filter((p) => {
     if (p.unavailable && !p.located) return false;
-    if (hidden) return !hidden[p.id];
-    return !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name);
+    if (hidden && p.id in hidden) return !hidden[p.id];
+    return !isScreenLogin(p);
   });
 }
 
@@ -9662,7 +9821,8 @@ function summaryText() {
 // Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
 function binsHtml(now) {
   const b = binNight(store.states, now);
-  if (!b) return '';
+  // Only on bin day itself: the rest of the week the chip is just clutter (a reminder comes at 6 pm).
+  if (!b || b.when !== 'tonight') return '';
   const words = binWords(b.colours);
   const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
   return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
@@ -9678,7 +9838,7 @@ const MODES = [
   { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
     on: 'Bedroom blind stays shut. Turns off at noon.',
     off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
-  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode',
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode', short: 'Holiday',
     on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
 ];
 
@@ -9707,7 +9867,7 @@ function modesHtml() {
       return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
         <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
           <span class="mode-ic">${icon(m.icon)}</span>
-          <span class="mode-text"><b>${esc(m.name)}</b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="mode-text"><b><span class="mode-name">${esc(m.name)}</span><span class="mode-short">${esc(m.short || m.name)}</span></b><small>${esc(on ? m.on : m.off(now))}</small></span>
           <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
         </button>
       </div>`;
@@ -9733,8 +9893,6 @@ function heroHtml() {
   const name = (store.user?.name || '').split(/\s+/)[0];
   const warnings = [...store.states.values()].find((s) => domainOf(s.entity_id) === 'sensor' && /warnings?$/i.test(s.entity_id) && Number(s.state) > 0);
   const { text, by } = summaryText();
-  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
-    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
   return `<section class="card hero">
     <div class="hero-top">
       <div class="hero-when">
@@ -9751,6 +9909,15 @@ function heroHtml() {
     </div>
     ${warnings ? `<button type="button" class="warn-banner" data-open-entity="${esc(warnings.entity_id)}">${icon('alert')}${esc(plural(Number(warnings.state), 'weather warning'))} for your area</button>` : ''}
     ${store.prefs.brief ? `<p class="hero-summary">${esc(text)}${by ? `<small> · written by ${esc(by)}</small>` : ''}</p>` : ''}
+  </section>`;
+}
+
+// Right now: open doors, someone at a camera, appliances running, lights left on. Its own card, beside the map.
+function nowCardHtml() {
+  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
+    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
+  if (!glance.length) return '';
+  return `<section class="card now-card">
     ${glance.length ? `<ul class="glance" aria-label="Right now">${glance.map((g) => `
       <li class="glance-item tone-${g.tone}">
         <button type="button" ${g.open ? `data-open-entity="${esc(g.open)}"` : g.href ? `data-href="${esc(g.href === '#/solar' ? '#/energy' : g.href.replace('#/entities', '#/home'))}"` : 'disabled'}>
@@ -9784,7 +9951,7 @@ function agendaHtml() {
       : `${dayBlock(today, 'Today')}${dayBlock(calAddDays(today, 1), 'Tomorrow')}`;
   // "Everyone" or one person's events (with the shared ones); remembered on this screen.
   const filter = vw.people.length > 1 && writableCals().length ? `<div class="who-filter" role="group" aria-label="Whose events">
-      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">Everyone</button>
+      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">${vw.people.length === 2 ? 'Both' : 'Everyone'}</button>
       ${vw.people.map((p) => `<button type="button" data-cal-for="${esc(p.id)}" aria-pressed="${vw.forId === p.id}" style="--cal:${p.color}">${esc(p.name)}</button>`).join('')}
     </div>` : '';
   return `<section class="card agenda-card${month ? ' month' : ''}">
@@ -9799,25 +9966,21 @@ function agendaHtml() {
   </section>`;
 }
 
+// Energy on Today: just the battery level and what it's doing; the Energy page has the rest.
 function energyMiniHtml() {
   if (!store.prefs.energyTab) return '';
   const e = energyNow();
   if (!e.flow.found) return '';
   const f = e.flow;
   const soc = f.soc;
-  const state = f.charging > 0.05 ? `Charging ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Using ${energyPower(f.discharging)}` : soc >= 99.5 ? 'Full' : 'Resting';
-  const sold = e.today.sold?.kwh;
-  return `<a class="card energy-mini" href="#/energy">
-    <h2 class="card-title">${icon('solar')}Energy<span class="card-go">${icon('chevronRight')}</span></h2>
-    <div class="em-row">
-      ${soc != null ? `<div class="ring" style="--p:${Math.max(0, Math.min(100, soc))}"><b>${Math.round(soc)}%</b><small>${esc(state)}</small></div>` : ''}
-      <dl class="em-stats">
-        <div><dt>Solar</dt><dd>${energyPower(f.solar)}</dd></div>
-        <div><dt>${f.selling > 0.05 ? 'Selling' : f.buying > 0.05 ? 'Buying' : 'Grid'}</dt><dd class="${f.selling > 0.05 ? 'pos' : f.buying > 0.05 ? 'neg' : ''}">${energyPower(f.selling > 0.05 ? f.selling : f.buying || 0)}</dd></div>
-        ${sold != null ? `<div><dt>Sold</dt><dd class="pos">${sold.toFixed(1)}<small class="u"> kWh</small>${e.rates.feedIn ? `<small>${money(sold * e.rates.feedIn)}</small>` : ''}</dd></div>` : ''}
-        ${e.today.pv ? `<div><dt>Made</dt><dd>${e.today.pv.kwh.toFixed(1)}<small class="u"> kWh</small></dd></div>` : ''}
-      </dl>
-    </div>
+  const [tone, state] = f.buying > 0.05 ? ['neg', `Using grid · ${energyPower(f.buying)}`]
+    : f.charging > 0.05 ? ['pos', `Charging · ${energyPower(f.charging)}`]
+      : soc != null && soc >= 99.5 ? ['pos', f.selling > 0.05 ? `Full · selling ${energyPower(f.selling)}` : 'Full']
+        : f.discharging > 0.05 ? ['bat', 'Running the house'] : ['bat', f.selling > 0.05 ? `Selling ${energyPower(f.selling)}` : 'Resting'];
+  return `<a class="card energy-mini" href="#/energy" aria-label="Energy">
+    <span class="em-label">${icon('solar')}<span>Battery</span></span>
+    ${soc != null ? `<b class="em-soc">${Math.round(soc)}%</b><span class="em-bar" style="--p:${Math.max(0, Math.min(100, soc))}%"><i></i></span>` : `<b class="em-soc">${energyPower(f.solar)}</b><span class="em-bar"></span>`}
+    <span class="em-state ${tone}"><i></i>${esc(state)}</span>
   </a>`;
 }
 
@@ -10032,6 +10195,15 @@ async function loadEnergyHistory(force = false) {
   queueRefresh();
 }
 
+/** The inverter's on-grid / off-grid sensor (Sigenergy local Modbus: sensor.sigen_plant_grid_connection_status). */
+function gridStatus() {
+  const s = [...store.states.values()].find((x) => domainOf(x.entity_id) === 'sensor'
+    && (/grid_(connection_)?status|on_off_grid/.test(x.entity_id) || /^(on_grid|off_grid)/.test(x.state)) && !isUnavailable(x));
+  if (!s) return null;
+  const off = /off/i.test(s.state) && !/^on/i.test(s.state);
+  return { s, off, text: off ? 'Off grid · running on solar and battery' : 'On grid · power is on' };
+}
+
 function batteryAlert() {
   return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation'
     && (s.attributes?.id === 'dashboard_battery_full' || /batter.*(full|charged|100)/i.test(nameOf(s))));
@@ -10118,22 +10290,27 @@ function nice(v) {
   return Math.ceil(v / 10) * 10;
 }
 
-function energyChartsView(m) {
+const ENERGY_CHARTS = [['solar', 'Solar'], ['grid', 'Grid'], ['soc', 'Battery']];
+
+/** One 24-hour chart at a time, picked with the chips in the card title. */
+function energyChartsView(m, pick = ui.energyChart) {
   if (!m) return energy.error ? `<p class="muted">${esc(energy.error)}</p>` : '<div class="spinner"></div>';
+  const has = { solar: !!(m.solar || m.home), grid: !!m.grid, soc: !!m.soc };
+  if (!has[pick]) pick = ENERGY_CHARTS.map(([k]) => k).find((k) => has[k]);
   const peak = (...arrs) => Math.max(0.5, ...arrs.flat().filter((v) => v != null).map(Math.abs));
   const out = [];
-  if (m.solar || m.home) {
+  if (pick === 'solar') {
     out.push(chartHtml({ title: 'Solar and home use', m, min: 0, max: nice(peak(m.solar || [], m.home || [])),
       series: [{ values: m.solar, cls: 'solar', area: true, label: 'Solar' }, { values: m.home, cls: 'home', label: 'Home' }] }));
   }
-  if (m.grid) {
+  if (pick === 'grid') {
     const sold = m.grid.map((v) => (v == null ? null : Math.min(0, v)));
     const bought = m.grid.map((v) => (v == null ? null : Math.max(0, v)));
     const top = nice(peak(m.grid));
     out.push(chartHtml({ title: 'Grid', m, min: -top, max: top, note: 'Sold below the line',
       series: [{ values: sold, cls: 'sold', area: true, label: 'Sold' }, { values: bought, cls: 'bought', area: true, label: 'Bought' }] }));
   }
-  if (m.soc) out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
+  if (pick === 'soc') out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
   return out.join('');
 }
 
@@ -10177,9 +10354,132 @@ function personCardHtml(p) {
   </button></li>`;
 }
 
+/** Garage doors and gates shown on the dashboard. */
+function garageDoors() {
+  return [...store.states.values()].filter((s) => domainOf(s.entity_id) === 'cover' && listed(s.entity_id)
+    && ['garage', 'gate'].includes(s.attributes?.device_class));
+}
+
+/** "Garage Door Door 1" reads as "Garage door". */
+function garageName(g) {
+  const n = nameOf(g).replace(/(\s+(door|opener))?(\s+\d+)+$/i, '').replace(/\s+door\s+door$/i, ' door');
+  return /door|gate/i.test(n) ? n.replace(/\bDoor\b/, 'door') : `${n} door`;
+}
+
+const coverWord = (st) => ({ open: 'Open', closed: 'Closed', opening: 'Opening…', closing: 'Closing…' }[st] || st);
+
+function garageCardHtml() {
+  const doors = garageDoors();
+  if (!doors.length) return '';
+  const auto = store.states.get('input_boolean.garage_auto_open');
+  return `<section class="card garage-card">${doors.map((g) => {
+    const v = shown(g);
+    const open = v.state !== 'closed';
+    return `<div class="garage-row${open ? ' open' : ''}">
+      <span class="garage-ic">${icon(open ? 'garageOpen' : 'garage')}</span>
+      <span class="garage-text"><b>${esc(garageName(g))}</b><small class="muted">${esc(coverWord(v.state))}${g.last_changed ? ` · ${esc(relativeTime(g.last_changed))}` : ''}${auto?.state === 'on' && !open ? ' · opens when your car gets home' : ''}</small></span>
+      <button type="button" class="btn garage-go" data-quick="${open ? 'close' : 'open'}" data-ids="${esc(g.entity_id)}">${open ? 'Close' : 'Open'}</button>
+    </div>`;
+  }).join('')}</section>`;
+}
+
+// ---------- today's comings and goings, from each person's history since midnight ----------
+
+const moves = { key: '', at: 0, items: null, loading: false };
+
+async function loadMoves() {
+  const people = shownPeople().filter((p) => domainOf(p.id) === 'person');
+  const key = people.map((p) => `${p.id}:${p.state}`).join();
+  if (!store.client || moves.loading || !people.length) return;
+  if (key === moves.key && Date.now() - moves.at < 10 * 60_000) return;
+  moves.loading = true;
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const hours = (Date.now() - midnight) / 3_600_000;
+  try {
+    const items = [];
+    await Promise.all(people.map(async (p) => {
+      const hist = await store.client.history(p.id, Math.max(hours, 0.1));
+      for (let i = 1; i < hist.length; i++) {
+        const a = hist[i - 1].s; const b = hist[i].s;
+        if (a === b || ['unknown', 'unavailable'].includes(a) || ['unknown', 'unavailable'].includes(b)) continue;
+        const zone = (z) => (z === 'home' ? 'home' : z);
+        let text;
+        if (b === 'home') text = `${p.name} got home${a !== 'not_home' ? ` from ${a}` : ''}`;
+        else if (a === 'home') text = `${p.name} left home`;
+        else if (b !== 'not_home') text = `${p.name} got to ${zone(b)}`;
+        else text = `${p.name} left ${zone(a)}`;
+        items.push({ t: hist[i].t, text, p });
+      }
+    }));
+    moves.items = items.filter((x) => x.t >= +midnight).sort((x, y) => y.t - x.t);
+    moves.key = key; moves.at = Date.now();
+  } catch { moves.items = moves.items || []; }
+  moves.loading = false;
+  queueRefresh();
+}
+
+function movesCardHtml() {
+  if (!shownPeople().some((p) => domainOf(p.id) === 'person')) return '';
+  const items = moves.items;
+  return `<section class="card moves-card">
+    <h2 class="card-title">${icon('today')}Today</h2>
+    ${!items ? '<div class="spinner"></div>' : items.length
+      ? `<ul class="moves">${items.slice(0, 8).map((x) => `<li>${avatarHtml(x.p, base(), 'pavatar sm')}<span><b>${esc(x.text)}</b><small class="muted">${esc(fmtTime(new Date(x.t)))}</small></span></li>`).join('')}</ul>`
+      : '<p class="muted">No comings or goings yet today.</p>'}
+  </section>`;
+}
+
 // ============================================================
 // Home: floor plan and rooms
 // ============================================================
+
+const DOOR_CLASSES = new Set(['door', 'garage_door', 'opening']);
+
+/** The row of quick controls across the top of Home: lights on, garage, blinds and doors. */
+function quickRowHtml() {
+  const all = [...store.states.values()].filter((s) => listed(s.entity_id)).map(shown);
+  const names = (list) => list.map((s) => nameOf(s)).slice(0, 3).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
+  const ids = (list) => esc(list.map((s) => s.entity_id).join(','));
+  const chip = ({ warn, ic, title, sub, btn, act, list }) => `<div class="qchip${warn ? ' warn' : ''}">
+      ${icon(ic)}<span class="qchip-text"><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      ${btn ? `<button type="button" class="qchip-btn" data-quick="${act}" data-ids="${ids(list)}">${btn}</button>` : ''}
+    </div>`;
+  const out = [];
+  const lights = all.filter((s) => domainOf(s.entity_id) === 'light' && s.state === 'on' && !isStatusLight(s));
+  out.push(lights.length
+    ? chip({ warn: true, ic: 'light', title: plural(lights.length, 'light') + ' on', sub: names(lights), btn: 'All off', act: 'lights-off', list: lights })
+    : chip({ ic: 'light', title: 'Lights', sub: 'All off' }));
+  for (const g of all.filter((s) => domainOf(s.entity_id) === 'cover' && ['garage', 'gate'].includes(s.attributes?.device_class))) {
+    const open = g.state !== 'closed';
+    out.push(chip({ warn: open, ic: open ? 'garageOpen' : 'garage', title: garageName(g), sub: coverWord(g.state), btn: open ? 'Close' : 'Open', act: open ? 'close' : 'open', list: [g] }));
+  }
+  const blinds = all.filter((s) => domainOf(s.entity_id) === 'cover' && !isCoverDoor(s));
+  if (blinds.length) {
+    const open = blinds.filter((s) => s.state === 'open' || s.state === 'opening');
+    const dark = store.states.get('sun.sun')?.state === 'below_horizon';
+    out.push(open.length
+      ? chip({ warn: dark, ic: 'blindOpen', title: `${plural(open.length, 'blind')} open`, sub: dark ? 'after dark' : names(open), btn: 'Close', act: 'close', list: open })
+      : chip({ ic: 'blindOpen', title: 'Blinds', sub: 'All closed', btn: dark ? '' : 'Open', act: 'open', list: blinds }));
+  }
+  const doors = all.filter((s) => domainOf(s.entity_id) === 'binary_sensor' && DOOR_CLASSES.has(s.attributes?.device_class) && !APPLIANCE_WORDS.test(nameOf(s)));
+  if (doors.length) {
+    const open = doors.filter((s) => s.state === 'on');
+    out.push(open.length
+      ? chip({ warn: true, ic: 'door', title: `${plural(open.length, 'door')} open`, sub: names(open).replace(/\b(door)\s+\1\b/gi, '$1') })
+      : chip({ ic: 'door', title: 'Doors', sub: 'All shut' }));
+  }
+  return `<div class="quick-row">${out.join('')}</div>`;
+}
+
+function quickAct(kind, el) {
+  const ids = (el.dataset.ids || '').split(',').filter(Boolean);
+  if (!ids.length) return;
+  for (const id of ids) ui.pending.set(id, { 'lights-off': 'off', open: 'opening', close: 'closing' }[kind]);
+  if (kind === 'lights-off') { call('light', 'turn_off', {}, ids); toast(`Turning off ${plural(ids.length, 'light')}…`); }
+  else call('cover', kind === 'open' ? 'open_cover' : 'close_cover', {}, ids);
+  setTimeout(() => { for (const id of ids) ui.pending.delete(id); queueRefresh(); }, 8000);
+  queueRefresh();
+}
 
 async function dataGet(scope, key) {
   try { return (await store.client.send({ type: `frontend/get_${scope}_data`, key }))?.value ?? null; } catch { return undefined; }
@@ -10467,7 +10767,7 @@ async function loadMusicLists(players, main) {
   music.listsFor = key;
   music.listsAt = Date.now();
   try {
-    music.lists = await loadPlaylists(store.client, main.entity_id);
+    music.lists = await loadPlaylists(store.client, musicLibraryPlayer(players, main).entity_id);
   } catch {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
@@ -10484,7 +10784,8 @@ function musicHtml() {
     on: true, entity: hereEntity, status: sp.status, error: sp.error, pin: sp.pin, name: sp.name || musicName(),
     needsTap: sp.status === 'ready' && sp.needsTap,
   } : null;
-  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel() });
+  const phones = store.prefs.musicPhones === false ? [] : store.phones || [];
+  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel(), phones });
 }
 
 /**
@@ -10548,6 +10849,7 @@ function musicSettingsHtml(check) {
       ${p.musicHere ? `<label class="row"><span><b>Speaker name</b><small class="muted">How it shows in Music Assistant and Home Assistant</small></span><input type="text" data-pref="musicName" value="${esc(p.musicName)}" placeholder="${esc(musicName())}" autocomplete="off"></label>
         <label class="row"><span><b>Music Assistant address</b><small class="muted">Leave empty when Music Assistant runs as a Home Assistant add-on</small></span><input type="text" data-pref="musicServer" value="${esc(p.musicServer)}" placeholder="${esc(musicServerUrl('', base()))}" autocomplete="off" inputmode="url"></label>
         ${status ? `<p class="hint">${esc(status)}</p>` : ''}` : ''}
+      ${store.phones?.length ? check('musicPhones', 'Open Spotify on phones', esc(`Buttons that open the Spotify app on ${store.phones.map((x) => x.name).join(' or ')}`)) : ''}
       ${players.kind !== 'spotify' && shown.size ? `<details><summary>Speakers on the card</summary>${[...shown].map((id) => store.states.get(id)).map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc(s.entity_id)}</small></span><input type="checkbox" data-music-hide="${esc(s.entity_id)}"${p.musicHidden?.[s.entity_id] ? '' : ' checked'}></label>`).join('')}</details>` : ''}` : ''}
   </section>`;
 }
@@ -10563,9 +10865,8 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}${modesHtml()}<div class="music-slot"></div></div>
-      <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
-      <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
   },
 
@@ -10592,12 +10893,19 @@ const VIEWS = {
     const lastFull = alert?.attributes?.last_triggered;
     const recap = solarRecap();
     const net = r.feedIn || r.buy ? (t.sold?.kwh || 0) * r.feedIn - (t.bought?.kwh || 0) * r.buy : null;
+    const grid = gridStatus();
+    const hasMonth = x.exportMonth != null || x.exportYear != null;
+    const m = e.m;
+    const chips = m ? ENERGY_CHARTS.filter(([k]) => (k === 'solar' ? m.solar || m.home : m[k])) : [];
+    const pick = chips.some(([k]) => k === ui.energyChart) ? ui.energyChart : chips[0]?.[0];
     return `<div class="v-energy">
+      <div class="col col-a">
       <section class="card battery-card">
         <h2 class="card-title">${icon('battery')}Battery</h2>
         <div class="bat">
           <div class="bat-gauge" style="--p:${Math.max(0, Math.min(100, f.soc ?? 0))}"><span class="bat-fill"></span><b>${f.soc != null ? Math.round(f.soc) : '–'}%</b></div>
           <div class="bat-text">
+            ${grid ? `<p class="grid-pill${grid.off ? ' off' : ''}"><i></i>${esc(grid.text)}</p>` : ''}
             <p class="bat-state">${f.charging > 0.05 ? `Charging at ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Powering the house at ${energyPower(f.discharging)}` : f.soc >= 99.5 ? 'Full' : 'Resting'}</p>
             ${eta ? `<p>${esc(eta)}</p>` : ''}
             ${stored != null ? `<p class="muted">${stored.toFixed(1)} kWh stored${cap ? ` of ${cap.toFixed(1)} kWh` : ''}</p>` : ''}
@@ -10618,9 +10926,11 @@ const VIEWS = {
         <h2 class="card-title">${icon('power')}Right now</h2>
         ${flowHtml(f)}
       </section>
+      </div>
 
+      <div class="col col-b">
       <section class="card today-energy">
-        <h2 class="card-title">${icon('today')}Today</h2>
+        <h2 class="card-title">${icon('today')}Today${hasMonth ? `<button type="button" class="title-link" data-energy-month aria-expanded="${ui.energyMonth}">${ui.energyMonth ? 'Hide month' : 'This month ›'}</button>` : ''}</h2>
         <dl class="tiles">
           <div class="t-solar"><dt>${icon('solar')}Solar made</dt><dd>${kwh(t.pv)}${est(t.pv)}</dd></div>
           <div class="t-sold"><dt>${icon('cash')}Sold to grid</dt><dd>${kwh(t.sold)}${est(t.sold)}</dd>${t.sold && r.feedIn ? `<small>${money(t.sold.kwh * r.feedIn)} earned</small>` : ''}</div>
@@ -10632,7 +10942,7 @@ const VIEWS = {
         ${!r.feedIn ? '<p class="hint">Add your feed-in rate in <a href="#/settings?section=energy">Settings</a> to see what the solar you sell earns.</p>' : ''}
       </section>
 
-      ${x.exportMonth != null || x.exportYear != null ? `<section class="card month-energy">
+      ${hasMonth && ui.energyMonth ? `<section class="card month-energy">
         <h2 class="card-title">${icon('cash')}Selling to the grid</h2>
         <dl class="tiles">
           ${x.exportMonth != null ? `<div><dt>This month</dt><dd>${x.exportMonth.toFixed(0)}<small> kWh</small></dd>${r.feedIn ? `<small>${money(x.exportMonth * r.feedIn)}</small>` : ''}</div>` : ''}
@@ -10642,21 +10952,27 @@ const VIEWS = {
       </section>` : ''}
 
       <section class="card charts-card">
-        <h2 class="card-title">${icon('timer')}Last 24 hours</h2>
-        ${energyChartsView(e.m)}
+        <h2 class="card-title">${icon('timer')}Last 24 hours${chips.length > 1 ? `<span class="title-chips">${chips.map(([k, label]) => `<button type="button" class="chip${k === pick ? ' on' : ''}" data-energy-chart="${k}">${label}</button>`).join('')}</span>` : ''}</h2>
+        ${energyChartsView(m, pick)}
       </section>
+      </div>
     </div>`;
   },
 
   places() {
     if (!ready()) return notReady();
+    loadMoves();
     const people = shownPeople();
     return `<div class="v-places">
       <section class="card map-card"><div class="pmap-slot big"></div></section>
+      <div class="places-side">
       <section class="card people-card">
         <h2 class="card-title">${icon('people')}Household</h2>
         ${people.length ? `<ul class="people-list">${people.map(personCardHtml).join('')}</ul>` : '<p class="muted">No people in Home Assistant yet.</p>'}
       </section>
+      ${garageCardHtml()}
+      ${movesCardHtml()}
+      </div>
     </div>`;
   },
 
@@ -10685,6 +11001,7 @@ const VIEWS = {
     const count = [...store.states.keys()].filter(listed).length;
     const camCard = cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : '';
     return `<div class="v-home">
+      ${quickRowHtml()}
       ${plan ? `<div class="home-plan">${plan}${camCard}</div>` : camCard}
       <section class="card rooms-card">
         <h2 class="card-title">${icon('area')}Rooms</h2>
@@ -10705,7 +11022,7 @@ const VIEWS = {
     const embedded = store.authMode === 'embedded';
     const ids = store.states.size ? energyIds() : {};
     const people = peopleOf(store.states);
-    const hidden = (pp) => (p.hiddenPeople ? !!p.hiddenPeople[pp.id] : /wall|display|kiosk|tablet|ipad|dashboard/i.test(pp.name));
+    const hidden = (pp) => (p.hiddenPeople && pp.id in p.hiddenPeople ? !!p.hiddenPeople[pp.id] : isScreenLogin(pp));
     const { lists, events } = newsSources(store.states);
     const cals = calendarsOf(store.states);
     const colors = calColors();
@@ -10793,6 +11110,8 @@ const VIEWS = {
           <input type="checkbox" data-person-show="${esc(pp.id)}"${hidden(pp) ? '' : ' checked'}></label>`).join('') : '<p class="muted">No people yet.</p>') : ''}
       </section>
 
+      ${carsSettingsHtml(people)}
+
       <section class="card" id="look">
         <h2 class="card-title">${icon('sun')}Look</h2>
         ${choose('theme', 'Theme', [['auto', 'Same as this device'], ['sun', 'Dark after sunset'], ['light', 'Light'], ['dark', 'Dark']])}
@@ -10852,6 +11171,56 @@ const VIEWS = {
     </div>`;
   },
 };
+
+/** Settings → Family cars: the plates the car arrivals automation announces as "Andrew is home". */
+function carsSettingsHtml(people) {
+  const helper = store.states.get(CARS_ENTITY);
+  if (!helper) {
+    return store.user?.is_admin ? `<section class="card" id="cars">
+        <h2 class="card-title">${icon('car')}Family cars</h2>
+        <p class="muted">Add <code>homeassistant/car_arrivals.yaml</code> to Home Assistant to hear “Andrew is home” when a family car pulls in. Its plates are typed in here.</p>
+      </section>` : '';
+  }
+  const persons = people.filter((pp) => pp.id.startsWith('person.') && !/wall|display|kiosk|tablet|ipad|dashboard|^tv$|livingtv/i.test(pp.name));
+  const ownerName = (o) => (o.startsWith('person.') ? (people.find((pp) => pp.id === o)?.name || o) : o);
+  const cars = parseCars(helper.state);
+  return `<section class="card" id="cars">
+      <h2 class="card-title">${icon('car')}Family cars</h2>
+      <p class="muted">When a camera reads one of these plates, everyone gets a “… is home” notification, like “Andrew is home”. Other cars get the usual camera alert. They’re saved in Home Assistant, so every screen shares them.</p>
+      ${cars.length ? cars.map((c) => `<div class="row"><span><b>${esc(c.plate)}</b><small class="muted">${esc(ownerName(c.owner))}’s car</small></span>
+        <button type="button" class="btn" data-car-remove="${esc(c.plate)}" aria-label="Remove ${esc(c.plate)}">Remove</button></div>`).join('')
+        : '<p class="muted quiet">No cars yet.</p>'}
+      <form class="car-add" data-car-add>
+        <label>Number plate<input name="plate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. ABC123" maxlength="12"></label>
+        <label>Whose car<select name="owner">${persons.map((pp) => `<option value="${esc(pp.id)}">${esc(pp.name)}</option>`).join('')}<option value="">Someone else…</option></select></label>
+        <label class="car-other"${persons.length ? ' hidden' : ''}>Their name<input name="other" autocomplete="off" placeholder="e.g. Nana"></label>
+        <button class="btn primary" type="submit">Add car</button>
+      </form>
+    </section>`;
+}
+
+/** Settings doesn't redraw on state changes (it would wipe what's being typed), so the cars card redraws itself. */
+function redrawCars(force = false) {
+  const sec = document.getElementById('cars');
+  if (!sec || (!force && sec.contains(document.activeElement) && document.activeElement.matches('input, select'))) return;
+  const html = carsSettingsHtml(peopleOf(store.states));
+  if (html) sec.outerHTML = html;
+  ui.viewHtml = '';
+}
+
+/** Writes the cars back to Home Assistant and redraws the card. */
+async function saveCars(cars, done) {
+  try {
+    const value = serializeCars(cars);
+    await store.client.callService('input_text', 'set_value', { value }, { entity_id: CARS_ENTITY });
+    const cur = store.states.get(CARS_ENTITY);
+    if (cur) store.states.set(CARS_ENTITY, { ...cur, state: value });
+    redrawCars(true);
+    toast(done);
+  } catch (err) {
+    toast(`Couldn't save the cars: ${err.message}`);
+  }
+}
 
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
@@ -11442,6 +11811,11 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
+  const ec = t.closest('[data-energy-chart]');
+  if (ec) { ui.energyChart = ec.dataset.energyChart; render(); return; }
+  if (t.closest('[data-energy-month]')) { ui.energyMonth = !ui.energyMonth; render(); return; }
+  const qa = t.closest('[data-quick]');
+  if (qa) { quickAct(qa.dataset.quick, qa); return; }
   if (handleSettingsClick(t) || handleCalendarClick(t)) return;
   const ce = t.closest('[data-cam-edit]');
   if (ce) { camEditAct(ce.dataset.camEdit); return; }
@@ -11485,6 +11859,13 @@ document.addEventListener('click', (e) => {
   if (mp) { musicPick(mp.dataset.musicPick); return; }
   const ms = t.closest('[data-music-source]');
   if (ms) { const id = ms.closest('[data-entity]')?.dataset.entity; if (id) call('media_player', 'select_source', { source: ms.dataset.musicSource }, id); return; }
+  const sph = t.closest('[data-spotify-phone]');
+  if (sph) {
+    const ph = (store.phones || []).find((x) => x.service === sph.dataset.spotifyPhone);
+    toast(`Opening Spotify on ${ph?.name || 'the phone'}…`);
+    call('notify', sph.dataset.spotifyPhone, { message: 'command_launch_app', data: { package_name: 'com.spotify.music' } });
+    return;
+  }
   const ml = t.closest('[data-music-play]');
   if (ml) { musicPlay(Number(ml.dataset.musicPlay)); return; }
   if (t.closest('[data-music-unlock]')) { screenSpeaker.unlock(); render(); return; }
@@ -11600,6 +11981,12 @@ document.addEventListener('input', (e) => {
   if (out) out.textContent = `${r.value}${out.textContent.replace(/^[\d.]+/, '')}`;
 });
 document.addEventListener('change', (e) => {
+  if (e.target.name === 'owner' && e.target.closest('[data-car-add]')) {
+    const other = e.target.closest('form').querySelector('.car-other');
+    other.hidden = !!e.target.value;
+    if (!other.hidden) other.querySelector('input').focus();
+    return;
+  }
   const t = e.target;
   const r = t.closest('[data-slide]');
   if (r) {
@@ -11648,8 +12035,8 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.personShow) {
     const hidden = store.prefs.hiddenPeople || Object.fromEntries(peopleOf(store.states)
-      .filter((p) => /wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name)).map((p) => [p.id, true]));
-    if (t.checked) delete hidden[t.dataset.personShow]; else hidden[t.dataset.personShow] = true;
+      .filter(isScreenLogin).map((p) => [p.id, true]));
+    hidden[t.dataset.personShow] = !t.checked;
     store.prefs.hiddenPeople = hidden;
     writePrefs();
     return;
@@ -11683,6 +12070,12 @@ function handleSettingsClick(t) {
     return true;
   }
   if (t.closest('[data-install]')) { promptInstall(); return true; }
+  const rm = t.closest('[data-car-remove]');
+  if (rm) {
+    const cars = parseCars(store.states.get(CARS_ENTITY)?.state).filter((c) => c.plate !== rm.dataset.carRemove);
+    saveCars(cars, `Removed ${rm.dataset.carRemove}`);
+    return true;
+  }
   if (t.closest('[data-forget-token]')) {
     saveSettings({ ...loadSettings(), token: '' });
     toast('Token forgotten on this screen');
@@ -11759,6 +12152,15 @@ document.addEventListener('submit', (e) => {
     input.value = '';
     return;
   }
+  if (e.target.matches('[data-car-add]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const owner = String(f.get('owner') || '') || String(f.get('other') || '');
+    const res = addCar(parseCars(store.states.get(CARS_ENTITY)?.state), { plate: f.get('plate'), owner });
+    if (res.error) { toast(res.error); return; }
+    saveCars(res.cars, `Saved ${cleanPlate(f.get('plate'))}`);
+    return;
+  }
   if (!e.target.matches('[data-conn]')) return;
   e.preventDefault();
   const f = new FormData(e.target);
@@ -11798,7 +12200,8 @@ async function start() {
   });
   client.addEventListener('ready', async (e) => {
     if (client !== store.client) return;
-    const { states, config, areas, entityInfo } = e.detail;
+    const { states, config, areas, entityInfo, phones } = e.detail;
+    store.phones = phones || [];
     store.states = new Map(states.map((s) => [s.entity_id, s]));
     store.config = config || {};
     store.areas = new Map(areas.map((a) => [a.area_id, a.name]));
@@ -11826,7 +12229,7 @@ async function start() {
       const f = energyFlow(store.states, energyIds(), {});
       learnSigns(f.raw, null, energyIds());
     }
-    if (ui.view === 'settings') return;
+    if (ui.view === 'settings') { if (entityId === CARS_ENTITY) redrawCars(); return; }
     // On Today a speaker only changes the Music card: redraw just that (speakers report every few seconds).
     if (ui.view === 'today' && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
     queueRefresh();

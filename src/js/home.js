@@ -20,7 +20,7 @@ const SAFETY_CLASSES = new Set(['smoke', 'gas', 'carbon_monoxide', 'moisture', '
 export const OPENING_CLASSES = new Set(['door', 'window', 'opening', 'garage_door']);
 export const MOTION_CLASSES = new Set(['motion', 'occupancy', 'presence']);
 // Appliances have doors too; a dishwasher left ajar to dry is not news.
-const APPLIANCE_WORDS = /dishwasher|washing|washer|dryer|oven|fridge|refrigerator|freezer|microwave|airfryer|air fryer/i;
+export const APPLIANCE_WORDS = /dishwasher|washing|washer|dryer|oven|fridge|refrigerator|freezer|microwave|airfryer|air fryer/i;
 // Lights that are meant to stay on, so "lights on" is not always one.
 const STATUS_LIGHTS = /notification|indicator|status|night ?light|led ring/i;
 // Sensors that measure something other than the room.

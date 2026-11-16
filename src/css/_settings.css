@@ -198,3 +198,11 @@ button.cal-ev.big:hover, button.cal-ev.big:focus-visible { background: color-mix
 .hchart-loading { place-items: center; min-height: 120px; }
 .htimeline { position: relative; height: 28px; border-radius: 8px; background: var(--surface-2); overflow: hidden; }
 .htimeline span { position: absolute; top: 0; bottom: 0; background: var(--accent); }
+
+/* Settings → Family cars */
+.car-add { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; margin-top: 12px; }
+.car-add label { display: grid; gap: 4px; font-weight: 600; font-size: 0.9rem; }
+.car-add input, .car-add select { min-height: 42px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: inherit; width: 100%; }
+.car-add input[name="plate"] { text-transform: uppercase; letter-spacing: 0.06em; }
+.car-add [hidden] { display: none; }
+.car-add input::placeholder { text-transform: none; letter-spacing: normal; }

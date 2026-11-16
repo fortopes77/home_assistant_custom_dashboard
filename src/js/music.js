@@ -30,12 +30,32 @@ export function musicPlayers(states, { ok = () => true, platform = () => '', hid
   const pf = (s) => platform(s.entity_id);
   // Music Assistant's players are listed whether or not they're exposed to Assist: they're the speakers.
   const mass = all.filter((s) => isMassPlayer(s, pf(s)) && !isUnavailable(s));
-  if (mass.length) return { kind: 'mass', speakers: mass, account: null };
+  if (mass.length) return { kind: 'mass', speakers: dedupeSpeakers(mass), account: null };
   const account = all.find((s) => isSpotifyAccount(s, pf(s)) && s.state !== 'unavailable') || null;
   if (account) return { kind: 'spotify', speakers: [], account };
   const speakers = all.filter((s) => !isUnavailable(s) && ok(s.entity_id)
     && (mpHas(s, MF.PAUSE) || mpHas(s, MF.PLAY) || mpHas(s, MF.VOLUME_SET)) && !NOT_A_SPEAKER.test(nameOf(s)));
   return { kind: 'plain', speakers, account: null };
+}
+
+// Music Assistant's own players carry mass_player_type. Its "Home Assistant MediaPlayers" provider can
+// add a second copy of the same speaker (wrapping Home Assistant's Google Cast entity) that has none,
+// and that copy can't browse the library, so keep one chip per speaker name: the native one.
+const isNativeMass = (s) => s.attributes?.mass_player_type != null;
+function dedupeSpeakers(list) {
+  const byName = new Map();
+  for (const s of list) {
+    const k = nameOf(s).trim().toLowerCase();
+    const had = byName.get(k);
+    if (!had || (!isNativeMass(had) && isNativeMass(s))) byName.set(k, s);
+  }
+  return list.filter((s) => byName.get(nameOf(s).trim().toLowerCase()) === s);
+}
+
+/** The player to read Music Assistant's library from: a native one, since they all share it. */
+export function musicLibraryPlayer(players, main) {
+  if (players.kind !== 'mass') return main;
+  return (main && isNativeMass(main) ? main : players.speakers.find(isNativeMass)) || main;
 }
 
 /** Which player the card shows: Spotify's account, else the one picked here, else whatever is playing. */
@@ -71,17 +91,18 @@ function musicPosition(s, now = Date.now()) {
 
 /**
  * The card. opts: lists (playlists [{ title, thumb, id, type }] or null), art(url) for a full address,
- * here ({ on, entity, needsTap, status, pin }) for this screen's own player.
+ * here ({ on, entity, needsTap, status, pin }) for this screen's own player, phones ([{ name, service }])
+ * to open the Spotify app on.
  */
-export function musicCardHtml(players, main, { lists = null, art = (u) => u, here = null, hereLabel = 'This screen' } = {}) {
+export function musicCardHtml(players, main, { lists = null, art = (u) => u, here = null, hereLabel = 'This screen', phones = [] } = {}) {
   const hereOn = here?.on;
-  if (!main && !hereOn) return '';
+  if (!main && !hereOn && !phones.length) return '';
   const { kind } = players;
   const a = main?.attributes || {};
   const live = main && ['playing', 'paused', 'buffering'].includes(main.state) && a.media_title;
   const playing = main && (main.state === 'playing' || main.state === 'buffering');
   const isHere = main && here?.entity && main.entity_id === here.entity.entity_id;
-  const where = !main ? hereLabel : kind === 'spotify' ? a.source || '' : isHere ? hereLabel : nameOf(main);
+  const where = !main ? (hereOn ? hereLabel : '') : kind === 'spotify' ? a.source || '' : isHere ? hereLabel : nameOf(main);
   const pic = live && (a.entity_picture_local || a.entity_picture);
   const sub = [a.media_artist || a.media_album_artist || (a.app_name && a.app_name !== a.media_title ? a.app_name : ''), a.media_album_name]
     .filter(Boolean).join(' · ');
@@ -129,6 +150,12 @@ export function musicCardHtml(players, main, { lists = null, art = (u) => u, her
     else if (here.needsTap) hereNote = `<button type="button" class="btn primary music-here-tap" data-music-unlock>${icon('volumeHigh')}<span>Tap to play on ${esc(hereLabel.replace(/^This/, 'this'))}</span></button>`;
   }
 
+  // Open the Spotify app on a phone (the Home Assistant app on Android can launch apps).
+  const phonesHtml = phones.length
+    ? `<div class="chips music-phones" aria-label="Open Spotify on a phone"><span class="muted">Open Spotify on</span>${phones.map((ph) =>
+      `<button type="button" class="chip" data-spotify-phone="${esc(ph.service)}">${icon('phone')}${esc(ph.name)}</button>`).join('')}</div>`
+    : '';
+
   const hint = kind === 'plain' && !live
     ? '<p class="muted quiet music-hint">Add Music Assistant to Home Assistant to play Spotify playlists here and on your speakers.</p>' : '';
 
@@ -147,6 +174,7 @@ export function musicCardHtml(players, main, { lists = null, art = (u) => u, her
     ${vol}
     ${chips ? `<div class="chips music-speakers" aria-label="Speakers">${chips}</div>` : ''}
     ${listsHtml}
+    ${phonesHtml}
     ${hint}
   </section>`;
 }
@@ -158,7 +186,9 @@ export async function loadPlaylists(client, entityId, limit = 12) {
   const kids = root?.children || [];
   const folder = kids.find((c) => c.can_expand && /playlist/i.test(`${c.title} ${c.media_content_id} ${c.media_content_type}`));
   const page = folder ? await browse({ media_content_id: folder.media_content_id, media_content_type: folder.media_content_type }) : root;
-  return (page?.children || []).filter((c) => c.can_play).slice(0, limit)
+  // Spotify's Liked Songs first: it's the one people reach for.
+  const liked = (c) => (/^liked songs\b/i.test(c.title || '') ? 0 : 1);
+  return (page?.children || []).filter((c) => c.can_play).sort((x, y) => liked(x) - liked(y)).slice(0, limit)
     .map((c) => ({ title: c.title, thumb: c.thumbnail || '', id: c.media_content_id, type: c.media_content_type }));
 }
 

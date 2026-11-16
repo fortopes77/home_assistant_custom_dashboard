@@ -33,12 +33,13 @@ import { weatherWord, greetingFor, dayPart, briefFacts, briefLocal, briefAgents,
 import { noteFromCall, noteMerge, noteText, noteItems, Ding } from './notify.js';
 import {
   roomGroups, roomTemperature, roomExtras, isStatusLight, switchNote, devicesIndex, glanceItems,
-  MOTION_CLASSES, OPENING_CLASSES,
+  MOTION_CLASSES, OPENING_CLASSES, APPLIANCE_WORDS,
 } from './home.js';
 import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './news.js';
 import { Voice } from './voice.js';
 import { binNight, binSvg, binWords } from './bins.js';
-import { musicPlayers, musicMain, musicHereEntity, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
+import { CARS_ENTITY, parseCars, serializeCars, addCar, cleanPlate } from './cars.js';
+import { musicPlayers, musicMain, musicHereEntity, musicLibraryPlayer, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
 
 const DASH_BUILD = 'source';
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -77,6 +78,7 @@ const DEFAULT_PREFS = {
   musicServer: '',       // Music Assistant's player address; empty = this Home Assistant's host, port 8927
   musicPlayer: '',       // the speaker this screen's card controls; empty = whatever is playing
   musicHidden: {},       // media_player ids left off the card
+  musicPhones: true,     // "Open Spotify on" buttons for the family's Android phones
   peopleMap: true,       // the Places page and the map on Today
   showHidden: false,     // hidden and diagnostic entities
   showUnavailable: false,
@@ -134,6 +136,8 @@ const ui = {
   dragging: false,
   refreshTimer: 0,
   lastRender: 0,
+  energyChart: 'solar',    // the one 24-hour chart shown on Energy: solar | grid | soc
+  energyMonth: false,      // "This month" opened on Energy
 };
 
 // ---------- helpers ----------
@@ -568,9 +572,13 @@ function calWhoSettingsHtml() {
  * The household for "Who": every person in Home Assistant except wall tablets, first names. Not the
  * Places list, so hiding someone from this screen's map (or their phone being off) doesn't drop them.
  */
+// Logins for screens (a wall tablet, a TV app) are persons in Home Assistant too, but not people.
+const SCREEN_NAME = /wall|display|kiosk|tablet|ipad|dashboard|\btv\b|tv$/i;
+const isScreenLogin = (p) => SCREEN_NAME.test(p.name) || SCREEN_NAME.test(p.id.split('.')[1] || '');
+
 function household() {
   return peopleOf(store.states)
-    .filter((p) => domainOf(p.id) === 'person' && !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name))
+    .filter((p) => domainOf(p.id) === 'person' && !isScreenLogin(p))
     .map((p, i) => ({ id: p.id, name: p.name.split(/\s+/)[0], full: p.name, color: WHO_COLORS[i % WHO_COLORS.length] }));
 }
 
@@ -819,8 +827,8 @@ function shownPeople() {
   const hidden = store.prefs.hiddenPeople;
   return peopleOf(store.states).filter((p) => {
     if (p.unavailable && !p.located) return false;
-    if (hidden) return !hidden[p.id];
-    return !/wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name);
+    if (hidden && p.id in hidden) return !hidden[p.id];
+    return !isScreenLogin(p);
   });
 }
 
@@ -920,7 +928,8 @@ function summaryText() {
 // Bin night: little coloured bins under the date, from the bin night sensor (homeassistant/bin_night.yaml).
 function binsHtml(now) {
   const b = binNight(store.states, now);
-  if (!b) return '';
+  // Only on bin day itself: the rest of the week the chip is just clutter (a reminder comes at 6 pm).
+  if (!b || b.when !== 'tonight') return '';
   const words = binWords(b.colours);
   const label = b.when ? `${words} bins ${b.when === 'tonight' || b.when === 'tomorrow night' ? b.when : `on ${b.when}`}` : `${words} bins`;
   return `<button type="button" class="bins${b.soon ? ' soon' : ''}" data-open-entity="${esc(b.id)}" aria-label="${esc(label)}" title="${esc(label)}">
@@ -936,7 +945,7 @@ const MODES = [
   { match: /^input_boolean\.sleep_?in$/, key: 'sleep', icon: 'wxNight', name: 'Sleep in',
     on: 'Bedroom blind stays shut. Turns off at noon.',
     off: (now) => (now.getHours() >= 17 ? 'Tap tonight to keep the bedroom blind shut tomorrow' : 'Keeps the bedroom blind shut in the morning') },
-  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode',
+  { match: /^input_boolean\.holiday_mode$/, key: 'holiday', icon: 'suitcase', name: 'Holiday mode', short: 'Holiday',
     on: 'We\'re away', off: () => 'Turn on when everyone goes away' },
 ];
 
@@ -965,7 +974,7 @@ function modesHtml() {
       return `<div class="mode mode-${m.key}${on ? ' on' : ''}" data-entity="${esc(s.entity_id)}">
         <button type="button" class="mode-btn" data-act="toggle" role="switch" aria-checked="${on}">
           <span class="mode-ic">${icon(m.icon)}</span>
-          <span class="mode-text"><b>${esc(m.name)}</b><small>${esc(on ? m.on : m.off(now))}</small></span>
+          <span class="mode-text"><b><span class="mode-name">${esc(m.name)}</span><span class="mode-short">${esc(m.short || m.name)}</span></b><small>${esc(on ? m.on : m.off(now))}</small></span>
           <span class="switch${on ? ' on' : ''}" aria-hidden="true"></span>
         </button>
       </div>`;
@@ -991,8 +1000,6 @@ function heroHtml() {
   const name = (store.user?.name || '').split(/\s+/)[0];
   const warnings = [...store.states.values()].find((s) => domainOf(s.entity_id) === 'sensor' && /warnings?$/i.test(s.entity_id) && Number(s.state) > 0);
   const { text, by } = summaryText();
-  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
-    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
   return `<section class="card hero">
     <div class="hero-top">
       <div class="hero-when">
@@ -1009,6 +1016,15 @@ function heroHtml() {
     </div>
     ${warnings ? `<button type="button" class="warn-banner" data-open-entity="${esc(warnings.entity_id)}">${icon('alert')}${esc(plural(Number(warnings.state), 'weather warning'))} for your area</button>` : ''}
     ${store.prefs.brief ? `<p class="hero-summary">${esc(text)}${by ? `<small> · written by ${esc(by)}</small>` : ''}</p>` : ''}
+  </section>`;
+}
+
+// Right now: open doors, someone at a camera, appliances running, lights left on. Its own card, beside the map.
+function nowCardHtml() {
+  const glance = !store.prefs.glance ? [] : glanceItems(homeCtx(), { areaName: (id) => store.areas.get(id) || '' })
+    .slice(0, matchMedia('(min-width: 700px)').matches ? 4 : 5);
+  if (!glance.length) return '';
+  return `<section class="card now-card">
     ${glance.length ? `<ul class="glance" aria-label="Right now">${glance.map((g) => `
       <li class="glance-item tone-${g.tone}">
         <button type="button" ${g.open ? `data-open-entity="${esc(g.open)}"` : g.href ? `data-href="${esc(g.href === '#/solar' ? '#/energy' : g.href.replace('#/entities', '#/home'))}"` : 'disabled'}>
@@ -1042,7 +1058,7 @@ function agendaHtml() {
       : `${dayBlock(today, 'Today')}${dayBlock(calAddDays(today, 1), 'Tomorrow')}`;
   // "Everyone" or one person's events (with the shared ones); remembered on this screen.
   const filter = vw.people.length > 1 && writableCals().length ? `<div class="who-filter" role="group" aria-label="Whose events">
-      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">Everyone</button>
+      <button type="button" data-cal-for="" aria-pressed="${!vw.forId}">${vw.people.length === 2 ? 'Both' : 'Everyone'}</button>
       ${vw.people.map((p) => `<button type="button" data-cal-for="${esc(p.id)}" aria-pressed="${vw.forId === p.id}" style="--cal:${p.color}">${esc(p.name)}</button>`).join('')}
     </div>` : '';
   return `<section class="card agenda-card${month ? ' month' : ''}">
@@ -1057,25 +1073,21 @@ function agendaHtml() {
   </section>`;
 }
 
+// Energy on Today: just the battery level and what it's doing; the Energy page has the rest.
 function energyMiniHtml() {
   if (!store.prefs.energyTab) return '';
   const e = energyNow();
   if (!e.flow.found) return '';
   const f = e.flow;
   const soc = f.soc;
-  const state = f.charging > 0.05 ? `Charging ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Using ${energyPower(f.discharging)}` : soc >= 99.5 ? 'Full' : 'Resting';
-  const sold = e.today.sold?.kwh;
-  return `<a class="card energy-mini" href="#/energy">
-    <h2 class="card-title">${icon('solar')}Energy<span class="card-go">${icon('chevronRight')}</span></h2>
-    <div class="em-row">
-      ${soc != null ? `<div class="ring" style="--p:${Math.max(0, Math.min(100, soc))}"><b>${Math.round(soc)}%</b><small>${esc(state)}</small></div>` : ''}
-      <dl class="em-stats">
-        <div><dt>Solar</dt><dd>${energyPower(f.solar)}</dd></div>
-        <div><dt>${f.selling > 0.05 ? 'Selling' : f.buying > 0.05 ? 'Buying' : 'Grid'}</dt><dd class="${f.selling > 0.05 ? 'pos' : f.buying > 0.05 ? 'neg' : ''}">${energyPower(f.selling > 0.05 ? f.selling : f.buying || 0)}</dd></div>
-        ${sold != null ? `<div><dt>Sold</dt><dd class="pos">${sold.toFixed(1)}<small class="u"> kWh</small>${e.rates.feedIn ? `<small>${money(sold * e.rates.feedIn)}</small>` : ''}</dd></div>` : ''}
-        ${e.today.pv ? `<div><dt>Made</dt><dd>${e.today.pv.kwh.toFixed(1)}<small class="u"> kWh</small></dd></div>` : ''}
-      </dl>
-    </div>
+  const [tone, state] = f.buying > 0.05 ? ['neg', `Using grid · ${energyPower(f.buying)}`]
+    : f.charging > 0.05 ? ['pos', `Charging · ${energyPower(f.charging)}`]
+      : soc != null && soc >= 99.5 ? ['pos', f.selling > 0.05 ? `Full · selling ${energyPower(f.selling)}` : 'Full']
+        : f.discharging > 0.05 ? ['bat', 'Running the house'] : ['bat', f.selling > 0.05 ? `Selling ${energyPower(f.selling)}` : 'Resting'];
+  return `<a class="card energy-mini" href="#/energy" aria-label="Energy">
+    <span class="em-label">${icon('solar')}<span>Battery</span></span>
+    ${soc != null ? `<b class="em-soc">${Math.round(soc)}%</b><span class="em-bar" style="--p:${Math.max(0, Math.min(100, soc))}%"><i></i></span>` : `<b class="em-soc">${energyPower(f.solar)}</b><span class="em-bar"></span>`}
+    <span class="em-state ${tone}"><i></i>${esc(state)}</span>
   </a>`;
 }
 
@@ -1290,6 +1302,15 @@ async function loadEnergyHistory(force = false) {
   queueRefresh();
 }
 
+/** The inverter's on-grid / off-grid sensor (Sigenergy local Modbus: sensor.sigen_plant_grid_connection_status). */
+function gridStatus() {
+  const s = [...store.states.values()].find((x) => domainOf(x.entity_id) === 'sensor'
+    && (/grid_(connection_)?status|on_off_grid/.test(x.entity_id) || /^(on_grid|off_grid)/.test(x.state)) && !isUnavailable(x));
+  if (!s) return null;
+  const off = /off/i.test(s.state) && !/^on/i.test(s.state);
+  return { s, off, text: off ? 'Off grid · running on solar and battery' : 'On grid · power is on' };
+}
+
 function batteryAlert() {
   return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation'
     && (s.attributes?.id === 'dashboard_battery_full' || /batter.*(full|charged|100)/i.test(nameOf(s))));
@@ -1376,22 +1397,27 @@ function nice(v) {
   return Math.ceil(v / 10) * 10;
 }
 
-function energyChartsView(m) {
+const ENERGY_CHARTS = [['solar', 'Solar'], ['grid', 'Grid'], ['soc', 'Battery']];
+
+/** One 24-hour chart at a time, picked with the chips in the card title. */
+function energyChartsView(m, pick = ui.energyChart) {
   if (!m) return energy.error ? `<p class="muted">${esc(energy.error)}</p>` : '<div class="spinner"></div>';
+  const has = { solar: !!(m.solar || m.home), grid: !!m.grid, soc: !!m.soc };
+  if (!has[pick]) pick = ENERGY_CHARTS.map(([k]) => k).find((k) => has[k]);
   const peak = (...arrs) => Math.max(0.5, ...arrs.flat().filter((v) => v != null).map(Math.abs));
   const out = [];
-  if (m.solar || m.home) {
+  if (pick === 'solar') {
     out.push(chartHtml({ title: 'Solar and home use', m, min: 0, max: nice(peak(m.solar || [], m.home || [])),
       series: [{ values: m.solar, cls: 'solar', area: true, label: 'Solar' }, { values: m.home, cls: 'home', label: 'Home' }] }));
   }
-  if (m.grid) {
+  if (pick === 'grid') {
     const sold = m.grid.map((v) => (v == null ? null : Math.min(0, v)));
     const bought = m.grid.map((v) => (v == null ? null : Math.max(0, v)));
     const top = nice(peak(m.grid));
     out.push(chartHtml({ title: 'Grid', m, min: -top, max: top, note: 'Sold below the line',
       series: [{ values: sold, cls: 'sold', area: true, label: 'Sold' }, { values: bought, cls: 'bought', area: true, label: 'Bought' }] }));
   }
-  if (m.soc) out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
+  if (pick === 'soc') out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
   return out.join('');
 }
 
@@ -1435,9 +1461,132 @@ function personCardHtml(p) {
   </button></li>`;
 }
 
+/** Garage doors and gates shown on the dashboard. */
+function garageDoors() {
+  return [...store.states.values()].filter((s) => domainOf(s.entity_id) === 'cover' && listed(s.entity_id)
+    && ['garage', 'gate'].includes(s.attributes?.device_class));
+}
+
+/** "Garage Door Door 1" reads as "Garage door". */
+function garageName(g) {
+  const n = nameOf(g).replace(/(\s+(door|opener))?(\s+\d+)+$/i, '').replace(/\s+door\s+door$/i, ' door');
+  return /door|gate/i.test(n) ? n.replace(/\bDoor\b/, 'door') : `${n} door`;
+}
+
+const coverWord = (st) => ({ open: 'Open', closed: 'Closed', opening: 'Opening…', closing: 'Closing…' }[st] || st);
+
+function garageCardHtml() {
+  const doors = garageDoors();
+  if (!doors.length) return '';
+  const auto = store.states.get('input_boolean.garage_auto_open');
+  return `<section class="card garage-card">${doors.map((g) => {
+    const v = shown(g);
+    const open = v.state !== 'closed';
+    return `<div class="garage-row${open ? ' open' : ''}">
+      <span class="garage-ic">${icon(open ? 'garageOpen' : 'garage')}</span>
+      <span class="garage-text"><b>${esc(garageName(g))}</b><small class="muted">${esc(coverWord(v.state))}${g.last_changed ? ` · ${esc(relativeTime(g.last_changed))}` : ''}${auto?.state === 'on' && !open ? ' · opens when your car gets home' : ''}</small></span>
+      <button type="button" class="btn garage-go" data-quick="${open ? 'close' : 'open'}" data-ids="${esc(g.entity_id)}">${open ? 'Close' : 'Open'}</button>
+    </div>`;
+  }).join('')}</section>`;
+}
+
+// ---------- today's comings and goings, from each person's history since midnight ----------
+
+const moves = { key: '', at: 0, items: null, loading: false };
+
+async function loadMoves() {
+  const people = shownPeople().filter((p) => domainOf(p.id) === 'person');
+  const key = people.map((p) => `${p.id}:${p.state}`).join();
+  if (!store.client || moves.loading || !people.length) return;
+  if (key === moves.key && Date.now() - moves.at < 10 * 60_000) return;
+  moves.loading = true;
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const hours = (Date.now() - midnight) / 3_600_000;
+  try {
+    const items = [];
+    await Promise.all(people.map(async (p) => {
+      const hist = await store.client.history(p.id, Math.max(hours, 0.1));
+      for (let i = 1; i < hist.length; i++) {
+        const a = hist[i - 1].s; const b = hist[i].s;
+        if (a === b || ['unknown', 'unavailable'].includes(a) || ['unknown', 'unavailable'].includes(b)) continue;
+        const zone = (z) => (z === 'home' ? 'home' : z);
+        let text;
+        if (b === 'home') text = `${p.name} got home${a !== 'not_home' ? ` from ${a}` : ''}`;
+        else if (a === 'home') text = `${p.name} left home`;
+        else if (b !== 'not_home') text = `${p.name} got to ${zone(b)}`;
+        else text = `${p.name} left ${zone(a)}`;
+        items.push({ t: hist[i].t, text, p });
+      }
+    }));
+    moves.items = items.filter((x) => x.t >= +midnight).sort((x, y) => y.t - x.t);
+    moves.key = key; moves.at = Date.now();
+  } catch { moves.items = moves.items || []; }
+  moves.loading = false;
+  queueRefresh();
+}
+
+function movesCardHtml() {
+  if (!shownPeople().some((p) => domainOf(p.id) === 'person')) return '';
+  const items = moves.items;
+  return `<section class="card moves-card">
+    <h2 class="card-title">${icon('today')}Today</h2>
+    ${!items ? '<div class="spinner"></div>' : items.length
+      ? `<ul class="moves">${items.slice(0, 8).map((x) => `<li>${avatarHtml(x.p, base(), 'pavatar sm')}<span><b>${esc(x.text)}</b><small class="muted">${esc(fmtTime(new Date(x.t)))}</small></span></li>`).join('')}</ul>`
+      : '<p class="muted">No comings or goings yet today.</p>'}
+  </section>`;
+}
+
 // ============================================================
 // Home: floor plan and rooms
 // ============================================================
+
+const DOOR_CLASSES = new Set(['door', 'garage_door', 'opening']);
+
+/** The row of quick controls across the top of Home: lights on, garage, blinds and doors. */
+function quickRowHtml() {
+  const all = [...store.states.values()].filter((s) => listed(s.entity_id)).map(shown);
+  const names = (list) => list.map((s) => nameOf(s)).slice(0, 3).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
+  const ids = (list) => esc(list.map((s) => s.entity_id).join(','));
+  const chip = ({ warn, ic, title, sub, btn, act, list }) => `<div class="qchip${warn ? ' warn' : ''}">
+      ${icon(ic)}<span class="qchip-text"><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      ${btn ? `<button type="button" class="qchip-btn" data-quick="${act}" data-ids="${ids(list)}">${btn}</button>` : ''}
+    </div>`;
+  const out = [];
+  const lights = all.filter((s) => domainOf(s.entity_id) === 'light' && s.state === 'on' && !isStatusLight(s));
+  out.push(lights.length
+    ? chip({ warn: true, ic: 'light', title: plural(lights.length, 'light') + ' on', sub: names(lights), btn: 'All off', act: 'lights-off', list: lights })
+    : chip({ ic: 'light', title: 'Lights', sub: 'All off' }));
+  for (const g of all.filter((s) => domainOf(s.entity_id) === 'cover' && ['garage', 'gate'].includes(s.attributes?.device_class))) {
+    const open = g.state !== 'closed';
+    out.push(chip({ warn: open, ic: open ? 'garageOpen' : 'garage', title: garageName(g), sub: coverWord(g.state), btn: open ? 'Close' : 'Open', act: open ? 'close' : 'open', list: [g] }));
+  }
+  const blinds = all.filter((s) => domainOf(s.entity_id) === 'cover' && !isCoverDoor(s));
+  if (blinds.length) {
+    const open = blinds.filter((s) => s.state === 'open' || s.state === 'opening');
+    const dark = store.states.get('sun.sun')?.state === 'below_horizon';
+    out.push(open.length
+      ? chip({ warn: dark, ic: 'blindOpen', title: `${plural(open.length, 'blind')} open`, sub: dark ? 'after dark' : names(open), btn: 'Close', act: 'close', list: open })
+      : chip({ ic: 'blindOpen', title: 'Blinds', sub: 'All closed', btn: dark ? '' : 'Open', act: 'open', list: blinds }));
+  }
+  const doors = all.filter((s) => domainOf(s.entity_id) === 'binary_sensor' && DOOR_CLASSES.has(s.attributes?.device_class) && !APPLIANCE_WORDS.test(nameOf(s)));
+  if (doors.length) {
+    const open = doors.filter((s) => s.state === 'on');
+    out.push(open.length
+      ? chip({ warn: true, ic: 'door', title: `${plural(open.length, 'door')} open`, sub: names(open).replace(/\b(door)\s+\1\b/gi, '$1') })
+      : chip({ ic: 'door', title: 'Doors', sub: 'All shut' }));
+  }
+  return `<div class="quick-row">${out.join('')}</div>`;
+}
+
+function quickAct(kind, el) {
+  const ids = (el.dataset.ids || '').split(',').filter(Boolean);
+  if (!ids.length) return;
+  for (const id of ids) ui.pending.set(id, { 'lights-off': 'off', open: 'opening', close: 'closing' }[kind]);
+  if (kind === 'lights-off') { call('light', 'turn_off', {}, ids); toast(`Turning off ${plural(ids.length, 'light')}…`); }
+  else call('cover', kind === 'open' ? 'open_cover' : 'close_cover', {}, ids);
+  setTimeout(() => { for (const id of ids) ui.pending.delete(id); queueRefresh(); }, 8000);
+  queueRefresh();
+}
 
 async function dataGet(scope, key) {
   try { return (await store.client.send({ type: `frontend/get_${scope}_data`, key }))?.value ?? null; } catch { return undefined; }
@@ -1725,7 +1874,7 @@ async function loadMusicLists(players, main) {
   music.listsFor = key;
   music.listsAt = Date.now();
   try {
-    music.lists = await loadPlaylists(store.client, main.entity_id);
+    music.lists = await loadPlaylists(store.client, musicLibraryPlayer(players, main).entity_id);
   } catch {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
@@ -1742,7 +1891,8 @@ function musicHtml() {
     on: true, entity: hereEntity, status: sp.status, error: sp.error, pin: sp.pin, name: sp.name || musicName(),
     needsTap: sp.status === 'ready' && sp.needsTap,
   } : null;
-  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel() });
+  const phones = store.prefs.musicPhones === false ? [] : store.phones || [];
+  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel(), phones });
 }
 
 /**
@@ -1806,6 +1956,7 @@ function musicSettingsHtml(check) {
       ${p.musicHere ? `<label class="row"><span><b>Speaker name</b><small class="muted">How it shows in Music Assistant and Home Assistant</small></span><input type="text" data-pref="musicName" value="${esc(p.musicName)}" placeholder="${esc(musicName())}" autocomplete="off"></label>
         <label class="row"><span><b>Music Assistant address</b><small class="muted">Leave empty when Music Assistant runs as a Home Assistant add-on</small></span><input type="text" data-pref="musicServer" value="${esc(p.musicServer)}" placeholder="${esc(musicServerUrl('', base()))}" autocomplete="off" inputmode="url"></label>
         ${status ? `<p class="hint">${esc(status)}</p>` : ''}` : ''}
+      ${store.phones?.length ? check('musicPhones', 'Open Spotify on phones', esc(`Buttons that open the Spotify app on ${store.phones.map((x) => x.name).join(' or ')}`)) : ''}
       ${players.kind !== 'spotify' && shown.size ? `<details><summary>Speakers on the card</summary>${[...shown].map((id) => store.states.get(id)).map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc(s.entity_id)}</small></span><input type="checkbox" data-music-hide="${esc(s.entity_id)}"${p.musicHidden?.[s.entity_id] ? '' : ' checked'}></label>`).join('')}</details>` : ''}` : ''}
   </section>`;
 }
@@ -1821,9 +1972,8 @@ const VIEWS = {
     loadEvents();
     loadEnergyHistory();
     return `<div class="v-today">
-      <div class="col col-a">${heroHtml()}${modesHtml()}<div class="music-slot"></div></div>
-      <div class="col col-b">${energyMiniHtml()}${agendaHtml()}${shopCardHtml()}</div>
-      <div class="col col-c">${notesCardHtml({ limit: 3 })}${peopleMiniHtml()}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
   },
 
@@ -1850,12 +2000,19 @@ const VIEWS = {
     const lastFull = alert?.attributes?.last_triggered;
     const recap = solarRecap();
     const net = r.feedIn || r.buy ? (t.sold?.kwh || 0) * r.feedIn - (t.bought?.kwh || 0) * r.buy : null;
+    const grid = gridStatus();
+    const hasMonth = x.exportMonth != null || x.exportYear != null;
+    const m = e.m;
+    const chips = m ? ENERGY_CHARTS.filter(([k]) => (k === 'solar' ? m.solar || m.home : m[k])) : [];
+    const pick = chips.some(([k]) => k === ui.energyChart) ? ui.energyChart : chips[0]?.[0];
     return `<div class="v-energy">
+      <div class="col col-a">
       <section class="card battery-card">
         <h2 class="card-title">${icon('battery')}Battery</h2>
         <div class="bat">
           <div class="bat-gauge" style="--p:${Math.max(0, Math.min(100, f.soc ?? 0))}"><span class="bat-fill"></span><b>${f.soc != null ? Math.round(f.soc) : '–'}%</b></div>
           <div class="bat-text">
+            ${grid ? `<p class="grid-pill${grid.off ? ' off' : ''}"><i></i>${esc(grid.text)}</p>` : ''}
             <p class="bat-state">${f.charging > 0.05 ? `Charging at ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Powering the house at ${energyPower(f.discharging)}` : f.soc >= 99.5 ? 'Full' : 'Resting'}</p>
             ${eta ? `<p>${esc(eta)}</p>` : ''}
             ${stored != null ? `<p class="muted">${stored.toFixed(1)} kWh stored${cap ? ` of ${cap.toFixed(1)} kWh` : ''}</p>` : ''}
@@ -1876,9 +2033,11 @@ const VIEWS = {
         <h2 class="card-title">${icon('power')}Right now</h2>
         ${flowHtml(f)}
       </section>
+      </div>
 
+      <div class="col col-b">
       <section class="card today-energy">
-        <h2 class="card-title">${icon('today')}Today</h2>
+        <h2 class="card-title">${icon('today')}Today${hasMonth ? `<button type="button" class="title-link" data-energy-month aria-expanded="${ui.energyMonth}">${ui.energyMonth ? 'Hide month' : 'This month ›'}</button>` : ''}</h2>
         <dl class="tiles">
           <div class="t-solar"><dt>${icon('solar')}Solar made</dt><dd>${kwh(t.pv)}${est(t.pv)}</dd></div>
           <div class="t-sold"><dt>${icon('cash')}Sold to grid</dt><dd>${kwh(t.sold)}${est(t.sold)}</dd>${t.sold && r.feedIn ? `<small>${money(t.sold.kwh * r.feedIn)} earned</small>` : ''}</div>
@@ -1890,7 +2049,7 @@ const VIEWS = {
         ${!r.feedIn ? '<p class="hint">Add your feed-in rate in <a href="#/settings?section=energy">Settings</a> to see what the solar you sell earns.</p>' : ''}
       </section>
 
-      ${x.exportMonth != null || x.exportYear != null ? `<section class="card month-energy">
+      ${hasMonth && ui.energyMonth ? `<section class="card month-energy">
         <h2 class="card-title">${icon('cash')}Selling to the grid</h2>
         <dl class="tiles">
           ${x.exportMonth != null ? `<div><dt>This month</dt><dd>${x.exportMonth.toFixed(0)}<small> kWh</small></dd>${r.feedIn ? `<small>${money(x.exportMonth * r.feedIn)}</small>` : ''}</div>` : ''}
@@ -1900,21 +2059,27 @@ const VIEWS = {
       </section>` : ''}
 
       <section class="card charts-card">
-        <h2 class="card-title">${icon('timer')}Last 24 hours</h2>
-        ${energyChartsView(e.m)}
+        <h2 class="card-title">${icon('timer')}Last 24 hours${chips.length > 1 ? `<span class="title-chips">${chips.map(([k, label]) => `<button type="button" class="chip${k === pick ? ' on' : ''}" data-energy-chart="${k}">${label}</button>`).join('')}</span>` : ''}</h2>
+        ${energyChartsView(m, pick)}
       </section>
+      </div>
     </div>`;
   },
 
   places() {
     if (!ready()) return notReady();
+    loadMoves();
     const people = shownPeople();
     return `<div class="v-places">
       <section class="card map-card"><div class="pmap-slot big"></div></section>
+      <div class="places-side">
       <section class="card people-card">
         <h2 class="card-title">${icon('people')}Household</h2>
         ${people.length ? `<ul class="people-list">${people.map(personCardHtml).join('')}</ul>` : '<p class="muted">No people in Home Assistant yet.</p>'}
       </section>
+      ${garageCardHtml()}
+      ${movesCardHtml()}
+      </div>
     </div>`;
   },
 
@@ -1943,6 +2108,7 @@ const VIEWS = {
     const count = [...store.states.keys()].filter(listed).length;
     const camCard = cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : '';
     return `<div class="v-home">
+      ${quickRowHtml()}
       ${plan ? `<div class="home-plan">${plan}${camCard}</div>` : camCard}
       <section class="card rooms-card">
         <h2 class="card-title">${icon('area')}Rooms</h2>
@@ -1963,7 +2129,7 @@ const VIEWS = {
     const embedded = store.authMode === 'embedded';
     const ids = store.states.size ? energyIds() : {};
     const people = peopleOf(store.states);
-    const hidden = (pp) => (p.hiddenPeople ? !!p.hiddenPeople[pp.id] : /wall|display|kiosk|tablet|ipad|dashboard/i.test(pp.name));
+    const hidden = (pp) => (p.hiddenPeople && pp.id in p.hiddenPeople ? !!p.hiddenPeople[pp.id] : isScreenLogin(pp));
     const { lists, events } = newsSources(store.states);
     const cals = calendarsOf(store.states);
     const colors = calColors();
@@ -2051,6 +2217,8 @@ const VIEWS = {
           <input type="checkbox" data-person-show="${esc(pp.id)}"${hidden(pp) ? '' : ' checked'}></label>`).join('') : '<p class="muted">No people yet.</p>') : ''}
       </section>
 
+      ${carsSettingsHtml(people)}
+
       <section class="card" id="look">
         <h2 class="card-title">${icon('sun')}Look</h2>
         ${choose('theme', 'Theme', [['auto', 'Same as this device'], ['sun', 'Dark after sunset'], ['light', 'Light'], ['dark', 'Dark']])}
@@ -2110,6 +2278,56 @@ const VIEWS = {
     </div>`;
   },
 };
+
+/** Settings → Family cars: the plates the car arrivals automation announces as "Andrew is home". */
+function carsSettingsHtml(people) {
+  const helper = store.states.get(CARS_ENTITY);
+  if (!helper) {
+    return store.user?.is_admin ? `<section class="card" id="cars">
+        <h2 class="card-title">${icon('car')}Family cars</h2>
+        <p class="muted">Add <code>homeassistant/car_arrivals.yaml</code> to Home Assistant to hear “Andrew is home” when a family car pulls in. Its plates are typed in here.</p>
+      </section>` : '';
+  }
+  const persons = people.filter((pp) => pp.id.startsWith('person.') && !/wall|display|kiosk|tablet|ipad|dashboard|^tv$|livingtv/i.test(pp.name));
+  const ownerName = (o) => (o.startsWith('person.') ? (people.find((pp) => pp.id === o)?.name || o) : o);
+  const cars = parseCars(helper.state);
+  return `<section class="card" id="cars">
+      <h2 class="card-title">${icon('car')}Family cars</h2>
+      <p class="muted">When a camera reads one of these plates, everyone gets a “… is home” notification, like “Andrew is home”. Other cars get the usual camera alert. They’re saved in Home Assistant, so every screen shares them.</p>
+      ${cars.length ? cars.map((c) => `<div class="row"><span><b>${esc(c.plate)}</b><small class="muted">${esc(ownerName(c.owner))}’s car</small></span>
+        <button type="button" class="btn" data-car-remove="${esc(c.plate)}" aria-label="Remove ${esc(c.plate)}">Remove</button></div>`).join('')
+        : '<p class="muted quiet">No cars yet.</p>'}
+      <form class="car-add" data-car-add>
+        <label>Number plate<input name="plate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. ABC123" maxlength="12"></label>
+        <label>Whose car<select name="owner">${persons.map((pp) => `<option value="${esc(pp.id)}">${esc(pp.name)}</option>`).join('')}<option value="">Someone else…</option></select></label>
+        <label class="car-other"${persons.length ? ' hidden' : ''}>Their name<input name="other" autocomplete="off" placeholder="e.g. Nana"></label>
+        <button class="btn primary" type="submit">Add car</button>
+      </form>
+    </section>`;
+}
+
+/** Settings doesn't redraw on state changes (it would wipe what's being typed), so the cars card redraws itself. */
+function redrawCars(force = false) {
+  const sec = document.getElementById('cars');
+  if (!sec || (!force && sec.contains(document.activeElement) && document.activeElement.matches('input, select'))) return;
+  const html = carsSettingsHtml(peopleOf(store.states));
+  if (html) sec.outerHTML = html;
+  ui.viewHtml = '';
+}
+
+/** Writes the cars back to Home Assistant and redraws the card. */
+async function saveCars(cars, done) {
+  try {
+    const value = serializeCars(cars);
+    await store.client.callService('input_text', 'set_value', { value }, { entity_id: CARS_ENTITY });
+    const cur = store.states.get(CARS_ENTITY);
+    if (cur) store.states.set(CARS_ENTITY, { ...cur, state: value });
+    redrawCars(true);
+    toast(done);
+  } catch (err) {
+    toast(`Couldn't save the cars: ${err.message}`);
+  }
+}
 
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
@@ -2700,6 +2918,11 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
+  const ec = t.closest('[data-energy-chart]');
+  if (ec) { ui.energyChart = ec.dataset.energyChart; render(); return; }
+  if (t.closest('[data-energy-month]')) { ui.energyMonth = !ui.energyMonth; render(); return; }
+  const qa = t.closest('[data-quick]');
+  if (qa) { quickAct(qa.dataset.quick, qa); return; }
   if (handleSettingsClick(t) || handleCalendarClick(t)) return;
   const ce = t.closest('[data-cam-edit]');
   if (ce) { camEditAct(ce.dataset.camEdit); return; }
@@ -2743,6 +2966,13 @@ document.addEventListener('click', (e) => {
   if (mp) { musicPick(mp.dataset.musicPick); return; }
   const ms = t.closest('[data-music-source]');
   if (ms) { const id = ms.closest('[data-entity]')?.dataset.entity; if (id) call('media_player', 'select_source', { source: ms.dataset.musicSource }, id); return; }
+  const sph = t.closest('[data-spotify-phone]');
+  if (sph) {
+    const ph = (store.phones || []).find((x) => x.service === sph.dataset.spotifyPhone);
+    toast(`Opening Spotify on ${ph?.name || 'the phone'}…`);
+    call('notify', sph.dataset.spotifyPhone, { message: 'command_launch_app', data: { package_name: 'com.spotify.music' } });
+    return;
+  }
   const ml = t.closest('[data-music-play]');
   if (ml) { musicPlay(Number(ml.dataset.musicPlay)); return; }
   if (t.closest('[data-music-unlock]')) { screenSpeaker.unlock(); render(); return; }
@@ -2858,6 +3088,12 @@ document.addEventListener('input', (e) => {
   if (out) out.textContent = `${r.value}${out.textContent.replace(/^[\d.]+/, '')}`;
 });
 document.addEventListener('change', (e) => {
+  if (e.target.name === 'owner' && e.target.closest('[data-car-add]')) {
+    const other = e.target.closest('form').querySelector('.car-other');
+    other.hidden = !!e.target.value;
+    if (!other.hidden) other.querySelector('input').focus();
+    return;
+  }
   const t = e.target;
   const r = t.closest('[data-slide]');
   if (r) {
@@ -2906,8 +3142,8 @@ document.addEventListener('change', (e) => {
   }
   if (t.dataset.personShow) {
     const hidden = store.prefs.hiddenPeople || Object.fromEntries(peopleOf(store.states)
-      .filter((p) => /wall|display|kiosk|tablet|ipad|dashboard/i.test(p.name)).map((p) => [p.id, true]));
-    if (t.checked) delete hidden[t.dataset.personShow]; else hidden[t.dataset.personShow] = true;
+      .filter(isScreenLogin).map((p) => [p.id, true]));
+    hidden[t.dataset.personShow] = !t.checked;
     store.prefs.hiddenPeople = hidden;
     writePrefs();
     return;
@@ -2941,6 +3177,12 @@ function handleSettingsClick(t) {
     return true;
   }
   if (t.closest('[data-install]')) { promptInstall(); return true; }
+  const rm = t.closest('[data-car-remove]');
+  if (rm) {
+    const cars = parseCars(store.states.get(CARS_ENTITY)?.state).filter((c) => c.plate !== rm.dataset.carRemove);
+    saveCars(cars, `Removed ${rm.dataset.carRemove}`);
+    return true;
+  }
   if (t.closest('[data-forget-token]')) {
     saveSettings({ ...loadSettings(), token: '' });
     toast('Token forgotten on this screen');
@@ -3017,6 +3259,15 @@ document.addEventListener('submit', (e) => {
     input.value = '';
     return;
   }
+  if (e.target.matches('[data-car-add]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const owner = String(f.get('owner') || '') || String(f.get('other') || '');
+    const res = addCar(parseCars(store.states.get(CARS_ENTITY)?.state), { plate: f.get('plate'), owner });
+    if (res.error) { toast(res.error); return; }
+    saveCars(res.cars, `Saved ${cleanPlate(f.get('plate'))}`);
+    return;
+  }
   if (!e.target.matches('[data-conn]')) return;
   e.preventDefault();
   const f = new FormData(e.target);
@@ -3056,7 +3307,8 @@ async function start() {
   });
   client.addEventListener('ready', async (e) => {
     if (client !== store.client) return;
-    const { states, config, areas, entityInfo } = e.detail;
+    const { states, config, areas, entityInfo, phones } = e.detail;
+    store.phones = phones || [];
     store.states = new Map(states.map((s) => [s.entity_id, s]));
     store.config = config || {};
     store.areas = new Map(areas.map((a) => [a.area_id, a.name]));
@@ -3084,7 +3336,7 @@ async function start() {
       const f = energyFlow(store.states, energyIds(), {});
       learnSigns(f.raw, null, energyIds());
     }
-    if (ui.view === 'settings') return;
+    if (ui.view === 'settings') { if (entityId === CARS_ENTITY) redrawCars(); return; }
     // On Today a speaker only changes the Music card: redraw just that (speakers report every few seconds).
     if (ui.view === 'today' && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
     queueRefresh();
