@@ -1,0 +1,147 @@
+# Garage auto-open: opens the garage when someone in the family drives home.
+# Change the person, phone and garage entity ids below to yours (search for "CHANGE").
+#
+# It only opens when ALL of these are true:
+#   1. "Garage auto-open" (input_boolean.garage_auto_open) is on. It starts OFF after install.
+#   2. That person's phone has just come home after at least 10 minutes away (not a GPS wobble).
+#   3. They're in the car: the phone is connected to the car's Bluetooth. Type the car's Bluetooth
+#      name or address into "Driver one car Bluetooth" / "Driver two car Bluetooth" (input_text). If it's
+#      left blank, this check is skipped for that person and you get the "Open garage?" question below.
+#   4. The driveway camera sees a vehicle within 3 minutes of arriving.
+#   5. The garage is closed and holiday mode is off. Coming back from holiday it asks instead (the
+#      house has been empty, so it won't open by itself), with a button to turn holiday mode off too.
+#
+# If any check fails, nothing opens on its own: the arriving phone gets "Open the garage?" with an
+# Open button instead. Every auto-open sends "Garage opened for <name>" with a Close button to that
+# phone, and the existing "Garage door left open" reminder still runs.
+#
+# Phones: in the Home Assistant app on each phone, Settings → Companion app → Manage sensors →
+# turn on "Bluetooth connection". Location must be allowed "All the time".
+#
+# The switch is off after a fresh install and remembers its last setting across restarts.
+#
+# CHANGE: cover.garage_door and binary_sensor.driveway_vehicle (your driveway camera's vehicle sensor).
+#
+# Install: put this file in /config/packages/ (see dashboard_update.yaml), then restart once.
+
+input_boolean:
+  garage_auto_open:
+    name: Garage auto-open
+    icon: mdi:garage-open-variant
+
+input_text:
+  garage_car_bt_one:
+    name: Driver one car Bluetooth
+    icon: mdi:car-connected
+    max: 100
+  garage_car_bt_two:
+    name: Driver two car Bluetooth
+    icon: mdi:car-connected
+    max: 100
+
+automation:
+  - id: dashboard_garage_auto_open
+    alias: "Garage: open when our car arrives"
+    mode: single
+    max_exceeded: silent
+    variables:
+      drivers:   # CHANGE: one entry per driver
+        person.driver_one:
+          name: Driver one
+          notify: notify.mobile_app_phone_one
+          bt: sensor.phone_one_bluetooth_connection
+          car: input_text.garage_car_bt_one
+        person.driver_two:
+          name: Driver two
+          notify: notify.mobile_app_phone_two
+          bt: sensor.phone_two_bluetooth_connection
+          car: input_text.garage_car_bt_two
+    triggers:   # CHANGE: same people as above
+      - trigger: state
+        entity_id: [person.driver_one, person.driver_two]
+        to: home
+    conditions:
+      - condition: state
+        entity_id: cover.garage_door
+        state: closed
+      # Away at least 10 minutes, so a GPS jump at home doesn't count as arriving.
+      - "{{ trigger.from_state is not none and trigger.from_state.state not in ['home', 'unknown', 'unavailable']
+           and (now() - trigger.from_state.last_changed).total_seconds() > 600 }}"
+    actions:
+      - variables:
+          who: "{{ drivers[trigger.entity_id] }}"
+          car_id: "{{ states(who.car) | trim | lower }}"
+          car_set: "{{ car_id not in ['', 'unknown', 'unavailable'] }}"
+          paired: "{{ state_attr(who.bt, 'connected_paired_devices') | default([], true) | join(' ') | lower }}"
+          in_car: "{{ car_set and car_id in paired }}"
+          holiday: "{{ is_state('input_boolean.holiday_mode', 'on') }}"
+          ask_tag: "garage-ask-{{ trigger.entity_id }}"
+          seen: false
+      # Is the car on the driveway? Count a sighting from the last minute, or wait up to 3 minutes.
+      - if: "{{ is_state('binary_sensor.driveway_vehicle', 'on') or
+                (now() - states.binary_sensor.driveway_vehicle.last_changed).total_seconds() < 60 }}"
+        then:
+          - variables: { seen: true }
+        else:
+          - wait_for_trigger:
+              - trigger: state
+                entity_id: binary_sensor.driveway_vehicle
+                to: "on"
+            timeout: "00:03:00"
+          - variables:
+              seen: "{{ wait.trigger is not none }}"
+      - if: "{{ is_state('input_boolean.garage_auto_open', 'on') and in_car and seen and not holiday
+                and is_state('cover.garage_door', 'closed') }}"
+        then:
+          - action: cover.open_cover
+            target: { entity_id: cover.garage_door }
+          - action: "{{ who.notify }}"
+            data:
+              title: "Garage opened for {{ who.name }} 🚗"
+              message: "Welcome home. Tap Close if this wasn't you."
+              data:
+                tag: garage-auto-open
+                actions:
+                  - { action: GARAGE_CLOSE, title: Close garage }
+        else:
+          # Not sure enough to open by itself: ask the person who just arrived.
+          - condition: "{{ is_state('cover.garage_door', 'closed') }}"
+          - action: "{{ who.notify }}"
+            data:
+              title: "Open the garage?"
+              message: >-
+                Welcome {{ 'back' if holiday else 'home' }}, {{ who.name }}.
+                {%- if holiday %} Holiday mode is still on.
+                {%- elif not car_set %} (Add your car's Bluetooth to open it by itself.)
+                {%- elif not in_car %} Your phone isn't on the car's Bluetooth.
+                {%- elif not seen %} The driveway camera didn't see a car.{% endif %}
+              data:
+                tag: "{{ ask_tag }}"
+                timeout: 600
+                actions: >-
+                  {{ [{'action': 'GARAGE_OPEN', 'title': 'Open garage'}]
+                     + ([{'action': 'GARAGE_OPEN_HOLIDAY_OFF', 'title': 'Open + end holiday'}] if holiday else []) }}
+
+  - id: dashboard_garage_notification_buttons
+    alias: "Garage: Open / Close buttons on notifications"
+    mode: queued
+    triggers:
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data: { action: GARAGE_OPEN }
+        id: open
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data: { action: GARAGE_CLOSE }
+        id: close
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data: { action: GARAGE_OPEN_HOLIDAY_OFF }
+        id: open_holiday_off
+    actions:
+      - action: "cover.{{ 'close' if trigger.id == 'close' else 'open' }}_cover"
+        target: { entity_id: cover.garage_door }
+      - if: "{{ trigger.id == 'open_holiday_off' }}"
+        then:
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.holiday_mode }
