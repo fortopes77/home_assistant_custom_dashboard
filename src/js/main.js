@@ -39,7 +39,7 @@ import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './n
 import { Voice } from './voice.js';
 import { binNight, binSvg, binWords } from './bins.js';
 import { CARS_ENTITY, parseCars, serializeCars, addCar, cleanPlate } from './cars.js';
-import { musicPlayers, musicMain, musicHereEntity, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
+import { musicPlayers, musicMain, musicHereEntity, musicLibraryPlayer, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
 
 const DASH_BUILD = 'source';
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1735,7 +1735,7 @@ async function loadMusicLists(players, main) {
   music.listsFor = key;
   music.listsAt = Date.now();
   try {
-    music.lists = await loadPlaylists(store.client, main.entity_id);
+    music.lists = await loadPlaylists(store.client, musicLibraryPlayer(players, main).entity_id);
   } catch {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
