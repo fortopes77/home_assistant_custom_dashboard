@@ -7,7 +7,8 @@
 #      name or address into "Azelia's car Bluetooth" / "Andrew's car Bluetooth" (input_text). If it's
 #      left blank, this check is skipped for that person and you get the "Open garage?" question below.
 #   4. The driveway camera sees a vehicle within 3 minutes of arriving.
-#   5. The garage is closed and it isn't on holiday mode.
+#   5. The garage is closed and holiday mode is off. Coming back from holiday it asks instead (the
+#      house has been empty, so it won't open by itself), with a button to turn holiday mode off too.
 #
 # If any check fails, nothing opens on its own: the arriving phone gets "Open the garage?" with an
 # Open button instead. Every auto-open sends "Garage opened for <name>" with a Close button to that
@@ -63,7 +64,6 @@ automation:
       # Away at least 10 minutes, so a GPS jump at home doesn't count as arriving.
       - "{{ trigger.from_state is not none and trigger.from_state.state not in ['home', 'unknown', 'unavailable']
            and (now() - trigger.from_state.last_changed).total_seconds() > 600 }}"
-      - "{{ not is_state('input_boolean.holiday_mode', 'on') }}"
     actions:
       - variables:
           who: "{{ drivers[trigger.entity_id] }}"
@@ -71,6 +71,7 @@ automation:
           car_set: "{{ car_id not in ['', 'unknown', 'unavailable'] }}"
           paired: "{{ state_attr(who.bt, 'connected_paired_devices') | default([], true) | join(' ') | lower }}"
           in_car: "{{ car_set and car_id in paired }}"
+          holiday: "{{ is_state('input_boolean.holiday_mode', 'on') }}"
           ask_tag: "garage-ask-{{ trigger.entity_id }}"
           seen: false
       # Is the car on the driveway? Count a sighting from the last minute, or wait up to 3 minutes.
@@ -86,7 +87,7 @@ automation:
             timeout: "00:03:00"
           - variables:
               seen: "{{ wait.trigger is not none }}"
-      - if: "{{ is_state('input_boolean.garage_auto_open', 'on') and in_car and seen
+      - if: "{{ is_state('input_boolean.garage_auto_open', 'on') and in_car and seen and not holiday
                 and is_state('cover.garage_door_door_1_2', 'closed') }}"
         then:
           - action: cover.open_cover
@@ -106,15 +107,17 @@ automation:
             data:
               title: "Open the garage?"
               message: >-
-                Welcome home, {{ who.name }}.
-                {%- if not car_set %} (Add your car's Bluetooth to open it by itself.)
+                Welcome {{ 'back' if holiday else 'home' }}, {{ who.name }}.
+                {%- if holiday %} Holiday mode is still on.
+                {%- elif not car_set %} (Add your car's Bluetooth to open it by itself.)
                 {%- elif not in_car %} Your phone isn't on the car's Bluetooth.
                 {%- elif not seen %} The driveway camera didn't see a car.{% endif %}
               data:
                 tag: "{{ ask_tag }}"
                 timeout: 600
-                actions:
-                  - { action: GARAGE_OPEN, title: Open garage }
+                actions: >-
+                  {{ [{'action': 'GARAGE_OPEN', 'title': 'Open garage'}]
+                     + ([{'action': 'GARAGE_OPEN_HOLIDAY_OFF', 'title': 'Open + end holiday'}] if holiday else []) }}
 
   - id: dashboard_garage_notification_buttons
     alias: "Garage: Open / Close buttons on notifications"
@@ -128,6 +131,14 @@ automation:
         event_type: mobile_app_notification_action
         event_data: { action: GARAGE_CLOSE }
         id: close
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data: { action: GARAGE_OPEN_HOLIDAY_OFF }
+        id: open_holiday_off
     actions:
-      - action: "cover.{{ trigger.id }}_cover"
+      - action: "cover.{{ 'close' if trigger.id == 'close' else 'open' }}_cover"
         target: { entity_id: cover.garage_door_door_1_2 }
+      - if: "{{ trigger.id == 'open_holiday_off' }}"
+        then:
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.holiday_mode }
