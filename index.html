@@ -691,6 +691,13 @@ small { font-size: 0.8em; }
 /* ---------- Energy ---------- */
 
 .v-energy { display: grid; gap: var(--gap); }
+.v-energy .col, .places-side { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+.title-link { margin-left: auto; padding: 4px 2px; border: 0; background: none; color: var(--primary); font: inherit; font-size: 0.82rem; font-weight: 600; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.title-chips { display: flex; gap: 6px; margin-left: auto; }
+.title-chips .chip { padding: 4px 10px; font-size: 0.78rem; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.grid-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 5px 12px; border-radius: 999px; font-weight: 600; font-size: 0.84rem; background: color-mix(in srgb, var(--positive) 16%, transparent); color: var(--positive); }
+.grid-pill i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.grid-pill.off { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
 .bat { display: flex; align-items: center; gap: 18px; }
 .bat-gauge {
   position: relative;
@@ -852,6 +859,19 @@ small { font-size: 0.8em; }
 
 .v-places { display: grid; gap: var(--gap); }
 .map-card { padding: 0; overflow: hidden; }
+.garage-card { display: grid; gap: 10px; }
+.garage-row { display: flex; align-items: center; gap: 12px; }
+.garage-ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2); flex: none; }
+.garage-row.open .garage-ic { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+.garage-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.garage-text small { font-size: 0.8rem; }
+.garage-go { margin: 0; padding: 10px 18px; border-radius: 999px; }
+.moves { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.moves li { display: flex; align-items: center; gap: 10px; font-size: 0.92rem; }
+.moves li > span:last-child { display: grid; gap: 1px; }
+.moves b { font-weight: 600; }
+.moves small { font-size: 0.78rem; }
+.pavatar.sm { width: 28px; height: 28px; font-size: 0.7rem; flex: none; }
 .pmap-slot.big .pmap { height: 56dvh; }
 .people-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .person-card {
@@ -876,6 +896,16 @@ small { font-size: 0.8em; }
 /* ---------- Home: plan, rooms, devices ---------- */
 
 .v-home { display: grid; gap: var(--gap); }
+.quick-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px; padding: 2px; }
+.quick-row::-webkit-scrollbar { display: none; }
+.qchip { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.qchip > .icon { width: 22px; height: 22px; color: var(--muted); }
+.qchip-text { display: grid; gap: 1px; max-width: 180px; }
+.qchip-text b { font-size: 0.92rem; }
+.qchip-text small { font-size: 0.78rem; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.qchip.warn { border-color: color-mix(in srgb, var(--warning) 50%, transparent); background: color-mix(in srgb, var(--warning) 10%, var(--surface)); }
+.qchip.warn > .icon { color: var(--warning); }
+.qchip-btn { margin-left: 4px; padding: 7px 13px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--primary); font: inherit; font-weight: 700; font-size: 0.84rem; cursor: pointer; }
 .home-plan { display: grid; gap: var(--gap); min-width: 0; }
 .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .room { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 16px; background: var(--surface-2); }
@@ -1089,17 +1119,23 @@ small { font-size: 0.8em; }
   .v-today .glance-item small { display: inline; margin-left: 6px; }
   .v-today .glance-item > button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-  .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-  .today-energy, .month-energy, .charts-card { grid-column: 1 / -1; }
+  /* Energy: battery and the live flow on the left; today, the month and one 24-hour chart on the right. */
+  .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
 
-  .v-places { grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); align-items: start; }
+  .v-places { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); align-items: start; }
   .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
-  .people-card { position: sticky; top: 72px; }
+  .places-side { position: sticky; top: 72px; max-height: calc(100dvh - 72px - var(--dock-space)); overflow-y: auto; scrollbar-width: none; }
+
+  .v-home .quick-row { grid-column: 1 / -1; }
 }
 
 @media (min-width: 1000px) {
   .v-home { grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; }
   .v-home .home-plan { grid-row: span 2; }
+  .v-home .home-plan .cams { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .today-energy .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .v-home .quick-row .qchip { flex: 1 1 0; min-width: 0; }
+  .v-home .quick-row .qchip-text { min-width: 0; max-width: none; flex: 1; }
   .v-home .rooms { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) { grid-template-columns: 1fr; }
   .v-home:not(:has(.plan-card)) .rooms { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -1107,12 +1143,6 @@ small { font-size: 0.8em; }
 
 @media (min-width: 1000px) {
   .nav { left: 50%; transform: translateX(-50%); }
-}
-@media (min-width: 1200px) {
-  .v-energy { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.2fr); }
-  .today-energy { grid-column: 3; grid-row: 1; }
-  .month-energy { grid-column: 1; }
-  .charts-card, .month-energy + .charts-card { grid-column: 2 / -1; }
 }
 @media (min-width: 1400px) {
   .view { max-width: 1680px; margin: 0 auto; }
@@ -1126,6 +1156,7 @@ small { font-size: 0.8em; }
   .card { padding: 14px; }
   .card-title { margin-bottom: 8px; }
   .pmap-slot.mini .pmap { height: 150px; }
+  .v-energy .flow { zoom: 0.8; }
 }
 @media (min-width: 700px) and (max-height: 640px) {
   .hero-time { font-size: 3.2rem; }
@@ -8903,7 +8934,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '16 Nov 2026, 13:58 (61e30dc)';
+const DASH_BUILD = '16 Nov 2026, 14:10 (5e034da)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -8998,6 +9029,8 @@ const ui = {
   dragging: false,
   refreshTimer: 0,
   lastRender: 0,
+  energyChart: 'solar',    // the one 24-hour chart shown on Energy: solar | grid | soc
+  energyMonth: false,      // "This month" opened on Energy
 };
 
 // ---------- helpers ----------
@@ -10162,6 +10195,15 @@ async function loadEnergyHistory(force = false) {
   queueRefresh();
 }
 
+/** The inverter's on-grid / off-grid sensor (Sigenergy local Modbus: sensor.sigen_plant_grid_connection_status). */
+function gridStatus() {
+  const s = [...store.states.values()].find((x) => domainOf(x.entity_id) === 'sensor'
+    && (/grid_(connection_)?status|on_off_grid/.test(x.entity_id) || /^(on_grid|off_grid)/.test(x.state)) && !isUnavailable(x));
+  if (!s) return null;
+  const off = /off/i.test(s.state) && !/^on/i.test(s.state);
+  return { s, off, text: off ? 'Off grid · running on solar and battery' : 'On grid · power is on' };
+}
+
 function batteryAlert() {
   return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation'
     && (s.attributes?.id === 'dashboard_battery_full' || /batter.*(full|charged|100)/i.test(nameOf(s))));
@@ -10248,22 +10290,27 @@ function nice(v) {
   return Math.ceil(v / 10) * 10;
 }
 
-function energyChartsView(m) {
+const ENERGY_CHARTS = [['solar', 'Solar'], ['grid', 'Grid'], ['soc', 'Battery']];
+
+/** One 24-hour chart at a time, picked with the chips in the card title. */
+function energyChartsView(m, pick = ui.energyChart) {
   if (!m) return energy.error ? `<p class="muted">${esc(energy.error)}</p>` : '<div class="spinner"></div>';
+  const has = { solar: !!(m.solar || m.home), grid: !!m.grid, soc: !!m.soc };
+  if (!has[pick]) pick = ENERGY_CHARTS.map(([k]) => k).find((k) => has[k]);
   const peak = (...arrs) => Math.max(0.5, ...arrs.flat().filter((v) => v != null).map(Math.abs));
   const out = [];
-  if (m.solar || m.home) {
+  if (pick === 'solar') {
     out.push(chartHtml({ title: 'Solar and home use', m, min: 0, max: nice(peak(m.solar || [], m.home || [])),
       series: [{ values: m.solar, cls: 'solar', area: true, label: 'Solar' }, { values: m.home, cls: 'home', label: 'Home' }] }));
   }
-  if (m.grid) {
+  if (pick === 'grid') {
     const sold = m.grid.map((v) => (v == null ? null : Math.min(0, v)));
     const bought = m.grid.map((v) => (v == null ? null : Math.max(0, v)));
     const top = nice(peak(m.grid));
     out.push(chartHtml({ title: 'Grid', m, min: -top, max: top, note: 'Sold below the line',
       series: [{ values: sold, cls: 'sold', area: true, label: 'Sold' }, { values: bought, cls: 'bought', area: true, label: 'Bought' }] }));
   }
-  if (m.soc) out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
+  if (pick === 'soc') out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
   return out.join('');
 }
 
@@ -10307,9 +10354,132 @@ function personCardHtml(p) {
   </button></li>`;
 }
 
+/** Garage doors and gates shown on the dashboard. */
+function garageDoors() {
+  return [...store.states.values()].filter((s) => domainOf(s.entity_id) === 'cover' && listed(s.entity_id)
+    && ['garage', 'gate'].includes(s.attributes?.device_class));
+}
+
+/** "Garage Door Door 1" reads as "Garage door". */
+function garageName(g) {
+  const n = nameOf(g).replace(/(\s+(door|opener))?(\s+\d+)+$/i, '').replace(/\s+door\s+door$/i, ' door');
+  return /door|gate/i.test(n) ? n.replace(/\bDoor\b/, 'door') : `${n} door`;
+}
+
+const coverWord = (st) => ({ open: 'Open', closed: 'Closed', opening: 'Opening…', closing: 'Closing…' }[st] || st);
+
+function garageCardHtml() {
+  const doors = garageDoors();
+  if (!doors.length) return '';
+  const auto = store.states.get('input_boolean.garage_auto_open');
+  return `<section class="card garage-card">${doors.map((g) => {
+    const v = shown(g);
+    const open = v.state !== 'closed';
+    return `<div class="garage-row${open ? ' open' : ''}">
+      <span class="garage-ic">${icon(open ? 'garageOpen' : 'garage')}</span>
+      <span class="garage-text"><b>${esc(garageName(g))}</b><small class="muted">${esc(coverWord(v.state))}${g.last_changed ? ` · ${esc(relativeTime(g.last_changed))}` : ''}${auto?.state === 'on' && !open ? ' · opens when your car gets home' : ''}</small></span>
+      <button type="button" class="btn garage-go" data-quick="${open ? 'close' : 'open'}" data-ids="${esc(g.entity_id)}">${open ? 'Close' : 'Open'}</button>
+    </div>`;
+  }).join('')}</section>`;
+}
+
+// ---------- today's comings and goings, from each person's history since midnight ----------
+
+const moves = { key: '', at: 0, items: null, loading: false };
+
+async function loadMoves() {
+  const people = shownPeople().filter((p) => domainOf(p.id) === 'person');
+  const key = people.map((p) => `${p.id}:${p.state}`).join();
+  if (!store.client || moves.loading || !people.length) return;
+  if (key === moves.key && Date.now() - moves.at < 10 * 60_000) return;
+  moves.loading = true;
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const hours = (Date.now() - midnight) / 3_600_000;
+  try {
+    const items = [];
+    await Promise.all(people.map(async (p) => {
+      const hist = await store.client.history(p.id, Math.max(hours, 0.1));
+      for (let i = 1; i < hist.length; i++) {
+        const a = hist[i - 1].s; const b = hist[i].s;
+        if (a === b || ['unknown', 'unavailable'].includes(a) || ['unknown', 'unavailable'].includes(b)) continue;
+        const zone = (z) => (z === 'home' ? 'home' : z);
+        let text;
+        if (b === 'home') text = `${p.name} got home${a !== 'not_home' ? ` from ${a}` : ''}`;
+        else if (a === 'home') text = `${p.name} left home`;
+        else if (b !== 'not_home') text = `${p.name} got to ${zone(b)}`;
+        else text = `${p.name} left ${zone(a)}`;
+        items.push({ t: hist[i].t, text, p });
+      }
+    }));
+    moves.items = items.filter((x) => x.t >= +midnight).sort((x, y) => y.t - x.t);
+    moves.key = key; moves.at = Date.now();
+  } catch { moves.items = moves.items || []; }
+  moves.loading = false;
+  queueRefresh();
+}
+
+function movesCardHtml() {
+  if (!shownPeople().some((p) => domainOf(p.id) === 'person')) return '';
+  const items = moves.items;
+  return `<section class="card moves-card">
+    <h2 class="card-title">${icon('today')}Today</h2>
+    ${!items ? '<div class="spinner"></div>' : items.length
+      ? `<ul class="moves">${items.slice(0, 8).map((x) => `<li>${avatarHtml(x.p, base(), 'pavatar sm')}<span><b>${esc(x.text)}</b><small class="muted">${esc(fmtTime(new Date(x.t)))}</small></span></li>`).join('')}</ul>`
+      : '<p class="muted">No comings or goings yet today.</p>'}
+  </section>`;
+}
+
 // ============================================================
 // Home: floor plan and rooms
 // ============================================================
+
+const DOOR_CLASSES = new Set(['door', 'garage_door', 'opening']);
+
+/** The row of quick controls across the top of Home: lights on, garage, blinds and doors. */
+function quickRowHtml() {
+  const all = [...store.states.values()].filter((s) => listed(s.entity_id)).map(shown);
+  const names = (list) => list.map((s) => nameOf(s)).slice(0, 3).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
+  const ids = (list) => esc(list.map((s) => s.entity_id).join(','));
+  const chip = ({ warn, ic, title, sub, btn, act, list }) => `<div class="qchip${warn ? ' warn' : ''}">
+      ${icon(ic)}<span class="qchip-text"><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      ${btn ? `<button type="button" class="qchip-btn" data-quick="${act}" data-ids="${ids(list)}">${btn}</button>` : ''}
+    </div>`;
+  const out = [];
+  const lights = all.filter((s) => domainOf(s.entity_id) === 'light' && s.state === 'on' && !isStatusLight(s));
+  out.push(lights.length
+    ? chip({ warn: true, ic: 'light', title: plural(lights.length, 'light') + ' on', sub: names(lights), btn: 'All off', act: 'lights-off', list: lights })
+    : chip({ ic: 'light', title: 'Lights', sub: 'All off' }));
+  for (const g of all.filter((s) => domainOf(s.entity_id) === 'cover' && ['garage', 'gate'].includes(s.attributes?.device_class))) {
+    const open = g.state !== 'closed';
+    out.push(chip({ warn: open, ic: open ? 'garageOpen' : 'garage', title: garageName(g), sub: coverWord(g.state), btn: open ? 'Close' : 'Open', act: open ? 'close' : 'open', list: [g] }));
+  }
+  const blinds = all.filter((s) => domainOf(s.entity_id) === 'cover' && !isCoverDoor(s));
+  if (blinds.length) {
+    const open = blinds.filter((s) => s.state === 'open' || s.state === 'opening');
+    const dark = store.states.get('sun.sun')?.state === 'below_horizon';
+    out.push(open.length
+      ? chip({ warn: dark, ic: 'blindOpen', title: `${plural(open.length, 'blind')} open`, sub: dark ? 'after dark' : names(open), btn: 'Close', act: 'close', list: open })
+      : chip({ ic: 'blindOpen', title: 'Blinds', sub: 'All closed', btn: dark ? '' : 'Open', act: 'open', list: blinds }));
+  }
+  const doors = all.filter((s) => domainOf(s.entity_id) === 'binary_sensor' && DOOR_CLASSES.has(s.attributes?.device_class) && !APPLIANCE_WORDS.test(nameOf(s)));
+  if (doors.length) {
+    const open = doors.filter((s) => s.state === 'on');
+    out.push(open.length
+      ? chip({ warn: true, ic: 'door', title: `${plural(open.length, 'door')} open`, sub: names(open).replace(/\b(door)\s+\1\b/gi, '$1') })
+      : chip({ ic: 'door', title: 'Doors', sub: 'All shut' }));
+  }
+  return `<div class="quick-row">${out.join('')}</div>`;
+}
+
+function quickAct(kind, el) {
+  const ids = (el.dataset.ids || '').split(',').filter(Boolean);
+  if (!ids.length) return;
+  for (const id of ids) ui.pending.set(id, { 'lights-off': 'off', open: 'opening', close: 'closing' }[kind]);
+  if (kind === 'lights-off') { call('light', 'turn_off', {}, ids); toast(`Turning off ${plural(ids.length, 'light')}…`); }
+  else call('cover', kind === 'open' ? 'open_cover' : 'close_cover', {}, ids);
+  setTimeout(() => { for (const id of ids) ui.pending.delete(id); queueRefresh(); }, 8000);
+  queueRefresh();
+}
 
 async function dataGet(scope, key) {
   try { return (await store.client.send({ type: `frontend/get_${scope}_data`, key }))?.value ?? null; } catch { return undefined; }
@@ -10723,12 +10893,19 @@ const VIEWS = {
     const lastFull = alert?.attributes?.last_triggered;
     const recap = solarRecap();
     const net = r.feedIn || r.buy ? (t.sold?.kwh || 0) * r.feedIn - (t.bought?.kwh || 0) * r.buy : null;
+    const grid = gridStatus();
+    const hasMonth = x.exportMonth != null || x.exportYear != null;
+    const m = e.m;
+    const chips = m ? ENERGY_CHARTS.filter(([k]) => (k === 'solar' ? m.solar || m.home : m[k])) : [];
+    const pick = chips.some(([k]) => k === ui.energyChart) ? ui.energyChart : chips[0]?.[0];
     return `<div class="v-energy">
+      <div class="col col-a">
       <section class="card battery-card">
         <h2 class="card-title">${icon('battery')}Battery</h2>
         <div class="bat">
           <div class="bat-gauge" style="--p:${Math.max(0, Math.min(100, f.soc ?? 0))}"><span class="bat-fill"></span><b>${f.soc != null ? Math.round(f.soc) : '–'}%</b></div>
           <div class="bat-text">
+            ${grid ? `<p class="grid-pill${grid.off ? ' off' : ''}"><i></i>${esc(grid.text)}</p>` : ''}
             <p class="bat-state">${f.charging > 0.05 ? `Charging at ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Powering the house at ${energyPower(f.discharging)}` : f.soc >= 99.5 ? 'Full' : 'Resting'}</p>
             ${eta ? `<p>${esc(eta)}</p>` : ''}
             ${stored != null ? `<p class="muted">${stored.toFixed(1)} kWh stored${cap ? ` of ${cap.toFixed(1)} kWh` : ''}</p>` : ''}
@@ -10749,9 +10926,11 @@ const VIEWS = {
         <h2 class="card-title">${icon('power')}Right now</h2>
         ${flowHtml(f)}
       </section>
+      </div>
 
+      <div class="col col-b">
       <section class="card today-energy">
-        <h2 class="card-title">${icon('today')}Today</h2>
+        <h2 class="card-title">${icon('today')}Today${hasMonth ? `<button type="button" class="title-link" data-energy-month aria-expanded="${ui.energyMonth}">${ui.energyMonth ? 'Hide month' : 'This month ›'}</button>` : ''}</h2>
         <dl class="tiles">
           <div class="t-solar"><dt>${icon('solar')}Solar made</dt><dd>${kwh(t.pv)}${est(t.pv)}</dd></div>
           <div class="t-sold"><dt>${icon('cash')}Sold to grid</dt><dd>${kwh(t.sold)}${est(t.sold)}</dd>${t.sold && r.feedIn ? `<small>${money(t.sold.kwh * r.feedIn)} earned</small>` : ''}</div>
@@ -10763,7 +10942,7 @@ const VIEWS = {
         ${!r.feedIn ? '<p class="hint">Add your feed-in rate in <a href="#/settings?section=energy">Settings</a> to see what the solar you sell earns.</p>' : ''}
       </section>
 
-      ${x.exportMonth != null || x.exportYear != null ? `<section class="card month-energy">
+      ${hasMonth && ui.energyMonth ? `<section class="card month-energy">
         <h2 class="card-title">${icon('cash')}Selling to the grid</h2>
         <dl class="tiles">
           ${x.exportMonth != null ? `<div><dt>This month</dt><dd>${x.exportMonth.toFixed(0)}<small> kWh</small></dd>${r.feedIn ? `<small>${money(x.exportMonth * r.feedIn)}</small>` : ''}</div>` : ''}
@@ -10773,21 +10952,27 @@ const VIEWS = {
       </section>` : ''}
 
       <section class="card charts-card">
-        <h2 class="card-title">${icon('timer')}Last 24 hours</h2>
-        ${energyChartsView(e.m)}
+        <h2 class="card-title">${icon('timer')}Last 24 hours${chips.length > 1 ? `<span class="title-chips">${chips.map(([k, label]) => `<button type="button" class="chip${k === pick ? ' on' : ''}" data-energy-chart="${k}">${label}</button>`).join('')}</span>` : ''}</h2>
+        ${energyChartsView(m, pick)}
       </section>
+      </div>
     </div>`;
   },
 
   places() {
     if (!ready()) return notReady();
+    loadMoves();
     const people = shownPeople();
     return `<div class="v-places">
       <section class="card map-card"><div class="pmap-slot big"></div></section>
+      <div class="places-side">
       <section class="card people-card">
         <h2 class="card-title">${icon('people')}Household</h2>
         ${people.length ? `<ul class="people-list">${people.map(personCardHtml).join('')}</ul>` : '<p class="muted">No people in Home Assistant yet.</p>'}
       </section>
+      ${garageCardHtml()}
+      ${movesCardHtml()}
+      </div>
     </div>`;
   },
 
@@ -10816,6 +11001,7 @@ const VIEWS = {
     const count = [...store.states.keys()].filter(listed).length;
     const camCard = cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : '';
     return `<div class="v-home">
+      ${quickRowHtml()}
       ${plan ? `<div class="home-plan">${plan}${camCard}</div>` : camCard}
       <section class="card rooms-card">
         <h2 class="card-title">${icon('area')}Rooms</h2>
@@ -11625,6 +11811,11 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
+  const ec = t.closest('[data-energy-chart]');
+  if (ec) { ui.energyChart = ec.dataset.energyChart; render(); return; }
+  if (t.closest('[data-energy-month]')) { ui.energyMonth = !ui.energyMonth; render(); return; }
+  const qa = t.closest('[data-quick]');
+  if (qa) { quickAct(qa.dataset.quick, qa); return; }
   if (handleSettingsClick(t) || handleCalendarClick(t)) return;
   const ce = t.closest('[data-cam-edit]');
   if (ce) { camEditAct(ce.dataset.camEdit); return; }
