@@ -5384,7 +5384,7 @@ const ENERGY_ROLES = [
 
 const ENERGY_MATCH = {
   solar: { test: /\b(pv|solar|photovoltaic)\b/, skip: /string|mppt|daily|today|total|month|annual|year|lifetime|third.?party|rated|max/ },
-  grid: { test: /\bgrid\b/, skip: /phase|frequency|voltage|current|reactive|limit|max|rated|daily|today|total/ },
+  grid: { test: /\bgrid\b/, skip: /import|export|phase|frequency|voltage|current|reactive|limit|max|rated|daily|today|total/ },
   battery: { test: /\b(battery|bat|ess)\b/, skip: /available|max|rated|limit|capacity|daily|today|total|evdc|dc.?charger/ },
   home: { test: /\b(load|consumption|consumed|house|home)\b/, skip: /daily|today|total|month|annual|limit/ },
 };
@@ -8862,7 +8862,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '16 Nov 2026, 11:50 (a319f53)';
+const DASH_BUILD = '16 Nov 2026, 13:33 (6be1dc2)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
