@@ -87,7 +87,7 @@ Then tap **This iPad** among the speakers on the card. If something is playing o
 
 ## Energy
 
-The Energy page shows a live power-flow diagram: solar, grid, house and battery, with a battery gauge and how long it will last. It also shows today's totals, money earned from selling to the grid, monthly and yearly exports, and 24-hour charts.
+The Energy page shows a live power-flow diagram: solar, grid, house and battery, with a battery gauge and how long it will last. It also shows today's totals, money earned from selling to the grid, and one 24-hour chart at a time (tap **Solar**, **Grid** or **Battery**). Monthly and yearly exports open from **This month** on the Today card. When the inverter has an on-grid/off-grid sensor (Sigenergy local Modbus: `sensor.sigen_plant_grid_connection_status`), the battery card shows **On grid** or **Off grid**. On a tablet or computer the page fits on one screen: battery and live flow on the left, today and the chart on the right.
 
 - Sensors are found by name. That works with the Sigenergy integrations and most others. If it picks the wrong ones, choose them under **Settings → Energy → Sensors and directions**.
 - Integrations disagree on whether a positive grid number means buying or selling, and whether a positive battery number means charging or discharging. The dashboard works this out from readings that add up. If an arrow points the wrong way, set it there yourself.
@@ -99,7 +99,7 @@ The Energy page shows a live power-flow diagram: solar, grid, house and battery,
 
 ## Places
 
-A map with everyone's phones and your zones, plus a card per person. Each card shows where they are and since when, their address, distance from home and phone battery. A person's sheet has **Show on the map** and **Directions**. Wall tablets that are set up as people are hidden from the map by default; choose who shows under **Settings → People and the map**.
+A map with everyone's phones and your zones, plus a card per person. Each card shows where they are and since when, their address, distance from home and phone battery. Beside the map are a **Garage door** card with an Open/Close button (any cover with device class `garage` or `gate`) and **Today**, a list of who left and arrived where since midnight, read from each person's history. A person's sheet has **Show on the map** and **Directions**. Wall tablets that are set up as people are hidden from the map by default; choose who shows under **Settings → People and the map**.
 
 The map library (Leaflet) comes from cdn.jsdelivr.net and the map pictures from OpenStreetMap, so the map needs internet.
 
@@ -142,6 +142,10 @@ Today has a **Modes** card under the greeting for house-wide switches. It shows:
 - Any other toggle helper whose id ends in `_mode` (for example `input_boolean.guest_mode`).
 
 Tap a row to switch it. While Sleep in or Holiday mode is on, a coloured chip beside the date says so; tap it to turn that mode off. The card is hidden when none of these helpers exist.
+
+## Quick controls (Home)
+
+A row across the top of Home: how many lights are on with **All off**, each garage door with **Open/Close**, open blinds with **Close** (flagged after dark), and any open doors. Status lights (notification, indicator, night light) and appliance doors are left out, as on Today.
 
 ## Floor plan (Home)
 

@@ -33,7 +33,7 @@ import { weatherWord, greetingFor, dayPart, briefFacts, briefLocal, briefAgents,
 import { noteFromCall, noteMerge, noteText, noteItems, Ding } from './notify.js';
 import {
   roomGroups, roomTemperature, roomExtras, isStatusLight, switchNote, devicesIndex, glanceItems,
-  MOTION_CLASSES, OPENING_CLASSES,
+  MOTION_CLASSES, OPENING_CLASSES, APPLIANCE_WORDS,
 } from './home.js';
 import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './news.js';
 import { Voice } from './voice.js';
@@ -136,6 +136,8 @@ const ui = {
   dragging: false,
   refreshTimer: 0,
   lastRender: 0,
+  energyChart: 'solar',    // the one 24-hour chart shown on Energy: solar | grid | soc
+  energyMonth: false,      // "This month" opened on Energy
 };
 
 // ---------- helpers ----------
@@ -1300,6 +1302,15 @@ async function loadEnergyHistory(force = false) {
   queueRefresh();
 }
 
+/** The inverter's on-grid / off-grid sensor (Sigenergy local Modbus: sensor.sigen_plant_grid_connection_status). */
+function gridStatus() {
+  const s = [...store.states.values()].find((x) => domainOf(x.entity_id) === 'sensor'
+    && (/grid_(connection_)?status|on_off_grid/.test(x.entity_id) || /^(on_grid|off_grid)/.test(x.state)) && !isUnavailable(x));
+  if (!s) return null;
+  const off = /off/i.test(s.state) && !/^on/i.test(s.state);
+  return { s, off, text: off ? 'Off grid · running on solar and battery' : 'On grid · power is on' };
+}
+
 function batteryAlert() {
   return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation'
     && (s.attributes?.id === 'dashboard_battery_full' || /batter.*(full|charged|100)/i.test(nameOf(s))));
@@ -1386,22 +1397,27 @@ function nice(v) {
   return Math.ceil(v / 10) * 10;
 }
 
-function energyChartsView(m) {
+const ENERGY_CHARTS = [['solar', 'Solar'], ['grid', 'Grid'], ['soc', 'Battery']];
+
+/** One 24-hour chart at a time, picked with the chips in the card title. */
+function energyChartsView(m, pick = ui.energyChart) {
   if (!m) return energy.error ? `<p class="muted">${esc(energy.error)}</p>` : '<div class="spinner"></div>';
+  const has = { solar: !!(m.solar || m.home), grid: !!m.grid, soc: !!m.soc };
+  if (!has[pick]) pick = ENERGY_CHARTS.map(([k]) => k).find((k) => has[k]);
   const peak = (...arrs) => Math.max(0.5, ...arrs.flat().filter((v) => v != null).map(Math.abs));
   const out = [];
-  if (m.solar || m.home) {
+  if (pick === 'solar') {
     out.push(chartHtml({ title: 'Solar and home use', m, min: 0, max: nice(peak(m.solar || [], m.home || [])),
       series: [{ values: m.solar, cls: 'solar', area: true, label: 'Solar' }, { values: m.home, cls: 'home', label: 'Home' }] }));
   }
-  if (m.grid) {
+  if (pick === 'grid') {
     const sold = m.grid.map((v) => (v == null ? null : Math.min(0, v)));
     const bought = m.grid.map((v) => (v == null ? null : Math.max(0, v)));
     const top = nice(peak(m.grid));
     out.push(chartHtml({ title: 'Grid', m, min: -top, max: top, note: 'Sold below the line',
       series: [{ values: sold, cls: 'sold', area: true, label: 'Sold' }, { values: bought, cls: 'bought', area: true, label: 'Bought' }] }));
   }
-  if (m.soc) out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
+  if (pick === 'soc') out.push(chartHtml({ title: 'Battery level', m, min: 0, max: 100, unit: '%', series: [{ values: m.soc, cls: 'soc', area: true }] }));
   return out.join('');
 }
 
@@ -1445,9 +1461,132 @@ function personCardHtml(p) {
   </button></li>`;
 }
 
+/** Garage doors and gates shown on the dashboard. */
+function garageDoors() {
+  return [...store.states.values()].filter((s) => domainOf(s.entity_id) === 'cover' && listed(s.entity_id)
+    && ['garage', 'gate'].includes(s.attributes?.device_class));
+}
+
+/** "Garage Door Door 1" reads as "Garage door". */
+function garageName(g) {
+  const n = nameOf(g).replace(/(\s+(door|opener))?(\s+\d+)+$/i, '').replace(/\s+door\s+door$/i, ' door');
+  return /door|gate/i.test(n) ? n.replace(/\bDoor\b/, 'door') : `${n} door`;
+}
+
+const coverWord = (st) => ({ open: 'Open', closed: 'Closed', opening: 'Opening…', closing: 'Closing…' }[st] || st);
+
+function garageCardHtml() {
+  const doors = garageDoors();
+  if (!doors.length) return '';
+  const auto = store.states.get('input_boolean.garage_auto_open');
+  return `<section class="card garage-card">${doors.map((g) => {
+    const v = shown(g);
+    const open = v.state !== 'closed';
+    return `<div class="garage-row${open ? ' open' : ''}">
+      <span class="garage-ic">${icon(open ? 'garageOpen' : 'garage')}</span>
+      <span class="garage-text"><b>${esc(garageName(g))}</b><small class="muted">${esc(coverWord(v.state))}${g.last_changed ? ` · ${esc(relativeTime(g.last_changed))}` : ''}${auto?.state === 'on' && !open ? ' · opens when your car gets home' : ''}</small></span>
+      <button type="button" class="btn garage-go" data-quick="${open ? 'close' : 'open'}" data-ids="${esc(g.entity_id)}">${open ? 'Close' : 'Open'}</button>
+    </div>`;
+  }).join('')}</section>`;
+}
+
+// ---------- today's comings and goings, from each person's history since midnight ----------
+
+const moves = { key: '', at: 0, items: null, loading: false };
+
+async function loadMoves() {
+  const people = shownPeople().filter((p) => domainOf(p.id) === 'person');
+  const key = people.map((p) => `${p.id}:${p.state}`).join();
+  if (!store.client || moves.loading || !people.length) return;
+  if (key === moves.key && Date.now() - moves.at < 10 * 60_000) return;
+  moves.loading = true;
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const hours = (Date.now() - midnight) / 3_600_000;
+  try {
+    const items = [];
+    await Promise.all(people.map(async (p) => {
+      const hist = await store.client.history(p.id, Math.max(hours, 0.1));
+      for (let i = 1; i < hist.length; i++) {
+        const a = hist[i - 1].s; const b = hist[i].s;
+        if (a === b || ['unknown', 'unavailable'].includes(a) || ['unknown', 'unavailable'].includes(b)) continue;
+        const zone = (z) => (z === 'home' ? 'home' : z);
+        let text;
+        if (b === 'home') text = `${p.name} got home${a !== 'not_home' ? ` from ${a}` : ''}`;
+        else if (a === 'home') text = `${p.name} left home`;
+        else if (b !== 'not_home') text = `${p.name} got to ${zone(b)}`;
+        else text = `${p.name} left ${zone(a)}`;
+        items.push({ t: hist[i].t, text, p });
+      }
+    }));
+    moves.items = items.filter((x) => x.t >= +midnight).sort((x, y) => y.t - x.t);
+    moves.key = key; moves.at = Date.now();
+  } catch { moves.items = moves.items || []; }
+  moves.loading = false;
+  queueRefresh();
+}
+
+function movesCardHtml() {
+  if (!shownPeople().some((p) => domainOf(p.id) === 'person')) return '';
+  const items = moves.items;
+  return `<section class="card moves-card">
+    <h2 class="card-title">${icon('today')}Today</h2>
+    ${!items ? '<div class="spinner"></div>' : items.length
+      ? `<ul class="moves">${items.slice(0, 8).map((x) => `<li>${avatarHtml(x.p, base(), 'pavatar sm')}<span><b>${esc(x.text)}</b><small class="muted">${esc(fmtTime(new Date(x.t)))}</small></span></li>`).join('')}</ul>`
+      : '<p class="muted">No comings or goings yet today.</p>'}
+  </section>`;
+}
+
 // ============================================================
 // Home: floor plan and rooms
 // ============================================================
+
+const DOOR_CLASSES = new Set(['door', 'garage_door', 'opening']);
+
+/** The row of quick controls across the top of Home: lights on, garage, blinds and doors. */
+function quickRowHtml() {
+  const all = [...store.states.values()].filter((s) => listed(s.entity_id)).map(shown);
+  const names = (list) => list.map((s) => nameOf(s)).slice(0, 3).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
+  const ids = (list) => esc(list.map((s) => s.entity_id).join(','));
+  const chip = ({ warn, ic, title, sub, btn, act, list }) => `<div class="qchip${warn ? ' warn' : ''}">
+      ${icon(ic)}<span class="qchip-text"><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+      ${btn ? `<button type="button" class="qchip-btn" data-quick="${act}" data-ids="${ids(list)}">${btn}</button>` : ''}
+    </div>`;
+  const out = [];
+  const lights = all.filter((s) => domainOf(s.entity_id) === 'light' && s.state === 'on' && !isStatusLight(s));
+  out.push(lights.length
+    ? chip({ warn: true, ic: 'light', title: plural(lights.length, 'light') + ' on', sub: names(lights), btn: 'All off', act: 'lights-off', list: lights })
+    : chip({ ic: 'light', title: 'Lights', sub: 'All off' }));
+  for (const g of all.filter((s) => domainOf(s.entity_id) === 'cover' && ['garage', 'gate'].includes(s.attributes?.device_class))) {
+    const open = g.state !== 'closed';
+    out.push(chip({ warn: open, ic: open ? 'garageOpen' : 'garage', title: garageName(g), sub: coverWord(g.state), btn: open ? 'Close' : 'Open', act: open ? 'close' : 'open', list: [g] }));
+  }
+  const blinds = all.filter((s) => domainOf(s.entity_id) === 'cover' && !isCoverDoor(s));
+  if (blinds.length) {
+    const open = blinds.filter((s) => s.state === 'open' || s.state === 'opening');
+    const dark = store.states.get('sun.sun')?.state === 'below_horizon';
+    out.push(open.length
+      ? chip({ warn: dark, ic: 'blindOpen', title: `${plural(open.length, 'blind')} open`, sub: dark ? 'after dark' : names(open), btn: 'Close', act: 'close', list: open })
+      : chip({ ic: 'blindOpen', title: 'Blinds', sub: 'All closed', btn: dark ? '' : 'Open', act: 'open', list: blinds }));
+  }
+  const doors = all.filter((s) => domainOf(s.entity_id) === 'binary_sensor' && DOOR_CLASSES.has(s.attributes?.device_class) && !APPLIANCE_WORDS.test(nameOf(s)));
+  if (doors.length) {
+    const open = doors.filter((s) => s.state === 'on');
+    out.push(open.length
+      ? chip({ warn: true, ic: 'door', title: `${plural(open.length, 'door')} open`, sub: names(open).replace(/\b(door)\s+\1\b/gi, '$1') })
+      : chip({ ic: 'door', title: 'Doors', sub: 'All shut' }));
+  }
+  return `<div class="quick-row">${out.join('')}</div>`;
+}
+
+function quickAct(kind, el) {
+  const ids = (el.dataset.ids || '').split(',').filter(Boolean);
+  if (!ids.length) return;
+  for (const id of ids) ui.pending.set(id, { 'lights-off': 'off', open: 'opening', close: 'closing' }[kind]);
+  if (kind === 'lights-off') { call('light', 'turn_off', {}, ids); toast(`Turning off ${plural(ids.length, 'light')}…`); }
+  else call('cover', kind === 'open' ? 'open_cover' : 'close_cover', {}, ids);
+  setTimeout(() => { for (const id of ids) ui.pending.delete(id); queueRefresh(); }, 8000);
+  queueRefresh();
+}
 
 async function dataGet(scope, key) {
   try { return (await store.client.send({ type: `frontend/get_${scope}_data`, key }))?.value ?? null; } catch { return undefined; }
@@ -1861,12 +2000,19 @@ const VIEWS = {
     const lastFull = alert?.attributes?.last_triggered;
     const recap = solarRecap();
     const net = r.feedIn || r.buy ? (t.sold?.kwh || 0) * r.feedIn - (t.bought?.kwh || 0) * r.buy : null;
+    const grid = gridStatus();
+    const hasMonth = x.exportMonth != null || x.exportYear != null;
+    const m = e.m;
+    const chips = m ? ENERGY_CHARTS.filter(([k]) => (k === 'solar' ? m.solar || m.home : m[k])) : [];
+    const pick = chips.some(([k]) => k === ui.energyChart) ? ui.energyChart : chips[0]?.[0];
     return `<div class="v-energy">
+      <div class="col col-a">
       <section class="card battery-card">
         <h2 class="card-title">${icon('battery')}Battery</h2>
         <div class="bat">
           <div class="bat-gauge" style="--p:${Math.max(0, Math.min(100, f.soc ?? 0))}"><span class="bat-fill"></span><b>${f.soc != null ? Math.round(f.soc) : '–'}%</b></div>
           <div class="bat-text">
+            ${grid ? `<p class="grid-pill${grid.off ? ' off' : ''}"><i></i>${esc(grid.text)}</p>` : ''}
             <p class="bat-state">${f.charging > 0.05 ? `Charging at ${energyPower(f.charging)}` : f.discharging > 0.05 ? `Powering the house at ${energyPower(f.discharging)}` : f.soc >= 99.5 ? 'Full' : 'Resting'}</p>
             ${eta ? `<p>${esc(eta)}</p>` : ''}
             ${stored != null ? `<p class="muted">${stored.toFixed(1)} kWh stored${cap ? ` of ${cap.toFixed(1)} kWh` : ''}</p>` : ''}
@@ -1887,9 +2033,11 @@ const VIEWS = {
         <h2 class="card-title">${icon('power')}Right now</h2>
         ${flowHtml(f)}
       </section>
+      </div>
 
+      <div class="col col-b">
       <section class="card today-energy">
-        <h2 class="card-title">${icon('today')}Today</h2>
+        <h2 class="card-title">${icon('today')}Today${hasMonth ? `<button type="button" class="title-link" data-energy-month aria-expanded="${ui.energyMonth}">${ui.energyMonth ? 'Hide month' : 'This month ›'}</button>` : ''}</h2>
         <dl class="tiles">
           <div class="t-solar"><dt>${icon('solar')}Solar made</dt><dd>${kwh(t.pv)}${est(t.pv)}</dd></div>
           <div class="t-sold"><dt>${icon('cash')}Sold to grid</dt><dd>${kwh(t.sold)}${est(t.sold)}</dd>${t.sold && r.feedIn ? `<small>${money(t.sold.kwh * r.feedIn)} earned</small>` : ''}</div>
@@ -1901,7 +2049,7 @@ const VIEWS = {
         ${!r.feedIn ? '<p class="hint">Add your feed-in rate in <a href="#/settings?section=energy">Settings</a> to see what the solar you sell earns.</p>' : ''}
       </section>
 
-      ${x.exportMonth != null || x.exportYear != null ? `<section class="card month-energy">
+      ${hasMonth && ui.energyMonth ? `<section class="card month-energy">
         <h2 class="card-title">${icon('cash')}Selling to the grid</h2>
         <dl class="tiles">
           ${x.exportMonth != null ? `<div><dt>This month</dt><dd>${x.exportMonth.toFixed(0)}<small> kWh</small></dd>${r.feedIn ? `<small>${money(x.exportMonth * r.feedIn)}</small>` : ''}</div>` : ''}
@@ -1911,21 +2059,27 @@ const VIEWS = {
       </section>` : ''}
 
       <section class="card charts-card">
-        <h2 class="card-title">${icon('timer')}Last 24 hours</h2>
-        ${energyChartsView(e.m)}
+        <h2 class="card-title">${icon('timer')}Last 24 hours${chips.length > 1 ? `<span class="title-chips">${chips.map(([k, label]) => `<button type="button" class="chip${k === pick ? ' on' : ''}" data-energy-chart="${k}">${label}</button>`).join('')}</span>` : ''}</h2>
+        ${energyChartsView(m, pick)}
       </section>
+      </div>
     </div>`;
   },
 
   places() {
     if (!ready()) return notReady();
+    loadMoves();
     const people = shownPeople();
     return `<div class="v-places">
       <section class="card map-card"><div class="pmap-slot big"></div></section>
+      <div class="places-side">
       <section class="card people-card">
         <h2 class="card-title">${icon('people')}Household</h2>
         ${people.length ? `<ul class="people-list">${people.map(personCardHtml).join('')}</ul>` : '<p class="muted">No people in Home Assistant yet.</p>'}
       </section>
+      ${garageCardHtml()}
+      ${movesCardHtml()}
+      </div>
     </div>`;
   },
 
@@ -1954,6 +2108,7 @@ const VIEWS = {
     const count = [...store.states.keys()].filter(listed).length;
     const camCard = cams.length ? `<section class="card cams-card"><h2 class="card-title">${icon('camera')}Cameras</h2>${camerasHtml(cams)}</section>` : '';
     return `<div class="v-home">
+      ${quickRowHtml()}
       ${plan ? `<div class="home-plan">${plan}${camCard}</div>` : camCard}
       <section class="card rooms-card">
         <h2 class="card-title">${icon('area')}Rooms</h2>
@@ -2763,6 +2918,11 @@ document.addEventListener('contextmenu', (e) => {
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (ui.suppressClick) { ui.suppressClick = false; return; }
+  const ec = t.closest('[data-energy-chart]');
+  if (ec) { ui.energyChart = ec.dataset.energyChart; render(); return; }
+  if (t.closest('[data-energy-month]')) { ui.energyMonth = !ui.energyMonth; render(); return; }
+  const qa = t.closest('[data-quick]');
+  if (qa) { quickAct(qa.dataset.quick, qa); return; }
   if (handleSettingsClick(t) || handleCalendarClick(t)) return;
   const ce = t.closest('[data-cam-edit]');
   if (ce) { camEditAct(ce.dataset.camEdit); return; }
