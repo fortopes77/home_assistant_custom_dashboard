@@ -1,10 +1,11 @@
-# Garage auto-open: opens the garage when Azelia or Andrew drives home.
+# Garage auto-open: opens the garage when someone in the family drives home.
+# Change the person, phone and garage entity ids below to yours (search for "CHANGE").
 #
 # It only opens when ALL of these are true:
 #   1. "Garage auto-open" (input_boolean.garage_auto_open) is on. It starts OFF after install.
 #   2. That person's phone has just come home after at least 10 minutes away (not a GPS wobble).
 #   3. They're in the car: the phone is connected to the car's Bluetooth. Type the car's Bluetooth
-#      name or address into "Azelia's car Bluetooth" / "Andrew's car Bluetooth" (input_text). If it's
+#      name or address into "Driver one car Bluetooth" / "Driver two car Bluetooth" (input_text). If it's
 #      left blank, this check is skipped for that person and you get the "Open garage?" question below.
 #   4. The driveway camera sees a vehicle within 3 minutes of arriving.
 #   5. The garage is closed and holiday mode is off. Coming back from holiday it asks instead (the
@@ -19,6 +20,8 @@
 #
 # The switch is off after a fresh install and remembers its last setting across restarts.
 #
+# CHANGE: cover.garage_door and binary_sensor.driveway_vehicle (your driveway camera's vehicle sensor).
+#
 # Install: put this file in /config/packages/ (see dashboard_update.yaml), then restart once.
 
 input_boolean:
@@ -27,12 +30,12 @@ input_boolean:
     icon: mdi:garage-open-variant
 
 input_text:
-  garage_car_bt_azelia:
-    name: Azelia's car Bluetooth
+  garage_car_bt_one:
+    name: Driver one car Bluetooth
     icon: mdi:car-connected
     max: 100
-  garage_car_bt_andy:
-    name: Andrew's car Bluetooth
+  garage_car_bt_two:
+    name: Driver two car Bluetooth
     icon: mdi:car-connected
     max: 100
 
@@ -42,24 +45,24 @@ automation:
     mode: single
     max_exceeded: silent
     variables:
-      drivers:
-        person.azelia:
-          name: Azelia
-          notify: notify.mobile_app_azelia_s_phone
-          bt: sensor.azelia_s_phone_bluetooth_connection
-          car: input_text.garage_car_bt_azelia
-        person.andy:
-          name: Andrew
-          notify: notify.mobile_app_sm_s938b
-          bt: sensor.sm_s938b_bluetooth_connection
-          car: input_text.garage_car_bt_andy
-    triggers:
+      drivers:   # CHANGE: one entry per driver
+        person.driver_one:
+          name: Driver one
+          notify: notify.mobile_app_phone_one
+          bt: sensor.phone_one_bluetooth_connection
+          car: input_text.garage_car_bt_one
+        person.driver_two:
+          name: Driver two
+          notify: notify.mobile_app_phone_two
+          bt: sensor.phone_two_bluetooth_connection
+          car: input_text.garage_car_bt_two
+    triggers:   # CHANGE: same people as above
       - trigger: state
-        entity_id: [person.azelia, person.andy]
+        entity_id: [person.driver_one, person.driver_two]
         to: home
     conditions:
       - condition: state
-        entity_id: cover.garage_door_door_1_2
+        entity_id: cover.garage_door
         state: closed
       # Away at least 10 minutes, so a GPS jump at home doesn't count as arriving.
       - "{{ trigger.from_state is not none and trigger.from_state.state not in ['home', 'unknown', 'unavailable']
@@ -88,10 +91,10 @@ automation:
           - variables:
               seen: "{{ wait.trigger is not none }}"
       - if: "{{ is_state('input_boolean.garage_auto_open', 'on') and in_car and seen and not holiday
-                and is_state('cover.garage_door_door_1_2', 'closed') }}"
+                and is_state('cover.garage_door', 'closed') }}"
         then:
           - action: cover.open_cover
-            target: { entity_id: cover.garage_door_door_1_2 }
+            target: { entity_id: cover.garage_door }
           - action: "{{ who.notify }}"
             data:
               title: "Garage opened for {{ who.name }} 🚗"
@@ -102,7 +105,7 @@ automation:
                   - { action: GARAGE_CLOSE, title: Close garage }
         else:
           # Not sure enough to open by itself: ask the person who just arrived.
-          - condition: "{{ is_state('cover.garage_door_door_1_2', 'closed') }}"
+          - condition: "{{ is_state('cover.garage_door', 'closed') }}"
           - action: "{{ who.notify }}"
             data:
               title: "Open the garage?"
@@ -137,7 +140,7 @@ automation:
         id: open_holiday_off
     actions:
       - action: "cover.{{ 'close' if trigger.id == 'close' else 'open' }}_cover"
-        target: { entity_id: cover.garage_door_door_1_2 }
+        target: { entity_id: cover.garage_door }
       - if: "{{ trigger.id == 'open_holiday_off' }}"
         then:
           - action: input_boolean.turn_off
