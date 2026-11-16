@@ -15,7 +15,7 @@ export const ENERGY_ROLES = [
 
 const ENERGY_MATCH = {
   solar: { test: /\b(pv|solar|photovoltaic)\b/, skip: /string|mppt|daily|today|total|month|annual|year|lifetime|third.?party|rated|max/ },
-  grid: { test: /\bgrid\b/, skip: /phase|frequency|voltage|current|reactive|limit|max|rated|daily|today|total/ },
+  grid: { test: /\bgrid\b/, skip: /import|export|phase|frequency|voltage|current|reactive|limit|max|rated|daily|today|total/ },
   battery: { test: /\b(battery|bat|ess)\b/, skip: /available|max|rated|limit|capacity|daily|today|total|evdc|dc.?charger/ },
   home: { test: /\b(load|consumption|consumed|house|home)\b/, skip: /daily|today|total|month|annual|limit/ },
 };
