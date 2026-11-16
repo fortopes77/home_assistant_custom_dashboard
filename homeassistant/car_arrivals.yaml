@@ -43,7 +43,6 @@ automation:
       - trigger: state
         entity_id:
           - binary_sensor.driveway_vehicle
-          - binary_sensor.door_bell_vehicle
         to: "on"
     variables:
       # [{plate, owner, person}] from the Family cars helper. person is '' for a plain name.
@@ -61,7 +60,6 @@ automation:
         {{ ns.cars }}
       CAMERAS:
         binary_sensor.driveway_vehicle: camera.driveway_fluent
-        binary_sensor.door_bell_vehicle: camera.door_bell_snapshots_fluent
       camera: "{{ CAMERAS.get(trigger.entity_id, 'camera.driveway_fluent') }}"
     actions:
       # Give the car a moment to come into full view before taking the photo.
