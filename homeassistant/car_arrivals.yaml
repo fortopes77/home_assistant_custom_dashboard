@@ -1,0 +1,151 @@
+# Car arrivals: "Andrew is home" when one of the family's cars pulls into the driveway.
+# Put this file in /config/packages/ (see dashboard_update.yaml for turning packages on), then go to
+# Developer tools → YAML and reload "Input text" and "Automations" (or restart once).
+#
+# How it works: when a Reolink camera sees a vehicle, the automation sends a snapshot to the AI task
+# (Gemini), which reads the number plate. If the plate is one of the family cars, everyone gets
+# "<owner> is home" with the photo, through the notify_family script. Any other car gets the usual
+# "Car in the driveway" alert, now with its plate.
+#
+# The family's cars are typed in on the dashboard: Settings → Family cars (plate and whose car it is).
+# They're kept in input_text.family_cars as "ABC123=person.andy;XYZ789=Nana", so you can also edit that
+# helper in Home Assistant. The owner is a person entity (used for the name and to tell an arrival from
+# the car just leaving) or a plain name.
+#
+# Change to suit your home:
+#   - the trigger: the vehicle sensors of the cameras that look at the driveway, and the matching camera
+#     in CAMERAS so the right snapshot is read.
+#
+# Leaving vs arriving: a single photo can't tell which way a car is going, so for a person's car it only
+# says "is home" when they weren't already home 10 minutes ago. The same car is announced at most once every
+# 15 minutes.
+#
+# The "Camera alert with snapshot" automation also alerts on vehicles. Take the driveway vehicle
+# sensor(s) out of its triggers so a family car isn't announced twice; this file covers them now.
+
+input_text:
+  family_cars:
+    name: Family cars
+    icon: mdi:car-multiple
+    max: 255
+  last_car_arrival:
+    name: Last car arrival
+    icon: mdi:car-arrow-left
+    max: 255
+
+automation:
+  - id: dashboard_car_arrivals
+    alias: Car arrivals (number plates)
+    description: Reads the plate of a car in the driveway and says who's home if it's a family car.
+    mode: queued
+    max: 4
+    triggers:
+      - trigger: state
+        entity_id:
+          - binary_sensor.driveway_vehicle
+          - binary_sensor.door_bell_vehicle
+        to: "on"
+    variables:
+      # [{plate, owner, person}] from the Family cars helper. person is '' for a plain name.
+      CARS: >-
+        {% set ns = namespace(cars=[]) %}
+        {% for part in states('input_text.family_cars').split(';') if '=' in part %}
+          {% set plate = part.split('=')[0] | upper | regex_replace('[^A-Z0-9]', '') %}
+          {% set who = part.split('=')[1] | trim %}
+          {% set is_person = who.startswith('person.') %}
+          {% set name = (state_attr(who, 'friendly_name') or who.split('.')[1] | replace('_', ' ') | title) if is_person else who %}
+          {% if plate and who %}
+            {% set ns.cars = ns.cars + [{'plate': plate, 'owner': name, 'person': who if is_person else ''}] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.cars }}
+      CAMERAS:
+        binary_sensor.driveway_vehicle: camera.driveway_fluent
+        binary_sensor.door_bell_vehicle: camera.door_bell_snapshots_fluent
+      camera: "{{ CAMERAS.get(trigger.entity_id, 'camera.driveway_fluent') }}"
+    actions:
+      # Give the car a moment to come into full view before taking the photo.
+      - delay: 2
+      - action: ai_task.generate_data
+        continue_on_error: true
+        response_variable: ai
+        data:
+          entity_id: ai_task.google_ai_task
+          task_name: Read number plate
+          instructions: >-
+            This is a snapshot from a home security camera that just saw a vehicle. Read the number
+            plate of the main vehicle, letters and digits only, no spaces. If no plate is readable,
+            return an empty plate. Don't guess characters you can't see. Also describe the vehicle in a
+            few words (colour, type, make if obvious), e.g. "white Toyota SUV".
+          structure:
+            plate:
+              description: The number plate, letters and digits only, or empty if unreadable.
+              selector: { text: {} }
+            vehicle:
+              description: A few words describing the vehicle.
+              selector: { text: {} }
+          attachments:
+            - media_content_id: "media-source://camera/{{ camera }}"
+              media_content_type: image/jpeg
+      - variables:
+          seen: >-
+            {% set p = ai.data.plate if ai is defined and ai.data is mapping and ai.data.plate is string else '' %}
+            {{ p | upper | regex_replace('[^A-Z0-9]', '') }}
+          vehicle: >-
+            {{ ai.data.vehicle | default('', true) if ai is defined and ai.data is mapping else '' }}
+          # A family car whose plate matches exactly, or with one misread character (same length).
+          car: >-
+            {% set ns = namespace(car=none) %}
+            {% for c in CARS if ns.car is none and seen | length >= 4 %}
+              {% set p = c.plate | upper | regex_replace('[^A-Z0-9]', '') %}
+              {% if p | length == seen | length %}
+                {% set ns2 = namespace(diff=0) %}
+                {% for i in range(p | length) %}{% if p[i] != seen[i] %}{% set ns2.diff = ns2.diff + 1 %}{% endif %}{% endfor %}
+                {% if ns2.diff <= 1 %}{% set ns.car = c %}{% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.car }}
+          last: "{{ states('input_text.last_car_arrival') }}"
+          image: "/api/camera_proxy/{{ camera }}"
+      - choose:
+          # A family car.
+          - conditions: "{{ car is mapping }}"
+            sequence:
+              - condition: template
+                alias: Not the same car in the last 15 minutes
+                value_template: >-
+                  {% set parts = last.split('|') %}
+                  {{ not (parts | length == 2 and parts[0] == car.owner
+                          and (now() - as_datetime(parts[1])) < timedelta(minutes=15)) }}
+              - condition: template
+                alias: Arriving, not leaving (the driver wasn't home 10 minutes ago)
+                value_template: >-
+                  {% set p = car.person %}
+                  {{ not p or states[p] is none or not is_state(p, 'home')
+                     or (now() - states[p].last_changed) < timedelta(minutes=10) }}
+              - action: input_text.set_value
+                target: { entity_id: input_text.last_car_arrival }
+                data:
+                  value: "{{ car.owner }}|{{ now().isoformat() }}"
+              - action: script.notify_family
+                data:
+                  title: "{{ car.owner }} is home"
+                  message: "{{ car.owner }} just pulled into the driveway."
+                  data:
+                    image: "{{ image }}"
+                    tag: "car-arrival-{{ car.owner | lower }}"
+                    group: car-arrivals
+        # Any other vehicle: the usual alert, now with what it is and its plate.
+        default:
+          - condition: template
+            alias: Not when both of you are home (same as the camera alert)
+            value_template: "{{ not (is_state('person.andy', 'home') and is_state('person.azelia', 'home')) }}"
+          - action: script.notify_family
+            data:
+              title: Car in the driveway
+              message: >-
+                {{ ('A ' ~ vehicle) if vehicle else 'A car' }} is in the driveway{{ ' (plate ' ~ seen ~ ')' if seen else '' }}.
+              data:
+                image: "{{ image }}"
+                tag: car-unknown
+                group: car-arrivals

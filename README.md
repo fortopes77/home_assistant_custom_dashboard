@@ -129,6 +129,8 @@ Add, change and delete events right on Today, and say **who** each one is for: o
 
 On bin day, Today shows little bins with those coloured lids under the date ("Bins out tonight"); the rest of the week they stay out of the way. Tap them to see the sensor. Any sensor with "bin" in its id, colour words in its state and a `date` attribute works too.
 
+[`homeassistant/car_arrivals.yaml`](homeassistant/car_arrivals.yaml) is a package that says **"Andrew is home"** when a family car pulls into the driveway. When a Reolink camera sees a vehicle, it asks the AI task (Gemini) to read the number plate from the snapshot. The family's plates are typed in on the dashboard under **Settings → Family cars**, with whose car each one is (a person, or any name), and kept in the package's `input_text.family_cars` helper so every screen and the automation share them. A matching plate (one misread character is allowed) sends "<owner> is home" with the photo through `notify_family`, but only if that person wasn't already home, so a car leaving isn't announced. Any other car gets a "Car in the driveway" alert with its plate. Take the driveway vehicle sensors out of the camera alert automation so cars aren't announced twice.
+
 ## Modes
 
 Today has a **Modes** card under the greeting for house-wide switches. It shows:
