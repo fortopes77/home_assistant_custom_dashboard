@@ -345,11 +345,10 @@ small { font-size: 0.8em; }
 
 .v-today { display: grid; gap: var(--gap); }
 .v-today .col { display: contents; }
-/* Phone order: the day, right now, modes, energy, calendar, shopping, notifications, people, news. */
+/* Phone order: the day, right now, modes, energy, calendar, notifications, people, news. */
 .hero { order: 1; }
 .energy-mini { order: 2; }
 .agenda-card { order: 3; }
-.shop-card { order: 4; }
 .notes-card { order: 5; }
 .people-mini { order: 6; }
 .news-card { order: 7; }
@@ -551,53 +550,85 @@ small { font-size: 0.8em; }
 .glance-item.tone-ok .icon { color: var(--positive); }
 .glance-act { border: 0; border-left: 1px solid var(--border); padding: 0 12px; background: none; color: var(--primary); font-weight: 700; font-size: 0.85rem; }
 
-/* Shopping list: tap an item to tick it off. */
-.shop { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0; list-style: none; }
-.shop-item {
-  display: inline-flex;
+/* Shopping page: big rows to tap off at a glance; ticked things wait on the side until cleared. */
+.v-shop { display: grid; gap: var(--gap); align-items: start; }
+.shop-side { display: grid; gap: var(--gap); }
+.shop-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.shop-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 6px 12px 6px 6px;
+  gap: 14px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 16px 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 16px;
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
+  font-size: 1.12rem;
   font-weight: 600;
   text-align: left;
 }
-.shop-item .tick {
+.shop-name { min-width: 0; overflow-wrap: anywhere; }
+.shop-name small { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.shop-row .tick {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  flex: none;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 2px solid var(--border);
   background: var(--surface);
   color: transparent;
 }
-.shop-item .tick .icon { width: 16px; height: 16px; }
-.shop li.done .shop-item { opacity: 0.5; text-decoration: line-through; }
-.shop li.done .tick { background: var(--positive); border-color: var(--positive); color: #fff; }
-@media (hover: hover) { .shop-item:hover .tick { border-color: var(--positive); color: var(--positive); } }
-.shop-add { display: flex; gap: 6px; align-items: center; }
+.shop-row .tick .icon { width: 20px; height: 20px; }
+.shop-list li.done .shop-row, .shop-list li.undone .shop-row { opacity: 0.45; }
+.shop-list li.done .tick, .shop-list.done .tick { background: var(--positive); border-color: var(--positive); color: #fff; }
+.shop-list.done .shop-row { min-height: 46px; font-size: 0.98rem; background: none; }
+.shop-list.done .shop-name { color: var(--muted); text-decoration: line-through; }
+.shop-list.done li.undone .tick { background: var(--surface); border-color: var(--border); }
+.shop-done-card .shop-list { margin-top: 4px; }
+.shop-done-card .small { margin: 10px 0 0; }
+@media (hover: hover) { .shop-row:hover .tick { border-color: var(--positive); } }
+.shop-add { display: flex; gap: 8px; align-items: center; }
 .shop-add input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  padding: 8px 14px;
+  min-height: 52px;
+  padding: 10px 18px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  font-size: 1.05rem;
 }
 .shop-add input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
-.shop-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin: 8px 0 0; font-size: 0.82rem; }
-.shop-foot span { display: inline-flex; align-items: center; gap: 4px; }
-.shop-foot .icon { width: 15px; height: 15px; }
-.shop-foot .link-btn { margin: 0; }
+.shop-add .btn { min-height: 52px; padding: 0 20px; display: inline-flex; align-items: center; gap: 6px; }
+.shop-add .btn .icon { width: 20px; height: 20px; }
+.shop-empty { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 18px; border-radius: 16px; background: color-mix(in srgb, var(--positive) 12%, transparent); }
+.shop-empty > .icon { width: 34px; height: 34px; color: var(--positive); }
+.shop-empty p, .shop-remind p { display: grid; gap: 2px; margin: 0; }
+.shop-remind { display: flex; align-items: flex-start; gap: 12px; font-size: 0.9rem; }
+.shop-remind > .icon { color: var(--accent); }
+.nav a { position: relative; }
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
 
 .agenda-day + .agenda-day { margin-top: 14px; }
 .agenda-day h3 { font-size: 0.95rem; margin-bottom: 6px; }
@@ -1113,14 +1144,16 @@ small { font-size: 0.8em; }
   .v-today .mode-text small, .v-today .mode-name { display: none; }
   .v-today .mode-short { display: inline; white-space: nowrap; }
   .v-today .col > * { order: 0; }
-  .v-today .shop-foot > span { display: none; }
-  .v-today .shop-foot:not(:has(button)) { display: none; }
   .v-today .glance { grid-template-columns: 1fr; }
   .v-today .glance-item small { display: inline; margin-left: 6px; }
   .v-today .glance-item > button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
   /* Energy: battery and the live flow on the left; today, the month and one 24-hour chart on the right. */
   .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
+
+  /* Shopping: the list on the left in two columns of rows; ticked things and the shops reminder on the right. */
+  .v-shop { grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr); }
+  .v-shop .shop-main .shop-list { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 
   .v-places { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); align-items: start; }
   .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
@@ -8934,7 +8967,7 @@ class ScreenSpeaker {
 // Settings also sets up the floor plan, wall mode, the live sky and installing as an app.
 
 
-const DASH_BUILD = '16 Nov 2026, 14:13 (7e4903f)';
+const DASH_BUILD = '18 Nov 2026, 13:57 (4b6f1ff)';
 const $ = (sel, root = document) => root.querySelector(sel);
 
 // ---------- state ----------
@@ -9099,6 +9132,7 @@ function toast(msg) {
 
 const VIEWS_META = {
   today: { title: 'Today', icon: 'today' },
+  shopping: { title: 'Shopping', icon: 'cart' },
   energy: { title: 'Energy', icon: 'solar' },
   places: { title: 'Places', icon: 'mapMarker' },
   home: { title: 'Home', icon: 'home' },
@@ -9113,6 +9147,7 @@ if (kiosk) document.documentElement.classList.add('kiosk');
 function viewOn(v) {
   if (v === 'energy') return store.prefs.energyTab;
   if (v === 'places') return store.prefs.peopleMap;
+  if (v === 'shopping') return store.prefs.shopping && (!store.states.size || !!shopListId());
   return true;
 }
 
@@ -9124,7 +9159,13 @@ function parseRoute() {
 
 function renderNav() {
   $('#nav').innerHTML = `<span class="brand" aria-hidden="true">${icon('home')}</span>${Object.entries(VIEWS_META).filter(([v]) => viewOn(v)).map(([v, m]) => `
-    <a href="#/${v}" data-view="${v}" class="nav-${v}"${ui.view === v ? ' aria-current="page"' : ''}>${icon(m.icon)}<span>${m.title}</span></a>`).join('')}`;
+    <a href="#/${v}" data-view="${v}" class="nav-${v}"${ui.view === v ? ' aria-current="page"' : ''}>${icon(m.icon)}${v === 'shopping' ? shopBadge() : ''}<span>${m.title}</span></a>`).join('')}`;
+}
+
+/** How many things are still to buy, from the list's own state (no need to follow the items for this). */
+function shopBadge() {
+  const n = Number(store.states.get(shopListId())?.state);
+  return n > 0 ? `<b class="nav-badge">${n > 99 ? '99+' : n}</b>` : '';
 }
 
 function renderStatus() {
@@ -10069,21 +10110,33 @@ function shopAutomation() {
   return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation' && s.attributes?.id === SHOP_AUTOMATION) || null;
 }
 
-function shopCardHtml() {
+/** The Shopping page: a big list to read from across the room, ticked things kept aside until cleared. */
+function shopViewHtml() {
   watchShopList();
-  if (!shop.id) return '';
+  if (!shop.id) return emptyHtml('No shopping list yet', 'Add the Shopping list integration in Home Assistant, or pick a to-do list in Settings.', '<a class="btn" href="#/settings">Settings</a>');
   const all = shop.items || [];
   const open = all.filter((i) => i.status !== 'completed');
-  const done = all.length - open.length;
+  const done = all.filter((i) => i.status === 'completed');
   const auto = shopAutomation();
-  return `<section class="card shop-card">
-    <h2 class="card-title">${icon('cart')}${esc(nameOf(store.states.get(shop.id)))}${open.length ? `<span class="count">${open.length}</span>` : ''}</h2>
-    ${shop.items === null ? '<p class="muted quiet">Loading…</p>'
-      : open.length ? `<ul class="shop">${open.map((i) => `<li><button type="button" class="shop-item" data-shop-done="${esc(i.uid)}" aria-label="Tick off ${esc(i.summary)}"><span class="tick">${icon('check')}</span><span>${esc(i.summary)}</span></button></li>`).join('')}</ul>`
-      : '<p class="muted quiet">Nothing to buy.</p>'}
-    <form class="shop-add" data-shop-add><input type="text" name="item" placeholder="Add an item" autocomplete="off" enterkeyhint="done" aria-label="Add an item"><button class="icon-btn" aria-label="Add">${icon('plus')}</button></form>
-    ${done || auto ? `<p class="shop-foot muted">${auto?.state === 'on' ? `<span>${icon('mapMarker')}Sent to your phone at the shops</span>` : ''}${done ? `<button type="button" class="link-btn" data-shop-clear>Clear ${done} ticked</button>` : ''}</p>` : ''}
-  </section>`;
+  const add = '<form class="shop-add big" data-shop-add><input type="text" name="item" placeholder="Add something to buy" autocomplete="off" enterkeyhint="done" aria-label="Add an item"><button class="btn" aria-label="Add">' + icon('plus') + '<span>Add</span></button></form>';
+  return `<div class="v-shop">
+    <section class="card shop-main">
+      <h2 class="card-title">${icon('cart')}To buy${open.length ? `<span class="count">${open.length}</span>` : ''}</h2>
+      ${add}
+      ${shop.items === null ? '<p class="muted quiet">Loading…</p>'
+        : open.length ? `<ul class="shop-list">${open.map((i) => `<li><button type="button" class="shop-row" data-shop-done="${esc(i.uid)}" aria-label="Tick off ${esc(i.summary)}"><span class="tick">${icon('check')}</span><span class="shop-name">${esc(i.summary)}${i.description ? `<small>${esc(i.description)}</small>` : ''}</span></button></li>`).join('')}</ul>`
+        : `<div class="shop-empty">${icon('check')}<p><b>All done</b><span class="muted">Nothing left to buy.</span></p></div>`}
+    </section>
+    <div class="shop-side">
+      <section class="card shop-done-card">
+        <h2 class="card-title">${icon('check')}Ticked off${done.length ? `<span class="count">${done.length}</span>` : ''}${done.length ? '<button type="button" class="title-link" data-shop-clear>Clear all</button>' : ''}</h2>
+        ${done.length ? `<ul class="shop-list done">${done.map((i) => `<li><button type="button" class="shop-row" data-shop-undo="${esc(i.uid)}" aria-label="Put ${esc(i.summary)} back on the list"><span class="tick">${icon('check')}</span><span class="shop-name">${esc(i.summary)}</span></button></li>`).join('')}</ul>
+          <p class="muted small">Tap one to put it back on the list.</p>`
+          : '<p class="muted quiet">Things you tick off wait here until you clear them.</p>'}
+      </section>
+      ${auto ? `<section class="card shop-remind">${icon('mapMarker')}<p><b>${auto.state === 'on' ? 'Reminder at the shops is on' : 'Reminder at the shops is off'}</b><span class="muted">${auto.state === 'on' ? 'Your phone gets the list when you arrive at Aldi, Coles or Woolworths.' : 'Turn on the automation in Home Assistant to get the list at the shops.'}</span></p></section>` : ''}
+    </div>
+  </div>`;
 }
 
 // ============================================================
@@ -10866,8 +10919,13 @@ const VIEWS = {
     loadEnergyHistory();
     return `<div class="v-today">
       <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
-      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
+  },
+
+  shopping() {
+    if (!ready()) return notReady();
+    return shopViewHtml();
   },
 
   energy() {
@@ -11853,6 +11911,12 @@ document.addEventListener('click', (e) => {
     const uid = tick.dataset.shopDone;
     tick.closest('li')?.classList.add('done');
     call('todo', 'update_item', { item: uid, status: 'completed' }, shop.id);
+    return;
+  }
+  const undo = t.closest('[data-shop-undo]');
+  if (undo) {
+    undo.closest('li')?.classList.add('undone');
+    call('todo', 'update_item', { item: undo.dataset.shopUndo, status: 'needs_action' }, shop.id);
     return;
   }
   const mp = t.closest('[data-music-pick]');
