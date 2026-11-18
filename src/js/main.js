@@ -39,7 +39,8 @@ import { newsItems, newsMerge, newsSources, storyFromEvent, newsHtml } from './n
 import { Voice } from './voice.js';
 import { binNight, binSvg, binWords } from './bins.js';
 import { CARS_ENTITY, parseCars, serializeCars, addCar, cleanPlate } from './cars.js';
-import { musicPlayers, musicMain, musicHereEntity, musicLibraryPlayer, musicCardHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker } from './music.js';
+import { musicPlayers, musicMain, musicHereEntity, musicLibraryPlayer, musicCardHtml, musicMiniHtml, musicTileHtml, loadPlaylists, paintMusicBar, musicServerUrl, ScreenSpeaker,
+  MassApi, massApiUrl, massSpotifyAccounts, massPlaylists, matchAccounts } from './music.js';
 
 const DASH_BUILD = 'source';
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -72,7 +73,10 @@ const DEFAULT_PREFS = {
   calFor: '',            // show only one person's events (and shared ones) on this screen
   notifications: true,   // the notifications card on Today (the bell is always there)
   todayExtras: false,    // cameras, thermostats and scenes on Today too
-  music: true,           // the Music card on Today
+  music: true,           // the Music page (and its strip on Today)
+  musicToday: true,      // the slim now-playing strip on Today
+  musicWho: '',          // whose Spotify the Music page shows (person id); empty = whoever is logged in
+  musicApi: '',          // Music Assistant's API address; empty = /ws on this host (https) or port 8095
   musicHere: false,      // this screen is a Music Assistant speaker (plays music from the page)
   musicName: '',         // its name in Music Assistant; empty = "Wall iPad" / "Dashboard"
   musicServer: '',       // Music Assistant's player address; empty = this Home Assistant's host, port 8927
@@ -207,6 +211,7 @@ function toast(msg) {
 const VIEWS_META = {
   today: { title: 'Today', icon: 'today' },
   shopping: { title: 'Shopping', icon: 'cart' },
+  music: { title: 'Music', icon: 'music' },
   energy: { title: 'Energy', icon: 'solar' },
   places: { title: 'Places', icon: 'mapMarker' },
   home: { title: 'Home', icon: 'home' },
@@ -222,6 +227,7 @@ function viewOn(v) {
   if (v === 'energy') return store.prefs.energyTab;
   if (v === 'places') return store.prefs.peopleMap;
   if (v === 'shopping') return store.prefs.shopping && (!store.states.size || !!shopListId());
+  if (v === 'music') return store.prefs.music && (!store.states.size || musicAvailable());
   return true;
 }
 
@@ -423,7 +429,7 @@ function queueRefresh() {
     if (document.activeElement?.matches('#view input[type=text]') && document.activeElement.value) { setTimeout(queueRefresh, 1000); return; }
     render();
     renderSheet();
-    if (ui.view === 'today') paintMusic();
+    if (musicPage()) paintMusic();
   }, wait);
 }
 
@@ -1863,7 +1869,8 @@ function camEditAct(act) {
 const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const music = { lists: null, listsFor: '', listsAt: 0, html: '' };
 // Only the Music card shows the speaker on Today, so only it is redrawn there.
-const screenSpeaker = new ScreenSpeaker(() => (ui.view === 'today' ? queueMusicPaint() : queueRefresh()));
+const musicPage = () => ui.view === 'today' || ui.view === 'music';
+const screenSpeaker = new ScreenSpeaker(() => (musicPage() ? queueMusicPaint() : queueRefresh()));
 
 function musicName() {
   return (store.prefs.musicName || '').trim() || (store.prefs.wall || urlWall ? (IS_IPAD ? 'Wall iPad' : 'Wall screen') : 'Dashboard');
@@ -1894,25 +1901,151 @@ async function loadMusicLists(players, main) {
   music.listsFor = key;
   music.listsAt = Date.now();
   try {
-    music.lists = await loadPlaylists(store.client, musicLibraryPlayer(players, main).entity_id);
+    const lib = musicLibraryPlayer(players, main).entity_id;
+    music.lists = await loadPlaylists(store.client, lib);
+    music.radio = players.kind === 'mass' ? await loadPlaylists(store.client, lib, 8, /radio/i).catch(() => []) : [];
   } catch {
     music.lists = [];
     music.listsAt = Date.now() - 25 * 60_000; // try again in 5 minutes
   }
-  if (ui.view === 'today') queueMusicPaint(); else queueRefresh();
+  if (ui.view === 'music') queueRefresh();
 }
 
-function musicHtml() {
-  if (!store.prefs.music) return '';
-  const { players, main, hereEntity } = musicState();
-  loadMusicLists(players, main);
+function musicHere() {
+  const { hereEntity } = musicState();
   const sp = screenSpeaker;
-  const here = store.prefs.musicHere ? {
+  return store.prefs.musicHere ? {
     on: true, entity: hereEntity, status: sp.status, error: sp.error, pin: sp.pin, name: sp.name || musicName(),
     needsTap: sp.status === 'ready' && sp.needsTap,
   } : null;
+}
+const musicArt = (u) => new URL(u, `${base()}/`).href;
+
+/** Is there anything to play music on? (Else the Music page stays out of the menu.) */
+function musicAvailable() {
+  const { players, main } = musicState();
+  return !!(main || players.speakers.length || store.prefs.musicHere);
+}
+
+/** What goes in the music slot: the full player on the Music page, the slim strip on Today. */
+function musicHtml() {
+  if (!store.prefs.music) return '';
+  const { players, main } = musicState();
+  const here = musicHere();
+  if (ui.view !== 'music') return store.prefs.musicToday === false ? '' : musicMiniHtml(players, main, { art: musicArt, here, hereLabel: musicHereLabel() });
   const phones = store.prefs.musicPhones === false ? [] : store.phones || [];
-  return musicCardHtml(players, main, { lists: music.lists, art: (u) => new URL(u, `${base()}/`).href, here, hereLabel: musicHereLabel(), phones });
+  return musicCardHtml(players, main, { lists: null, art: musicArt, here, hereLabel: musicHereLabel(), phones, title: 'Now playing' });
+}
+
+// ---------- whose Spotify: each person's own account in Music Assistant ----------
+
+const MUSIC_CFG_KEY = 'ha-dash2.music'; // system data: { token, accounts: { [person id]: Spotify instance id } }
+const massApi = new MassApi();
+const mass = { cfg: null, accounts: null, status: 'off', error: '', lists: {}, at: 0, loading: false };
+
+async function loadMusicCfg() {
+  const v = await dataGet('system', MUSIC_CFG_KEY);
+  mass.cfg = v && typeof v === 'object' ? v : null;
+  mass.at = 0;
+  loadMassAccounts();
+}
+
+async function saveMusicCfg(patch) {
+  const next = { ...(mass.cfg || {}), ...patch };
+  try {
+    await store.client.send({ type: 'frontend/set_system_data', key: MUSIC_CFG_KEY, value: next });
+    mass.cfg = next;
+    mass.at = 0;
+    mass.lists = {};
+    toast('Saved for every screen');
+    loadMassAccounts();
+  } catch (err) {
+    toast(err?.code === 'unauthorized' ? 'Only an administrator can change this.' : `Couldn't save: ${err?.message || err}`);
+  }
+  render();
+}
+
+/** Try a pasted token before saving it, so a typo doesn't replace a working one. */
+async function tryMusicToken(token) {
+  const api = new MassApi();
+  mass.tokenNote = 'Checking the token…';
+  render();
+  try {
+    await massSpotifyAccounts(api, massApiUrl(store.prefs.musicApi, base()), token);
+    mass.tokenNote = '';
+    massApi.close();
+    await saveMusicCfg({ token });
+  } catch (err) {
+    mass.tokenNote = err?.message || String(err);
+    render();
+  }
+  api.close();
+}
+
+/** Ask Music Assistant for its Spotify accounts, and each one's playlists (kept for 30 minutes). */
+async function loadMassAccounts(force = false) {
+  const token = mass.cfg?.token;
+  if (!token || !store.client) { mass.status = 'off'; mass.accounts = null; return; }
+  if (mass.loading || (!force && Date.now() - mass.at < 30 * 60_000)) return;
+  mass.loading = true;
+  mass.at = Date.now();
+  const url = massApiUrl(store.prefs.musicApi, base());
+  if (mass.status !== 'ready') mass.status = 'loading';
+  try {
+    mass.accounts = await massSpotifyAccounts(massApi, url, token);
+    const lists = {};
+    await Promise.all(mass.accounts.map(async (a) => { lists[a.id] = await massPlaylists(massApi, url, token, a.id).catch(() => mass.lists[a.id] || []); }));
+    mass.lists = lists;
+    mass.status = 'ready';
+    mass.error = '';
+  } catch (err) {
+    mass.status = 'error';
+    mass.error = err?.message || String(err);
+    mass.at = Date.now() - 25 * 60_000; // try again in 5 minutes
+  }
+  mass.loading = false;
+  if (ui.view === 'music' || ui.view === 'settings') render();
+}
+
+/** The people with their own Spotify account, which one is picked here, and its playlists. */
+function musicWho() {
+  const people = household();
+  const map = mass.status === 'ready' && mass.accounts?.length ? matchAccounts(people, mass.accounts, mass.cfg?.accounts || {}, mass.lists) : {};
+  const withAcct = people.filter((p) => map[p.id]).map((p) => ({ ...p, account: map[p.id] }));
+  const me = people.find((p) => store.user?.name && p.full.toLowerCase() === store.user.name.toLowerCase())
+    || people.find((p) => store.user?.name && p.name.toLowerCase() === store.user.name.split(/\s+/)[0].toLowerCase());
+  const who = withAcct.find((p) => p.id === store.prefs.musicWho) || withAcct.find((p) => p.id === me?.id) || withAcct[0] || null;
+  return { people: withAcct, who, lists: who ? mass.lists[who.account] || [] : null, map };
+}
+
+/** The Music page: whose Spotify, the player (painted into its slot), their playlists, and radio. */
+function musicViewHtml() {
+  const { players, main } = musicState();
+  loadMusicLists(players, main);
+  loadMassAccounts();
+  const w = musicWho();
+  const switcher = w.people.length > 1 ? `<div class="music-head">
+      <span class="music-who" role="group" aria-label="Whose Spotify">${w.people.map((p) => `<button type="button" data-music-who="${esc(p.id)}" aria-pressed="${p.id === w.who?.id}" style="--who:${p.color}"><i>${esc(p.name[0] || '?')}</i>${esc(p.name)}</button>`).join('')}</span>
+      <span class="music-acct muted">Playlists from <b>${esc(w.who.name)}'s Spotify</b></span>
+    </div>` : '';
+  const lists = w.who ? w.lists : music.lists;
+  const title = w.who ? `${esc(w.who.name)}'s playlists` : 'Playlists';
+  const listsCard = lists === null && !w.who ? '' : `<section class="card music-lists-card"${w.who ? ` style="--who:${w.who.color}"` : ''}>
+      <h2 class="card-title">${icon('music')}${title}</h2>
+      ${lists?.length ? `<div class="music-tiles">${lists.map((l) => musicTileHtml(l, musicArt, 'music-tile')).join('')}</div>`
+        : `<p class="muted">${lists ? 'No playlists yet.' : 'Loading playlists…'}</p>`}
+    </section>`;
+  const radio = music.radio?.length ? `<section class="card music-radio-card">
+      <h2 class="card-title">${icon('radio')}Radio</h2>
+      <div class="music-radio">${music.radio.map((l) => musicTileHtml(l, musicArt, 'music-tile radio')).join('')}</div>
+    </section>` : '';
+  const setup = players.kind === 'mass' && !mass.cfg?.token && household().length > 1
+    ? `<p class="muted quiet music-setup">${icon('settings')}<span>Want separate Spotify accounts for each person? <a href="#/settings">Connect Music Assistant in Settings</a>.</span></p>` : '';
+  return `<div class="v-music">
+    ${switcher}
+    <div class="col col-a"><div class="music-slot"></div></div>
+    <div class="col col-b">${listsCard}${radio}${setup}</div>
+  </div>`;
 }
 
 /**
@@ -1931,13 +2064,13 @@ function paintMusic(root = document) {
     const lists = slot.querySelector('.music-lists');
     if (lists && scroll) lists.scrollLeft = scroll;
   }
-  const id = slot.querySelector('.music-card')?.dataset.entity;
+  const id = slot.querySelector('[data-entity]')?.dataset.entity;
   paintMusicBar(slot, id && store.states.get(id));
 }
 
 function queueMusicPaint() {
   if (music.timer) return;
-  music.timer = setTimeout(() => { music.timer = 0; if (ui.view === 'today') paintMusic(); }, 700);
+  music.timer = setTimeout(() => { music.timer = 0; if (musicPage()) paintMusic(); }, 700);
 }
 
 /** Tap a speaker: control it from here, and move the music there if something is playing. */
@@ -1948,16 +2081,43 @@ function musicPick(id) {
   if (players.kind === 'mass' && main && main.entity_id !== id && main.state === 'playing') {
     call('music_assistant', 'transfer_queue', { source_player: main.entity_id, auto_play: true }, id);
   }
-  if (ui.view === 'today') { music.html = ''; paintMusic(); } else render();
+  if (musicPage()) { music.html = ''; paintMusic(); } else render();
 }
 
-function musicPlay(i) {
-  const l = music.lists?.[i];
+/** Tap a playlist or station: play it on the speaker the card controls. */
+function musicPlay(el) {
   const { main } = musicState();
-  if (!l || !main) return;
+  if (!main) { toast('Pick a speaker first'); return; }
+  const title = el.dataset.musicTitle || 'it';
   // Say so straight away: Music Assistant takes a few seconds to fetch a Spotify playlist.
-  toast(`Starting ${l.title} on ${nameOf(main)}…`);
-  call('media_player', 'play_media', { media_content_id: l.id, media_content_type: l.type }, main.entity_id);
+  toast(`Starting ${title} on ${nameOf(main)}…`);
+  call('media_player', 'play_media', { media_content_id: el.dataset.musicUri, media_content_type: el.dataset.musicType || 'playlist' }, main.entity_id);
+}
+
+/** Settings → Music → Spotify accounts: connect to Music Assistant and say whose account is whose. */
+function musicAccountsSettingsHtml() {
+  const admin = !!store.user?.is_admin;
+  const has = !!mass.cfg?.token;
+  const w = musicWho();
+  const status = !has ? 'Not connected. Each person sees the same mixed list of playlists.'
+    : mass.status === 'ready' ? `Connected. ${mass.accounts.length === 1 ? 'One Spotify account' : `${mass.accounts.length} Spotify accounts`} in Music Assistant.`
+    : mass.status === 'error' ? mass.error : 'Connecting to Music Assistant…';
+  const people = household();
+  const picks = mass.cfg?.accounts || {};
+  const accountRows = has && mass.status === 'ready' && mass.accounts.length ? people.map((p) => `<label class="row"><span><b>${esc(p.name)}'s Spotify</b><small class="muted">${w.map[p.id] && !picks[p.id] ? `Found: ${esc(mass.accounts.find((a) => a.id === w.map[p.id])?.name || '')}` : picks[p.id] ? 'Picked here' : 'Not found yet'}</small></span>
+      <select data-music-acct="${esc(p.id)}"${admin ? '' : ' disabled'}><option value="">Automatic</option>${mass.accounts.map((a) => `<option value="${esc(a.id)}"${picks[p.id] === a.id ? ' selected' : ''}>${esc(a.name)} (${esc(a.id)})</option>`).join('')}</select></label>`).join('') : '';
+  const note = mass.tokenNote ? `<p class="hint${/Checking/.test(mass.tokenNote) ? '' : ' warn'}">${esc(mass.tokenNote)}</p>` : '';
+  return `<details${has && !note && mass.status !== 'error' ? '' : ' open'}><summary>Spotify accounts (one per person)</summary>
+    <p class="hint">Add each person's Spotify in Music Assistant (Settings → Music providers → Add → Spotify, then name it after them). To keep their playlists apart, this page asks Music Assistant directly.</p>
+    ${admin ? `<label class="row"><span><b>Music Assistant token</b><small class="muted">In Music Assistant, open your profile and create a long-lived access token. Saved for every screen.</small></span>
+      <input type="password" data-music-token value="" placeholder="${has ? 'Saved. Paste a new one to replace it' : 'Paste the token'}" autocomplete="off"></label>${note}`
+      : '<p class="hint">An administrator connects Music Assistant here.</p>'}
+    <label class="row"><span><b>Music Assistant API address</b><small class="muted">Leave empty for ${esc(massApiUrl('', base()))}. Over https, send <code>/ws</code> to port 8095 in your tunnel.</small></span>
+      <input type="text" data-pref="musicApi" value="${esc(store.prefs.musicApi)}" placeholder="${esc(massApiUrl('', base()))}" autocomplete="off" inputmode="url"></label>
+    ${has || mass.status === 'error' ? `<p class="hint${mass.status === 'error' ? ' warn' : ''}">${esc(status)}</p>` : `<p class="hint">${esc(status)}</p>`}
+    ${accountRows}
+    ${has && admin ? '<button type="button" class="btn" data-music-forget>Disconnect Music Assistant</button>' : ''}
+  </details>`;
 }
 
 function musicSettingsHtml(check) {
@@ -1971,12 +2131,14 @@ function musicSettingsHtml(check) {
   const source = { mass: 'Music Assistant', spotify: 'the Spotify integration', plain: 'your speakers (no Music Assistant yet)' }[players.kind];
   return `<section class="card" id="music">
     <h2 class="card-title">${icon('music')}Music</h2>
-    ${check('music', 'Music card on Today', all.length ? `Plays through ${source}` : 'No speakers in Home Assistant yet')}
+    ${check('music', 'Music page', all.length ? `Plays through ${source}` : 'No speakers in Home Assistant yet')}
+    ${p.music ? check('musicToday', 'Now playing on Today', 'A slim strip on Today; tap it for the Music page') : ''}
     ${p.music ? `${check('musicHere', `Play music on ${musicHereLabel().replace(/^This/, 'this')}`, 'Needs Music Assistant. This screen becomes one of its speakers, so the sound comes from here with no other app.')}
       ${p.musicHere ? `<label class="row"><span><b>Speaker name</b><small class="muted">How it shows in Music Assistant and Home Assistant</small></span><input type="text" data-pref="musicName" value="${esc(p.musicName)}" placeholder="${esc(musicName())}" autocomplete="off"></label>
         <label class="row"><span><b>Music Assistant address</b><small class="muted">Leave empty when Music Assistant runs as a Home Assistant add-on</small></span><input type="text" data-pref="musicServer" value="${esc(p.musicServer)}" placeholder="${esc(musicServerUrl('', base()))}" autocomplete="off" inputmode="url"></label>
         ${status ? `<p class="hint">${esc(status)}</p>` : ''}` : ''}
       ${store.phones?.length ? check('musicPhones', 'Open Spotify on phones', esc(`Buttons that open the Spotify app on ${store.phones.map((x) => x.name).join(' or ')}`)) : ''}
+      ${players.kind === 'mass' ? musicAccountsSettingsHtml() : ''}
       ${players.kind !== 'spotify' && shown.size ? `<details><summary>Speakers on the card</summary>${[...shown].map((id) => store.states.get(id)).map((s) => `<label class="row"><span><b>${esc(nameOf(s))}</b><small class="muted">${esc(s.entity_id)}</small></span><input type="checkbox" data-music-hide="${esc(s.entity_id)}"${p.musicHidden?.[s.entity_id] ? '' : ' checked'}></label>`).join('')}</details>` : ''}` : ''}
   </section>`;
 }
@@ -2000,6 +2162,11 @@ const VIEWS = {
   shopping() {
     if (!ready()) return notReady();
     return shopViewHtml();
+  },
+
+  music() {
+    if (!ready()) return notReady();
+    return musicViewHtml();
   },
 
   energy() {
@@ -2356,6 +2523,10 @@ async function saveCars(cars, done) {
 
 /** After a view's HTML is in: maps and anything else that keeps its own element. */
 const after = {
+  music(view) {
+    music.html = '';
+    paintMusic(view);
+  },
   today(view) {
     music.html = '';
     paintMusic(view);
@@ -3004,8 +3175,11 @@ document.addEventListener('click', (e) => {
     call('notify', sph.dataset.spotifyPhone, { message: 'command_launch_app', data: { package_name: 'com.spotify.music' } });
     return;
   }
-  const ml = t.closest('[data-music-play]');
-  if (ml) { musicPlay(Number(ml.dataset.musicPlay)); return; }
+  const ml = t.closest('[data-music-uri]');
+  if (ml) { musicPlay(ml); return; }
+  const mw = t.closest('[data-music-who]');
+  if (mw) { store.prefs.musicWho = mw.dataset.musicWho; writePrefs(); render(); return; }
+  if (t.closest('[data-music-forget]')) { saveMusicCfg({ token: '' }); return; }
   if (t.closest('[data-music-unlock]')) { screenSpeaker.unlock(); render(); return; }
   if (t.closest('[data-shop-clear]')) {
     call('todo', 'remove_completed_items', {}, shop.id);
@@ -3152,6 +3326,17 @@ document.addEventListener('change', (e) => {
     render();
     return;
   }
+  if (t.matches('[data-music-token]')) {
+    const token = t.value.trim();
+    if (token) tryMusicToken(token);
+    return;
+  }
+  if (t.dataset.musicAcct) {
+    const accounts = { ...(mass.cfg?.accounts || {}) };
+    if (t.value) accounts[t.dataset.musicAcct] = t.value; else delete accounts[t.dataset.musicAcct];
+    saveMusicCfg({ accounts });
+    return;
+  }
   if (t.dataset.musicHide) {
     const hidden = { ...store.prefs.musicHidden };
     if (t.checked) delete hidden[t.dataset.musicHide]; else hidden[t.dataset.musicHide] = true;
@@ -3168,6 +3353,7 @@ document.addEventListener('change', (e) => {
     if (['tint', 'sky', 'skyAnimate', 'weatherEntity'].includes(key)) applySky();
     if (key === 'calView') loadEvents(true);
     if (['music', 'musicHere', 'musicName', 'musicServer', 'wall'].includes(key)) syncScreenSpeaker();
+    if (key === 'musicApi') { massApi.close(); mass.at = 0; loadMassAccounts(true); }
     if (t.dataset.pref !== 'feedIn' && t.dataset.pref !== 'buyRate') render();
     return;
   }
@@ -3348,6 +3534,7 @@ async function start() {
     render();
     client.send({ type: 'auth/current_user' }).then((u) => { store.user = u; queueRefresh(); }).catch(() => {});
     loadExposed();
+    loadMusicCfg();
     planStore.areas = store.areas;
     loadFloorPlan(client);
     updateSky({ instant: true });
@@ -3369,7 +3556,7 @@ async function start() {
     }
     if (ui.view === 'settings') { if (entityId === CARS_ENTITY) redrawCars(); return; }
     // On Today a speaker only changes the Music card: redraw just that (speakers report every few seconds).
-    if (ui.view === 'today' && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
+    if (musicPage() && domainOf(entityId) === 'media_player' && !ui.sheet) { queueMusicPaint(); return; }
     queueRefresh();
   });
   client.connect();

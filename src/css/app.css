@@ -266,6 +266,7 @@ small { font-size: 0.8em; }
 .card-go .icon { color: var(--muted); }
 .quiet { font-size: 0.9rem; }
 .hint { margin-top: 12px; font-size: 0.85rem; color: var(--muted); }
+.hint.warn { color: var(--warning); }
 
 .btn {
   display: inline-flex;
@@ -347,7 +348,7 @@ small { font-size: 0.8em; }
 .news-card { order: 7; }
 .now-card { order: 1; }   /* right under the hero */
 .modes-card { order: 1; }
-.music-card { order: 1; } /* right under the hero */
+.music-card, .music-mini { order: 1; } /* right under the hero */
 
 /* Music */
 .music-slot { display: contents; }
@@ -388,6 +389,47 @@ small { font-size: 0.8em; }
 .music-here-note .icon { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--primary); }
 .music-here-note.warn .icon { color: var(--warning); }
 .music-hint { margin: 8px 0 0; font-size: 0.85rem; }
+
+/* Today's slim now-playing strip */
+.music-mini { padding: 10px 12px; }
+.music-mini-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.music-mini-open { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+.music-mini .music-art { width: 52px; height: 52px; }
+.music-mini .music-art .icon { width: 24px; height: 24px; }
+.music-mini .music-text b { font-size: 0.98rem; }
+.music-mini .music-text .muted { font-size: 0.82rem; }
+.music-mini .music-bar { margin-top: 6px; }
+.music-mini .music-btn { width: 44px; height: 44px; flex: none; }
+.music-mini .music-btn .icon { width: 22px; height: 22px; }
+.music-mini .music-btn.big { width: 48px; height: 48px; }
+.music-mini .music-btn.big .icon { width: 26px; height: 26px; }
+.music-mini-go { display: grid; place-items: center; flex: none; width: 28px; height: 44px; color: var(--muted); }
+
+/* Music page */
+.v-music { display: grid; gap: var(--gap); align-items: start; }
+.v-music .col { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+.music-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.music-who { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+.music-who button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 18px 6px 8px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+.music-who button i { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--who); color: #fff; font-style: normal; font-size: 0.85rem; opacity: 0.5; }
+.music-who button[aria-pressed="true"] { background: color-mix(in srgb, var(--who) 26%, transparent); color: var(--text); }
+.music-who button[aria-pressed="true"] i { opacity: 1; }
+.music-acct { font-size: 0.85rem; }
+.music-acct b { color: var(--text); }
+.v-music .music-card .music-art { width: 132px; height: 132px; border-radius: var(--radius); }
+.v-music .music-card .music-art .icon { width: 48px; height: 48px; }
+.v-music .music-card .music-text b { font-size: 1.25rem; white-space: normal; }
+.music-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.music-tile { display: grid; gap: 6px; align-content: start; padding: 0; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
+.music-tile .music-list-art { width: 100%; height: auto; aspect-ratio: 1; border-radius: var(--radius-sm); }
+.music-tile .music-list-art .icon { width: 36px; height: 36px; }
+.music-tile:active .music-list-art { transform: scale(0.97); }
+.music-radio { display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; }
+.music-radio::-webkit-scrollbar { display: none; }
+.music-tile.radio { flex: none; width: 76px; justify-items: center; text-align: center; }
+.music-tile.radio .music-list-art { width: 76px; border-radius: 50%; }
+.music-setup { display: flex; gap: 8px; align-items: flex-start; font-size: 0.88rem; }
+.music-setup .icon { flex: none; width: 18px; height: 18px; }
 
 .hero {
   position: relative;
@@ -1147,6 +1189,11 @@ small { font-size: 0.8em; }
   /* Shopping: the list on the left in two columns of rows; ticked things and the shops reminder on the right. */
   .v-shop { grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr); }
   .v-shop .shop-main .shop-list { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+
+  /* Music: the player on the left; this person's playlists and radio on the right. */
+  .v-music { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  .v-music .music-head { grid-column: 1 / -1; }
+  .music-tiles { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
 
   .v-places { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); align-items: start; }
   .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
