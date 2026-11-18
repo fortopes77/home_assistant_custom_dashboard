@@ -338,11 +338,10 @@ small { font-size: 0.8em; }
 
 .v-today { display: grid; gap: var(--gap); }
 .v-today .col { display: contents; }
-/* Phone order: the day, right now, modes, energy, calendar, shopping, notifications, people, news. */
+/* Phone order: the day, right now, modes, energy, calendar, notifications, people, news. */
 .hero { order: 1; }
 .energy-mini { order: 2; }
 .agenda-card { order: 3; }
-.shop-card { order: 4; }
 .notes-card { order: 5; }
 .people-mini { order: 6; }
 .news-card { order: 7; }
@@ -544,53 +543,85 @@ small { font-size: 0.8em; }
 .glance-item.tone-ok .icon { color: var(--positive); }
 .glance-act { border: 0; border-left: 1px solid var(--border); padding: 0 12px; background: none; color: var(--primary); font-weight: 700; font-size: 0.85rem; }
 
-/* Shopping list: tap an item to tick it off. */
-.shop { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; padding: 0; list-style: none; }
-.shop-item {
-  display: inline-flex;
+/* Shopping page: big rows to tap off at a glance; ticked things wait on the side until cleared. */
+.v-shop { display: grid; gap: var(--gap); align-items: start; }
+.shop-side { display: grid; gap: var(--gap); }
+.shop-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.shop-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 6px 12px 6px 6px;
+  gap: 14px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 16px 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 16px;
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
+  font-size: 1.12rem;
   font-weight: 600;
   text-align: left;
 }
-.shop-item .tick {
+.shop-name { min-width: 0; overflow-wrap: anywhere; }
+.shop-name small { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.shop-row .tick {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  flex: none;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 2px solid var(--border);
   background: var(--surface);
   color: transparent;
 }
-.shop-item .tick .icon { width: 16px; height: 16px; }
-.shop li.done .shop-item { opacity: 0.5; text-decoration: line-through; }
-.shop li.done .tick { background: var(--positive); border-color: var(--positive); color: #fff; }
-@media (hover: hover) { .shop-item:hover .tick { border-color: var(--positive); color: var(--positive); } }
-.shop-add { display: flex; gap: 6px; align-items: center; }
+.shop-row .tick .icon { width: 20px; height: 20px; }
+.shop-list li.done .shop-row, .shop-list li.undone .shop-row { opacity: 0.45; }
+.shop-list li.done .tick, .shop-list.done .tick { background: var(--positive); border-color: var(--positive); color: #fff; }
+.shop-list.done .shop-row { min-height: 46px; font-size: 0.98rem; background: none; }
+.shop-list.done .shop-name { color: var(--muted); text-decoration: line-through; }
+.shop-list.done li.undone .tick { background: var(--surface); border-color: var(--border); }
+.shop-done-card .shop-list { margin-top: 4px; }
+.shop-done-card .small { margin: 10px 0 0; }
+@media (hover: hover) { .shop-row:hover .tick { border-color: var(--positive); } }
+.shop-add { display: flex; gap: 8px; align-items: center; }
 .shop-add input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  padding: 8px 14px;
+  min-height: 52px;
+  padding: 10px 18px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  font-size: 1.05rem;
 }
 .shop-add input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
-.shop-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin: 8px 0 0; font-size: 0.82rem; }
-.shop-foot span { display: inline-flex; align-items: center; gap: 4px; }
-.shop-foot .icon { width: 15px; height: 15px; }
-.shop-foot .link-btn { margin: 0; }
+.shop-add .btn { min-height: 52px; padding: 0 20px; display: inline-flex; align-items: center; gap: 6px; }
+.shop-add .btn .icon { width: 20px; height: 20px; }
+.shop-empty { display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 18px; border-radius: 16px; background: color-mix(in srgb, var(--positive) 12%, transparent); }
+.shop-empty > .icon { width: 34px; height: 34px; color: var(--positive); }
+.shop-empty p, .shop-remind p { display: grid; gap: 2px; margin: 0; }
+.shop-remind { display: flex; align-items: flex-start; gap: 12px; font-size: 0.9rem; }
+.shop-remind > .icon { color: var(--accent); }
+.nav a { position: relative; }
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
 
 .agenda-day + .agenda-day { margin-top: 14px; }
 .agenda-day h3 { font-size: 0.95rem; margin-bottom: 6px; }
@@ -1106,14 +1137,16 @@ small { font-size: 0.8em; }
   .v-today .mode-text small, .v-today .mode-name { display: none; }
   .v-today .mode-short { display: inline; white-space: nowrap; }
   .v-today .col > * { order: 0; }
-  .v-today .shop-foot > span { display: none; }
-  .v-today .shop-foot:not(:has(button)) { display: none; }
   .v-today .glance { grid-template-columns: 1fr; }
   .v-today .glance-item small { display: inline; margin-left: 6px; }
   .v-today .glance-item > button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
   /* Energy: battery and the live flow on the left; today, the month and one 24-hour chart on the right. */
   .v-energy { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
+
+  /* Shopping: the list on the left in two columns of rows; ticked things and the shops reminder on the right. */
+  .v-shop { grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr); }
+  .v-shop .shop-main .shop-list { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 
   .v-places { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); align-items: start; }
   .pmap-slot.big .pmap { height: calc(100dvh - 72px - var(--dock-space)); min-height: 360px; }
