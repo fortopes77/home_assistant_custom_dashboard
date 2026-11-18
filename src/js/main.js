@@ -206,6 +206,7 @@ function toast(msg) {
 
 const VIEWS_META = {
   today: { title: 'Today', icon: 'today' },
+  shopping: { title: 'Shopping', icon: 'cart' },
   energy: { title: 'Energy', icon: 'solar' },
   places: { title: 'Places', icon: 'mapMarker' },
   home: { title: 'Home', icon: 'home' },
@@ -220,6 +221,7 @@ if (kiosk) document.documentElement.classList.add('kiosk');
 function viewOn(v) {
   if (v === 'energy') return store.prefs.energyTab;
   if (v === 'places') return store.prefs.peopleMap;
+  if (v === 'shopping') return store.prefs.shopping && (!store.states.size || !!shopListId());
   return true;
 }
 
@@ -231,7 +233,13 @@ function parseRoute() {
 
 function renderNav() {
   $('#nav').innerHTML = `<span class="brand" aria-hidden="true">${icon('home')}</span>${Object.entries(VIEWS_META).filter(([v]) => viewOn(v)).map(([v, m]) => `
-    <a href="#/${v}" data-view="${v}" class="nav-${v}"${ui.view === v ? ' aria-current="page"' : ''}>${icon(m.icon)}<span>${m.title}</span></a>`).join('')}`;
+    <a href="#/${v}" data-view="${v}" class="nav-${v}"${ui.view === v ? ' aria-current="page"' : ''}>${icon(m.icon)}${v === 'shopping' ? shopBadge() : ''}<span>${m.title}</span></a>`).join('')}`;
+}
+
+/** How many things are still to buy, from the list's own state (no need to follow the items for this). */
+function shopBadge() {
+  const n = Number(store.states.get(shopListId())?.state);
+  return n > 0 ? `<b class="nav-badge">${n > 99 ? '99+' : n}</b>` : '';
 }
 
 function renderStatus() {
@@ -1176,21 +1184,33 @@ function shopAutomation() {
   return [...store.states.values()].find((s) => domainOf(s.entity_id) === 'automation' && s.attributes?.id === SHOP_AUTOMATION) || null;
 }
 
-function shopCardHtml() {
+/** The Shopping page: a big list to read from across the room, ticked things kept aside until cleared. */
+function shopViewHtml() {
   watchShopList();
-  if (!shop.id) return '';
+  if (!shop.id) return emptyHtml('No shopping list yet', 'Add the Shopping list integration in Home Assistant, or pick a to-do list in Settings.', '<a class="btn" href="#/settings">Settings</a>');
   const all = shop.items || [];
   const open = all.filter((i) => i.status !== 'completed');
-  const done = all.length - open.length;
+  const done = all.filter((i) => i.status === 'completed');
   const auto = shopAutomation();
-  return `<section class="card shop-card">
-    <h2 class="card-title">${icon('cart')}${esc(nameOf(store.states.get(shop.id)))}${open.length ? `<span class="count">${open.length}</span>` : ''}</h2>
-    ${shop.items === null ? '<p class="muted quiet">Loading…</p>'
-      : open.length ? `<ul class="shop">${open.map((i) => `<li><button type="button" class="shop-item" data-shop-done="${esc(i.uid)}" aria-label="Tick off ${esc(i.summary)}"><span class="tick">${icon('check')}</span><span>${esc(i.summary)}</span></button></li>`).join('')}</ul>`
-      : '<p class="muted quiet">Nothing to buy.</p>'}
-    <form class="shop-add" data-shop-add><input type="text" name="item" placeholder="Add an item" autocomplete="off" enterkeyhint="done" aria-label="Add an item"><button class="icon-btn" aria-label="Add">${icon('plus')}</button></form>
-    ${done || auto ? `<p class="shop-foot muted">${auto?.state === 'on' ? `<span>${icon('mapMarker')}Sent to your phone at the shops</span>` : ''}${done ? `<button type="button" class="link-btn" data-shop-clear>Clear ${done} ticked</button>` : ''}</p>` : ''}
-  </section>`;
+  const add = '<form class="shop-add big" data-shop-add><input type="text" name="item" placeholder="Add something to buy" autocomplete="off" enterkeyhint="done" aria-label="Add an item"><button class="btn" aria-label="Add">' + icon('plus') + '<span>Add</span></button></form>';
+  return `<div class="v-shop">
+    <section class="card shop-main">
+      <h2 class="card-title">${icon('cart')}To buy${open.length ? `<span class="count">${open.length}</span>` : ''}</h2>
+      ${add}
+      ${shop.items === null ? '<p class="muted quiet">Loading…</p>'
+        : open.length ? `<ul class="shop-list">${open.map((i) => `<li><button type="button" class="shop-row" data-shop-done="${esc(i.uid)}" aria-label="Tick off ${esc(i.summary)}"><span class="tick">${icon('check')}</span><span class="shop-name">${esc(i.summary)}${i.description ? `<small>${esc(i.description)}</small>` : ''}</span></button></li>`).join('')}</ul>`
+        : `<div class="shop-empty">${icon('check')}<p><b>All done</b><span class="muted">Nothing left to buy.</span></p></div>`}
+    </section>
+    <div class="shop-side">
+      <section class="card shop-done-card">
+        <h2 class="card-title">${icon('check')}Ticked off${done.length ? `<span class="count">${done.length}</span>` : ''}${done.length ? '<button type="button" class="title-link" data-shop-clear>Clear all</button>' : ''}</h2>
+        ${done.length ? `<ul class="shop-list done">${done.map((i) => `<li><button type="button" class="shop-row" data-shop-undo="${esc(i.uid)}" aria-label="Put ${esc(i.summary)} back on the list"><span class="tick">${icon('check')}</span><span class="shop-name">${esc(i.summary)}</span></button></li>`).join('')}</ul>
+          <p class="muted small">Tap one to put it back on the list.</p>`
+          : '<p class="muted quiet">Things you tick off wait here until you clear them.</p>'}
+      </section>
+      ${auto ? `<section class="card shop-remind">${icon('mapMarker')}<p><b>${auto.state === 'on' ? 'Reminder at the shops is on' : 'Reminder at the shops is off'}</b><span class="muted">${auto.state === 'on' ? 'Your phone gets the list when you arrive at Aldi, Coles or Woolworths.' : 'Turn on the automation in Home Assistant to get the list at the shops.'}</span></p></section>` : ''}
+    </div>
+  </div>`;
 }
 
 // ============================================================
@@ -1973,8 +1993,13 @@ const VIEWS = {
     loadEnergyHistory();
     return `<div class="v-today">
       <div class="col col-a">${heroHtml()}${energyMiniHtml()}${agendaHtml()}</div>
-      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${shopCardHtml()}${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
+      <div class="col col-b">${peopleMiniHtml()}${nowCardHtml()}${modesHtml()}<div class="music-slot"></div>${notesCardHtml({ limit: 3 })}${newsCardHtml()}${store.prefs.todayExtras ? extrasHtml() : ''}</div>
     </div>`;
+  },
+
+  shopping() {
+    if (!ready()) return notReady();
+    return shopViewHtml();
   },
 
   energy() {
@@ -2960,6 +2985,12 @@ document.addEventListener('click', (e) => {
     const uid = tick.dataset.shopDone;
     tick.closest('li')?.classList.add('done');
     call('todo', 'update_item', { item: uid, status: 'completed' }, shop.id);
+    return;
+  }
+  const undo = t.closest('[data-shop-undo]');
+  if (undo) {
+    undo.closest('li')?.classList.add('undone');
+    call('todo', 'update_item', { item: undo.dataset.shopUndo, status: 'needs_action' }, shop.id);
     return;
   }
   const mp = t.closest('[data-music-pick]');
