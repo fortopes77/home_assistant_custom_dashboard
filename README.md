@@ -50,7 +50,7 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 - **Layout:** on a tablet or computer, Today is two columns that fit the screen without scrolling: the day, a slim **battery** bar (level, and whether it's charging, running the house or using the grid) and the calendar on the left; the map, Right now, Modes and the shopping list on the right. The menu floats at the bottom, with the bell and voice beside it. Notifications open from the bell, and news shows on phones.
 - **Right now** lists open doors, someone at a camera, appliances running and lights left on, with quick actions.
 - **Calendar:** every `calendar.*` entity, as **Days** (today and tomorrow) or a **Month** grid. Tap a day to see its events. Choose which calendars show in Settings. It's also a **family calendar** you can add to, see [Family calendar](#family-calendar).
-- **Music:** what's playing, with its cover, play/pause/skip, volume, your playlists and the speakers to play on. See [Music and Spotify](#music-and-spotify).
+- **Music:** a slim strip on Today shows what's playing with play/pause and skip. Tap it for the **Music** page. See [Music and Spotify](#music-and-spotify).
 - **Shopping list:** your Home Assistant to-do list. Tap an item to tick it off, type to add one, and use **Clear ticked** to tidy up.
 - **Notifications:** Home Assistant's own notices and what your automations sent to phones (`notify.*`). Tap **×** to dismiss one, or **Clear all** (tap twice) to empty the list on every screen; phone notifications drop off by themselves after a week. The **bell** (top bar on phones, beside the menu on tablets) counts new ones and plays a soft ding. Seeing what was sent to phones needs an administrator login.
 - **News:** Feedreader feeds work, but Home Assistant only keeps the latest story from each, so the dashboard collects stories as they arrive and shares them between screens. For a full list straight away, add a sensor from the HACS **feedparser** integration:
@@ -68,7 +68,7 @@ An administrator login reads the exposed list and shares a copy, so screens sign
 
 ## Music and Spotify
 
-The **Music** card on Today shows what's playing and lets you pick a playlist and a speaker. It works best with **Music Assistant**, which signs in to Spotify (Premium) and plays to Google Nest hubs, TVs and other speakers. A wall screen can also be one of its speakers, so the music comes out of the iPad from the dashboard page itself, with no Spotify app.
+The **Music** page (in the menu after Shopping) shows what's playing, the speakers, your playlists and radio stations. Today keeps a slim now-playing strip that opens it (turn the strip off under **Settings → Music**). It works best with **Music Assistant**, which signs in to Spotify (Premium) and plays to Google Nest hubs, TVs and other speakers. A wall screen can also be one of its speakers, so the music comes out of the iPad from the dashboard page itself, with no Spotify app.
 
 1. In Home Assistant, go to **Settings → Add-ons → Add-on store**, then install and start **Music Assistant**.
 2. Open Music Assistant. Under **Settings → Providers**, add **Spotify** and sign in. Add **Google Cast** too if it isn't there (for the Nest hubs and TVs).
@@ -84,6 +84,18 @@ Then tap **This iPad** among the speakers on the card. If something is playing o
 - **Open Spotify on a phone:** the card has a button for each Android phone with the Home Assistant app. Tapping one opens the Spotify app on that phone. On Android 10 and later, the Home Assistant app needs the **Display over other apps** permission for this. Without it, the phone gets a notification you tap to open Spotify. iPhones can't open apps this way. Turn the buttons off under **Settings → Music**.
 - **Phone players in Music Assistant:** Jellyfin app sessions on phones and browsers show up in Home Assistant as media players. They can't play Music Assistant's stream, so leave them out of Music Assistant's **Home Assistant MediaPlayers** provider.
 - **Without Music Assistant:** with Home Assistant's **Spotify** integration, the card controls your Spotify account and lists its Spotify Connect speakers. With neither, it controls whichever speaker or TV is playing. **Settings → Music** can take speakers off the card.
+
+### One Spotify account per person
+
+Music Assistant can sign in to more than one Spotify account, and it plays each playlist from the account it belongs to. Home Assistant mixes every account's playlists into one list, though, so the Music page asks Music Assistant directly to keep them apart. Then the page shows a switch (for example **Azelia / Andrew**), and each person sees their own playlists and Liked Songs.
+
+1. In Music Assistant, open **Settings → Music providers → Add → Spotify** and sign in with the second person's account. Naming it after them (for example "Spotify Andrew") helps, but the page can also tell whose it is from their Liked Songs.
+2. In Music Assistant, open your profile and create a **long-lived access token**.
+3. In the dashboard, as an administrator, open **Settings → Music → Spotify accounts** and paste the token. It's checked before saving, then saved in Home Assistant, so every screen uses it.
+4. Check that each person shows the right account. If not, pick it in the list next to their name.
+5. If you open the dashboard over **https** (a Cloudflare tunnel, for example), add a route for the path `/ws` to Music Assistant on port **8095** (for example `http://<HA IP>:8095`), like the `sendspin` route for port 8927. Over `http` at home, nothing extra is needed. If Music Assistant runs elsewhere, set **Music Assistant API address** under the same Settings section.
+
+Each screen remembers whose playlists it shows. It starts with the person who is logged in.
 
 ## Energy
 

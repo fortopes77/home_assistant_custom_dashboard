@@ -94,7 +94,7 @@ function musicPosition(s, now = Date.now()) {
  * here ({ on, entity, needsTap, status, pin }) for this screen's own player, phones ([{ name, service }])
  * to open the Spotify app on.
  */
-export function musicCardHtml(players, main, { lists = null, art = (u) => u, here = null, hereLabel = 'This screen', phones = [] } = {}) {
+export function musicCardHtml(players, main, { lists = null, art = (u) => u, here = null, hereLabel = 'This screen', phones = [], title = 'Music' } = {}) {
   const hereOn = here?.on;
   if (!main && !hereOn && !phones.length) return '';
   const { kind } = players;
@@ -137,18 +137,10 @@ export function musicCardHtml(players, main, { lists = null, art = (u) => u, her
 
   const canLists = main && kind !== 'plain' && mpHas(main, MF.PLAY_MEDIA);
   const listsHtml = canLists && lists?.length
-    ? `<div class="music-lists">${lists.map((l, i) => `<button type="button" class="music-list" data-music-play="${i}" aria-label="Play ${esc(l.title)}">
-          <span class="music-list-art">${l.thumb ? `<img src="${esc(art(l.thumb))}" alt="" loading="lazy">` : icon('music')}</span><span class="music-list-name">${esc(l.title)}</span></button>`).join('')}</div>`
+    ? `<div class="music-lists">${lists.map((l) => musicTileHtml(l, art)).join('')}</div>`
     : '';
 
-  // This screen's own player: one tap lets it make sound (an iPad rule), and Music Assistant may ask for a PIN.
-  let hereNote = '';
-  if (hereOn) {
-    if (here.pin) hereNote = `<p class="music-here-note">${icon('tablet')}<span>To add ${esc(hereLabel.replace(/^This/, 'this'))} as a speaker, enter <b>${esc(here.pin)}</b> in Music Assistant.</span></p>`;
-    else if (here.status === 'error') hereNote = `<p class="music-here-note warn">${icon('alert')}<span>${esc(here.error || "Can't reach Music Assistant.")}</span></p>`;
-    else if (here.status === 'waiting') hereNote = `<p class="music-here-note">${icon('tablet')}<span>In Music Assistant, open <b>Settings → Players</b> and add <b>${esc(here.name)}</b> (Connect unpaired).</span></p>`;
-    else if (here.needsTap) hereNote = `<button type="button" class="btn primary music-here-tap" data-music-unlock>${icon('volumeHigh')}<span>Tap to play on ${esc(hereLabel.replace(/^This/, 'this'))}</span></button>`;
-  }
+  const hereNote = hereOn ? hereNoteHtml(here, hereLabel) : '';
 
   // Open the Spotify app on a phone (the Home Assistant app on Android can launch apps).
   const phonesHtml = phones.length
@@ -160,7 +152,7 @@ export function musicCardHtml(players, main, { lists = null, art = (u) => u, her
     ? '<p class="muted quiet music-hint">Add Music Assistant to Home Assistant to play Spotify playlists here and on your speakers.</p>' : '';
 
   return `<section class="card music-card${playing ? ' playing' : ''}"${main ? ` data-entity="${esc(main.entity_id)}"` : ''}>
-    <h2 class="card-title">${icon('music')}Music${where ? `<span class="music-where">${icon(isHere ? 'tablet' : 'speaker')}${esc(where)}</span>` : ''}</h2>
+    <h2 class="card-title">${icon('music')}${esc(title)}${where ? `<span class="music-where">${icon(isHere ? 'tablet' : 'speaker')}${esc(where)}</span>` : ''}</h2>
     <div class="music-now">
       <span class="music-art">${pic ? `<img src="${esc(art(pic))}" alt="">` : icon('music')}</span>
       <span class="music-text">
@@ -179,12 +171,57 @@ export function musicCardHtml(players, main, { lists = null, art = (u) => u, her
   </section>`;
 }
 
-/** Playlists from Home Assistant's media browser: the root, then its "Playlists" folder. */
-export async function loadPlaylists(client, entityId, limit = 12) {
+/** This screen's own player: one tap lets it make sound (an iPad rule), and Music Assistant may ask for a PIN. */
+function hereNoteHtml(here, hereLabel) {
+  const label = esc(hereLabel.replace(/^This/, 'this'));
+  if (here.pin) return `<p class="music-here-note">${icon('tablet')}<span>To add ${label} as a speaker, enter <b>${esc(here.pin)}</b> in Music Assistant.</span></p>`;
+  if (here.status === 'error') return `<p class="music-here-note warn">${icon('alert')}<span>${esc(here.error || "Can't reach Music Assistant.")}</span></p>`;
+  if (here.status === 'waiting') return `<p class="music-here-note">${icon('tablet')}<span>In Music Assistant, open <b>Settings → Players</b> and add <b>${esc(here.name)}</b> (Connect unpaired).</span></p>`;
+  if (here.needsTap) return `<button type="button" class="btn primary music-here-tap" data-music-unlock>${icon('volumeHigh')}<span>Tap to play on ${label}</span></button>`;
+  return '';
+}
+
+/** One playlist (or station) to tap: { title, thumb, id, type }. */
+export function musicTileHtml(l, art = (u) => u, cls = 'music-list') {
+  return `<button type="button" class="${cls}" data-music-uri="${esc(l.id)}" data-music-type="${esc(l.type || 'playlist')}" data-music-title="${esc(l.title)}" aria-label="Play ${esc(l.title)}">
+    <span class="music-list-art">${l.thumb ? `<img src="${esc(art(l.thumb))}" alt="" loading="lazy">` : icon(cls.includes('radio') ? 'radio' : 'music')}</span><span class="music-list-name">${esc(l.label || l.title)}</span></button>`;
+}
+
+/** Today's slim strip: what's playing, play/pause, next, and a way into the Music page. */
+export function musicMiniHtml(players, main, { art = (u) => u, here = null, hereLabel = 'This screen' } = {}) {
+  if (!main && !here?.on) return '';
+  const a = main?.attributes || {};
+  const live = main && ['playing', 'paused', 'buffering'].includes(main.state) && a.media_title;
+  const playing = main && (main.state === 'playing' || main.state === 'buffering');
+  const isHere = main && here?.entity && main.entity_id === here.entity.entity_id;
+  const where = !main ? '' : players.kind === 'spotify' ? a.source || '' : isHere ? hereLabel : nameOf(main);
+  const pic = live && (a.entity_picture_local || a.entity_picture);
+  const artist = a.media_artist || a.media_album_artist || '';
+  const dur = Number(a.media_duration);
+  const bar = live && Number.isFinite(dur) && dur > 0 && a.media_position != null ? '<div class="music-bar" data-music-bar><i></i></div>' : '';
+  const btn = (act, ic, label, extra = '') => `<button type="button" class="icon-btn music-btn${extra}" data-act="${act}" aria-label="${esc(label)}">${icon(ic)}</button>`;
+  const note = here?.on ? hereNoteHtml(here, hereLabel) : '';
+  return `<section class="card music-mini${playing ? ' playing' : ''}"${main ? ` data-entity="${esc(main.entity_id)}"` : ''}>
+    <div class="music-mini-row">
+      <a class="music-mini-open" href="#/music" aria-label="Open Music">
+        <span class="music-art">${pic ? `<img src="${esc(art(pic))}" alt="">` : icon('music')}</span>
+        <span class="music-text"><b>${esc(live ? a.media_title : 'Nothing playing')}</b>
+          <span class="muted">${esc(live ? [artist, where].filter(Boolean).join(' · ') : 'Tap to pick a playlist')}</span>${bar}</span>
+      </a>
+      ${live ? `${btn('media_play_pause', playing ? 'pause' : 'play', playing ? 'Pause' : 'Play', ' big')}${mpHas(main, MF.NEXT) ? btn('media_next_track', 'skipNext', 'Next') : ''}` : ''}
+      <a class="music-mini-go" href="#/music" aria-label="Open Music">${icon('chevronRight')}</a>
+    </div>
+    ${note}
+  </section>`;
+}
+
+/** Playlists (or, with folderRe, another folder such as radio) from Home Assistant's media browser. */
+export async function loadPlaylists(client, entityId, limit = 12, folderRe = /playlist/i) {
   const browse = (extra = {}) => client.send({ type: 'media_player/browse_media', entity_id: entityId, ...extra });
   const root = await browse();
   const kids = root?.children || [];
-  const folder = kids.find((c) => c.can_expand && /playlist/i.test(`${c.title} ${c.media_content_id} ${c.media_content_type}`));
+  const folder = kids.find((c) => c.can_expand && folderRe.test(`${c.title} ${c.media_content_id} ${c.media_content_type}`));
+  if (!folder && !/playlist/.test(folderRe.source)) return [];
   const page = folder ? await browse({ media_content_id: folder.media_content_id, media_content_type: folder.media_content_type }) : root;
   // Spotify's Liked Songs first: it's the one people reach for.
   const liked = (c) => (/^liked songs\b/i.test(c.title || '') ? 0 : 1);
@@ -342,4 +379,139 @@ export class ScreenSpeaker {
     Object.assign(this, patch);
     if (`${this.status}|${this.pin}|${this.playing}|${this.error}` !== before) this.onChange?.();
   }
+}
+
+// ---------- Music Assistant's own API ----------
+// Home Assistant shows one library with every Spotify account mixed in. Music Assistant itself can list one
+// account's playlists, so for the Azelia / Andrew switch the page asks it directly, over its websocket API
+// (port 8095, or the page's own address when a tunnel sends /ws there).
+
+/** Where Music Assistant's API listens: the address from Settings, else /ws on this host (https) or port 8095. */
+export function massApiUrl(pref, haUrl) {
+  const ha = new URL(haUrl || location.href);
+  let u = (pref || '').trim();
+  if (!u) return ha.protocol === 'https:' ? `wss://${ha.host}/ws` : `ws://${ha.hostname}:8095/ws`;
+  if (!/^\w+:\/\//.test(u)) u = `${ha.protocol === 'https:' ? 'wss' : 'ws'}://${u}`;
+  u = u.replace(/^http(s?):/, 'ws$1:').replace(/\/+$/, '');
+  return /\/ws$/.test(u) ? u : `${u}/ws`;
+}
+
+/** A small client for Music Assistant's websocket API: connect, sign in with a token, send commands. */
+export class MassApi {
+  constructor(WS = globalThis.WebSocket) { this.WS = WS; this.ws = null; this.key = ''; this.ready = null; this.pending = new Map(); this.n = 0; }
+
+  connect(url, token) {
+    const key = `${url}|${token}`;
+    if (this.ready && this.key === key) return this.ready;
+    this.close();
+    this.key = key;
+    const fail = (msg) => new Error(msg);
+    this.ready = new Promise((resolve, reject) => {
+      let ws;
+      try { ws = new this.WS(url); } catch { reject(fail(`Can't reach Music Assistant at ${url}.`)); return; }
+      this.ws = ws;
+      let authed = false;
+      const timer = setTimeout(() => { reject(fail(`Music Assistant at ${url} didn't answer.`)); this.close(); }, 10_000);
+      ws.onmessage = (e) => {
+        let m;
+        try { m = JSON.parse(e.data); } catch { return; }
+        if (m.message_id == null) { // the server says hello first, then we sign in
+          if (m.server_id && !authed) {
+            authed = true;
+            this._send('auth', { token }).then(() => { clearTimeout(timer); resolve(this); }, (err) => {
+              clearTimeout(timer);
+              reject(fail(/auth|token|401/i.test(`${err.code} ${err.message}`) || err.code === 20 ? 'Music Assistant turned down the token. Make a new one in Music Assistant and paste it here.' : err.message));
+              this.close();
+            });
+          }
+          return;
+        }
+        const p = this.pending.get(String(m.message_id));
+        if (!p) return;
+        if (m.error_code != null) {
+          this.pending.delete(String(m.message_id));
+          p.reject(Object.assign(new Error(m.details || 'Music Assistant error'), { code: m.error_code }));
+        } else if (m.partial) {
+          p.items.push(...(m.result || []));
+        } else {
+          this.pending.delete(String(m.message_id));
+          p.resolve(p.items.length ? [...p.items, ...(m.result || [])] : m.result);
+        }
+      };
+      ws.onclose = () => {
+        clearTimeout(timer);
+        reject(fail(`Can't reach Music Assistant at ${url}.`));
+        for (const p of this.pending.values()) p.reject(fail('Lost the connection to Music Assistant.'));
+        this.pending.clear();
+        if (this.ws === ws) { this.ws = null; this.ready = null; this.key = ''; }
+      };
+    });
+    this.ready.catch(() => { if (this.key === key) { this.ready = null; this.key = ''; } });
+    return this.ready;
+  }
+
+  _send(command, args = {}) {
+    const id = String(++this.n);
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject, items: [] });
+      try { this.ws.send(JSON.stringify({ message_id: id, command, args })); } catch (err) { this.pending.delete(id); reject(err); }
+    });
+  }
+
+  async call(url, token, command, args) {
+    await this.connect(url, token);
+    return this._send(command, args);
+  }
+
+  close() {
+    const ws = this.ws;
+    this.ws = null; this.ready = null; this.key = '';
+    try { ws?.close(); } catch { /* gone */ }
+  }
+}
+
+/** The Spotify accounts added in Music Assistant: [{ id, name }]. */
+export async function massSpotifyAccounts(api, url, token) {
+  const list = await api.call(url, token, 'providers', {});
+  return (list || []).filter((p) => p.domain === 'spotify' && p.type === 'music')
+    .map((p) => ({ id: p.instance_id, name: p.name || 'Spotify', available: p.available !== false }));
+}
+
+const imageOf = (item) => {
+  const imgs = [item.image, ...(item.metadata?.images || [])].filter(Boolean);
+  const img = imgs.find((i) => i.type === 'thumb' && i.remotely_accessible) || imgs.find((i) => i.remotely_accessible);
+  return img?.path && /^https:/.test(img.path) ? img.path : '';
+};
+
+/** One Spotify account's playlists, Liked Songs first, with addresses that play them from that account. */
+export async function massPlaylists(api, url, token, instanceId, limit = 48) {
+  const items = await api.call(url, token, 'music/playlists/library_items', { provider: instanceId, limit: 500, summary: false });
+  const liked = (t) => (/^liked songs\b/i.test(t || '') ? 0 : 1);
+  return (items || []).map((it) => {
+    const m = (it.provider_mappings || []).find((x) => x.provider_instance === instanceId);
+    return { title: it.name, label: /^liked songs\b/i.test(it.name || '') ? 'Liked Songs' : it.name, thumb: imageOf(it), id: m ? `${instanceId}://playlist/${m.item_id}` : it.uri, type: 'playlist', owner: it.owner || '' };
+  }).sort((x, y) => liked(x.title) - liked(y.title) || x.title.localeCompare(y.title)).slice(0, limit);
+}
+
+/**
+ * Which Spotify account is whose: { [person id]: instance id }. Picks from Settings first, then an account
+ * named after the person ("Spotify (Andrew)"), then one whose Liked Songs or playlists carry their name.
+ */
+export function matchAccounts(people, accounts, picks = {}, listsByAccount = {}) {
+  const out = {};
+  const taken = new Set();
+  const ok = (id) => accounts.some((a) => a.id === id);
+  for (const p of people) if (ok(picks[p.id])) { out[p.id] = picks[p.id]; taken.add(picks[p.id]); }
+  const word = (p) => new RegExp(`\\b(${[p.name, p.full].filter(Boolean).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'i');
+  for (const test of [
+    (p, a) => word(p).test(a.name),
+    (p, a) => (listsByAccount[a.id] || []).some((l) => (/^liked songs\b/i.test(l.title) && word(p).test(l.title)) || word(p).test(l.owner || '')),
+  ]) {
+    for (const p of people) {
+      if (out[p.id]) continue;
+      const a = accounts.find((x) => !taken.has(x.id) && test(p, x));
+      if (a) { out[p.id] = a.id; taken.add(a.id); }
+    }
+  }
+  return out;
 }
